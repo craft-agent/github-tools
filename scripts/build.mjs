@@ -21,6 +21,13 @@ await build({
 
 await build({
   ...shared,
+  entryPoints: ["src/cli/main.ts"],
+  outfile: "dist/cli.js",
+  banner: { js: "#!/usr/bin/env node" },
+})
+
+await build({
+  ...shared,
   entryPoints: ["src/opencode/index.ts"],
   outfile: "dist/opencode.js",
 })

@@ -17,11 +17,12 @@
     "./opencode": "./dist/opencode.js"
   },
   "bin": {
+    "agent-github": "dist/cli.js",
     "agent-github-mcp": "dist/mcp.js"
   },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "smoke": "node scripts/smoke-mcp.mjs && node scripts/smoke-opencode.mjs",
+    "smoke": "node scripts/smoke-mcp.mjs && node scripts/smoke-opencode.mjs && node scripts/smoke-cli.mjs",
     "test": "bun test --pass-with-no-tests --timeout 30000",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
