@@ -9,8 +9,8 @@ importers:
   .:
     devDependencies:
       '@craftsamo/repo-kit':
-        specifier: ^1.0.1
-        version: 1.0.1
+        specifier: ^1.1.0
+        version: 1.1.0
       husky:
         specifier: ^9.1.7
         version: 9.1.7
@@ -20,8 +20,8 @@ importers:
 
 packages:
 
-  '@craftsamo/repo-kit@1.0.1':
-    resolution: {integrity: sha512-91DK0rINT64qjH2HoDgg/55zA43NPop/7alfFhr48I3XYeCNpVe0eZgzFIQt2+YWM3CjOqjdnfuJiwKW6KJi3w==}
+  '@craftsamo/repo-kit@1.1.0':
+    resolution: {integrity: sha512-wlkBgxIib36MqaROpO80nG7TAHks108paw+/9nDMVxHGJR0xr/TOpuNrOAiJeNdZ9n+TF4uo+Fkzj/h0uWofKQ==}
     engines: {node: '>=24'}
     hasBin: true
 
@@ -37,7 +37,7 @@ packages:
 
 snapshots:
 
-  '@craftsamo/repo-kit@1.0.1': {}
+  '@craftsamo/repo-kit@1.1.0': {}
 
   husky@9.1.7: {}
 
