@@ -75,16 +75,18 @@ discussion behind them is on
 A thrown error carries a `code` a caller can branch on, and a message that
 says what to do next.
 
-| Code               | When                                                   |
-| ------------------ | ------------------------------------------------------ |
-| `not_found`        | the object does not exist, or the viewer cannot see it |
-| `forbidden`        | the viewer lacks the permission the call needs         |
-| `invalid_argument` | the arguments cannot describe a valid call             |
-| `stale`            | what the call relied on changed before it could finish |
-| `unauthenticated`  | `gh` is not logged in                                  |
-| `gh_missing`       | `gh` is not installed                                  |
-| `gh_too_old`       | `gh` is older than the tools need                      |
-| `rate_limited`     | GitHub refused the call for its rate limit             |
+| Code               | When                                                                     |
+| ------------------ | ------------------------------------------------------------------------ |
+| `not_found`        | the object does not exist, or the viewer cannot see it                   |
+| `forbidden`        | the viewer lacks the permission the call needs                           |
+| `invalid_argument` | the arguments cannot describe a valid call                               |
+| `stale`            | what the call relied on changed before it could finish                   |
+| `unauthenticated`  | `gh` is not logged in                                                    |
+| `gh_missing`       | `gh` is not installed                                                    |
+| `gh_too_old`       | `gh` is older than the tools need                                        |
+| `rate_limited`     | GitHub refused the call for its rate limit                               |
+| `declined`         | the person declined a confirmation the tool asked for                    |
+| `github_error`     | GitHub or `gh` failed for another reason; the message carries their text |
 
 ## Write classes
 

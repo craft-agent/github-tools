@@ -26,6 +26,7 @@ Run these before you push:
 
 ```sh
 pnpm run format:check
+pnpm run typecheck
 pnpm test
 ```
 
