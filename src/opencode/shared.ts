@@ -1,4 +1,5 @@
-import { invoke, isAbortError, isToolError, resolveRepo, selectTools, type ToolContext, type ToolSpec } from "../core"
+import { invoke, isToolError, selectTools, type ToolContext, type ToolSpec } from "../core"
+import { ANY_RESOURCE } from "../entry/permission"
 import { settingsFromOptions } from "../entry/settings"
 import type { PluginOptions } from "./types"
 
@@ -8,25 +9,6 @@ export type PluginDeps = {
   env?: Record<string, string | undefined>
   /** The directory holding `<name>/SKILL.md` files, for the harness version that registers skills. */
   skillsDir?: URL | string
-}
-
-/** What a permission rule matches when the call's target repository cannot be told. */
-const ANY_RESOURCE = "*"
-
-/**
- * The resource a permission rule matches: the repository the call targets, in
- * lowercase (its `repo` argument, or else the working tree's `origin`). When
- * that cannot be resolved the resource is `*`, and the call fails its own way.
- */
-export async function permissionResource(args: unknown, ctx: Pick<ToolContext, "cwd" | "signal">): Promise<string> {
-  const repo = typeof args === "object" && args !== null ? (args as { repo?: unknown }).repo : undefined
-  if (repo !== undefined && typeof repo !== "string") return ANY_RESOURCE
-  try {
-    return (await resolveRepo(repo, ctx)).full.toLowerCase()
-  } catch (error) {
-    if (isAbortError(error)) throw error
-    return ANY_RESOURCE
-  }
 }
 
 /** The one plain line a person reads when the harness asks to run a tool. */

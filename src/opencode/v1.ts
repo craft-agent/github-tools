@@ -1,12 +1,6 @@
 import { inputJsonSchema, type ToolSpec } from "../core"
-import {
-  needsPermission,
-  permissionMetadata,
-  permissionResource,
-  runTool,
-  selectedTools,
-  type PluginDeps,
-} from "./shared"
+import { permissionResource } from "../entry/permission"
+import { needsPermission, permissionMetadata, runTool, selectedTools, type PluginDeps } from "./shared"
 import type { OpenCodePlugin, PluginOptions, V1Hooks, V1Tool, V1ToolContext } from "./types"
 
 type PropertySchema = {

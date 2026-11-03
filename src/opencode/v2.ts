@@ -1,13 +1,7 @@
 import type { ToolSpec } from "../core"
+import { permissionResource } from "../entry/permission"
 import { loadSkills } from "./skills"
-import {
-  needsPermission,
-  permissionMetadata,
-  permissionResource,
-  runTool,
-  selectedTools,
-  type PluginDeps,
-} from "./shared"
+import { needsPermission, permissionMetadata, runTool, selectedTools, type PluginDeps } from "./shared"
 import type { OpenCodePlugin, V2Context, V2Tool, V2ToolContext, V2ToolResult } from "./types"
 
 /** The directory of a session, or `undefined` when the harness cannot name it. */
