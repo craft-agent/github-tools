@@ -1,5 +1,13 @@
 import { ToolError, type ErrorCode } from "./errors"
+import { abortError, exec, type ExecResult } from "./exec"
 
+/**
+ * The highest minimum any tool needs: sub-issue, issue-type and dependency
+ * flags arrived in this release.
+ */
+export const MIN_GH_VERSION = "2.94.0"
+
+const VERSION_CHECK_TIMEOUT_MS = 15_000
 const MAX_MESSAGE_LENGTH = 2000
 
 /** Variables `gh` needs from the caller's environment: its search path, its authentication and its network setup. */
@@ -79,6 +87,93 @@ export function ghEnv(): Record<string, string> {
   return { ...passthroughEnv(), ...FORCED_ENV }
 }
 
+export type GhOptions = {
+  cwd: string
+  signal?: AbortSignal
+  /** Text written to `gh`'s stdin, for arguments such as `--body-file -`. */
+  stdin?: string
+  /** Stops the call after this many milliseconds; defaults to two minutes. */
+  timeoutMs?: number
+}
+
+/** How long one `gh` call may run before it is stopped. */
+export const DEFAULT_GH_TIMEOUT_MS = 120_000
+
+const GH_MISSING_MESSAGE =
+  "The GitHub CLI (gh) is not installed or not on PATH; install it from https://cli.github.com."
+
+function isSpawnNotFound(error: unknown): boolean {
+  return error instanceof Error && (error as NodeJS.ErrnoException).code === "ENOENT"
+}
+
+function versionParts(version: string): number[] {
+  return version.split(".").map((part) => Number.parseInt(part, 10))
+}
+
+function isOlder(version: string, minimum: string): boolean {
+  const have = versionParts(version)
+  const need = versionParts(minimum)
+  for (let i = 0; i < need.length; i++) {
+    const difference = (have[i] ?? 0) - need[i]!
+    if (difference !== 0) return difference < 0
+  }
+  return false
+}
+
+async function checkGhVersion(): Promise<void> {
+  let result: ExecResult
+  try {
+    result = await exec(["gh", "--version"], { env: ghEnv(), timeoutMs: VERSION_CHECK_TIMEOUT_MS })
+  } catch (error) {
+    if (isSpawnNotFound(error)) throw new ToolError("gh_missing", GH_MISSING_MESSAGE, { cause: error })
+    throw error
+  }
+  const stopped = stoppedError(result, VERSION_CHECK_TIMEOUT_MS)
+  if (stopped) throw stopped
+  const version = /gh version (\d+\.\d+\.\d+)/.exec(result.stdout)?.[1]
+  if (result.code !== 0 || !version) {
+    throw new ToolError(
+      "github_error",
+      `Could not read the GitHub CLI version: ${failureText(result.stderr, result.stdout) || `exit ${result.code}`}`,
+    )
+  }
+  if (isOlder(version, MIN_GH_VERSION)) {
+    throw new ToolError("gh_too_old", `gh ${version} is older than ${MIN_GH_VERSION}; update the GitHub CLI.`)
+  }
+}
+
+let ghCheck: Promise<void> | undefined
+
+/**
+ * Checks once per process that `gh` is installed and recent enough. A failed
+ * check is not remembered, so a later call retries after the person fixes it.
+ * The check itself ignores `signal`, so one caller's abort cannot fail the
+ * others waiting on the same check.
+ */
+export async function ensureGh(signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) throw abortError(signal)
+  ghCheck ??= checkGhVersion().catch((error: unknown) => {
+    ghCheck = undefined
+    throw error
+  })
+  await ghCheck
+}
+
+/** Forgets the version check. For tests only, which change `PATH` between cases. */
+export function resetGhCheck(): void {
+  ghCheck = undefined
+}
+
+/** The error for a call that was stopped by a signal, or undefined for one that ran to its end. */
+function stoppedError(result: ExecResult, timeoutMs: number): ToolError | undefined {
+  if (!result.signal && !result.timedOut) return undefined
+  const stoppedBy = result.signal ? ` and was stopped with ${result.signal}` : ""
+  const message = result.timedOut
+    ? `gh timed out after ${timeoutMs / 1000} seconds${stoppedBy}.`
+    : `gh was stopped with ${result.signal}.`
+  return new ToolError("github_error", message)
+}
+
 function failureText(stderr: string, stdout: string): string {
   const text = stderr.trim() || stdout.trim()
   return text.length > MAX_MESSAGE_LENGTH ? `${text.slice(0, MAX_MESSAGE_LENGTH)}…` : text
@@ -104,4 +199,45 @@ export function classifyGhFailure(stderr: string, stdout: string, code: number):
   const matched = FAILURE_PATTERNS.find(([, pattern]) => pattern.test(text))?.[0] ?? "github_error"
   const prefix = FAILURE_HINTS[matched] ?? `gh failed (exit ${code}):`
   return new ToolError(matched, text ? `${prefix} ${text}` : prefix)
+}
+
+async function runGh(args: string[], options: GhOptions): Promise<ExecResult> {
+  await ensureGh(options.signal)
+  const timeoutMs = options.timeoutMs ?? DEFAULT_GH_TIMEOUT_MS
+  let result: ExecResult
+  try {
+    result = await exec(["gh", ...args], {
+      cwd: options.cwd,
+      env: ghEnv(),
+      stdin: options.stdin,
+      signal: options.signal,
+      timeoutMs,
+    })
+  } catch (error) {
+    if (isSpawnNotFound(error)) throw new ToolError("gh_missing", GH_MISSING_MESSAGE, { cause: error })
+    throw error
+  }
+  const stopped = stoppedError(result, timeoutMs)
+  if (stopped) throw stopped
+  return result
+}
+
+/** Runs `gh` with the given arguments and returns its stdout; a failure throws the error `classifyGhFailure` picks. */
+export async function gh(args: string[], options: GhOptions): Promise<string> {
+  const result = await runGh(args, options)
+  if (result.code !== 0) throw classifyGhFailure(result.stderr, result.stdout, result.code)
+  return result.stdout
+}
+
+/** `gh`'s stdout parsed as JSON; empty output is `null`. */
+export async function ghJson<T>(args: string[], options: GhOptions): Promise<T | null> {
+  const text = (await gh(args, options)).trim()
+  if (!text) return null
+  try {
+    return JSON.parse(text) as T
+  } catch (error) {
+    throw new ToolError("github_error", `gh returned output that is not JSON: ${failureText(text, "")}`, {
+      cause: error,
+    })
+  }
 }

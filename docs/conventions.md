@@ -143,6 +143,10 @@ Every entry point takes the same settings:
   `GH_PROMPT_DISABLED=1`, `GH_NO_UPDATE_NOTIFIER=1`, `NO_COLOR=1`, and `gh`'s
   own authentication passed through. Nothing waits on a prompt, and output
   parses the same everywhere.
+- **Every call has a time limit** (120 s by default), and a call that is
+  stopped, by that limit or by cancellation, has its child process killed:
+  `SIGTERM`, then `SIGKILL` after two seconds. A hung `gh` neither holds a
+  harness forever nor outlives its call.
 - **It checks the `gh` version once per process** against the minimum the
   tools need, and maps `gh`'s failures to the error codes above.
 
