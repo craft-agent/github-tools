@@ -121,6 +121,21 @@ export function parseSettings(argv: string[], env: Record<string, string | undef
   return settings
 }
 
+/**
+ * Reads the tool settings from a command line that has no `confirm` setting,
+ * for entry points whose caller does the confirming: `--confirm` is
+ * `invalid_argument`, and `AGENT_GITHUB_CONFIRM` is ignored. Everything else
+ * is read as `parseSettings` reads it.
+ */
+export function parseToolSettings(argv: string[], env: Record<string, string | undefined>): ToolSettings {
+  const { flag, env: confirmEnv } = OPTIONS.confirm
+  if (argv.some((arg) => arg === flag || arg.startsWith(`${flag}=`))) {
+    throw new ToolError("invalid_argument", `Option ${flag} is not available here.`)
+  }
+  const { confirm: _confirm, ...settings } = parseSettings(argv, { ...env, [confirmEnv]: undefined })
+  return settings
+}
+
 const TOOL_OPTION_NAMES = ["toolsets", "read_only", "tools", "exclude_tools"] as const satisfies readonly OptionName[]
 type ToolOptionName = (typeof TOOL_OPTION_NAMES)[number]
 

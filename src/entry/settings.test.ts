@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { isToolError } from "../core"
-import { parseSettings, settingsFromOptions } from "./settings"
+import { parseSettings, parseToolSettings, settingsFromOptions } from "./settings"
 
 function failure(run: () => unknown): Error {
   try {
@@ -155,6 +155,29 @@ describe("parseSettings", () => {
     expect(failure(() => parseSettings([], { AGENT_GITHUB_TOOLSETS: "bogus" })).message).toContain(
       "AGENT_GITHUB_TOOLSETS",
     )
+  })
+})
+
+describe("parseToolSettings", () => {
+  test("reads the tool settings and gives no confirm setting", () => {
+    expect(parseToolSettings([], {})).toEqual({})
+    expect(
+      parseToolSettings(["--toolsets=repos", "--read-only", "--tools", "a"], { AGENT_GITHUB_EXCLUDE_TOOLS: "b" }),
+    ).toEqual({
+      toolsets: ["repos"],
+      read_only: true,
+      tools: ["a"],
+      exclude_tools: ["b"],
+    })
+  })
+
+  test("rejects --confirm in both forms, naming it", () => {
+    expect(failure(() => parseToolSettings(["--confirm", "harness"], {})).message).toContain("--confirm")
+    expect(failure(() => parseToolSettings(["--confirm=elicitation"], {})).message).toContain("--confirm")
+  })
+
+  test("ignores AGENT_GITHUB_CONFIRM, even a bad one", () => {
+    expect(parseToolSettings([], { AGENT_GITHUB_CONFIRM: "ask" })).toEqual({})
   })
 })
 
