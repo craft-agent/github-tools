@@ -111,6 +111,7 @@ describe("the package's tools", () => {
     ["github_issue_close", { destructiveHint: true, idempotentHint: true }],
     ["github_issue_reopen", { destructiveHint: true, idempotentHint: true }],
     ["github_issue_relate", { destructiveHint: false, idempotentHint: true }],
+    ["github_issue_develop", { destructiveHint: false, idempotentHint: true }],
   ])("%s is a write tool under the default toolsets, and read_only leaves it out", async (id, hints) => {
     const { client } = await connect(ALL_TOOLS, settings())
     const listed = (await client.listTools()).tools.find((t) => t.name === id)!

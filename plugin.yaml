@@ -7,6 +7,7 @@ provides_tools:
   - github_issue_close
   - github_issue_comment
   - github_issue_create
+  - github_issue_develop
   - github_issue_edit
   - github_issue_read
   - github_issue_relate
