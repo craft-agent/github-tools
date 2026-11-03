@@ -145,3 +145,99 @@ export function selectTools<S extends Pick<ToolSpec, "id" | "toolset" | "class">
       !(settings.read_only && spec.class !== "read"),
   )
 }
+
+function describeIssues(error: z.ZodError): string {
+  return error.issues
+    .flatMap((issue) => {
+      const path = issue.path.map(String)
+      if (issue.code === "unrecognized_keys") {
+        return issue.keys.map((key) => `${[...path, key].join(".")}: unknown argument`)
+      }
+      return path.length ? `${path.join(".")}: ${issue.message}` : issue.message
+    })
+    .join("; ")
+}
+
+const MAX_RESULT_JSON_LENGTH = 2000
+
+function describeResult(result: unknown): string {
+  let json: string
+  try {
+    json = JSON.stringify(result) ?? String(result)
+  } catch {
+    json = String(result)
+  }
+  return json.length > MAX_RESULT_JSON_LENGTH ? `${json.slice(0, MAX_RESULT_JSON_LENGTH)}…` : json
+}
+
+/**
+ * Runs a tool the way every entry point does: validates the raw arguments
+ * as strict (`invalid_argument` on a bad or unknown one), executes, and
+ * validates the result against the output schema. A result that does not
+ * match is a bug in the tool; it throws `github_error` carrying the raw
+ * result, so whatever the call already created stays visible. Errors from
+ * `execute` pass through unchanged.
+ */
+export async function invoke<I extends z.ZodObject<any>, O extends z.ZodType>(
+  spec: ToolSpec<I, O>,
+  rawArgs: unknown,
+  ctx: ToolContext,
+): Promise<z.output<O>> {
+  const args = spec.input.strict().safeParse(rawArgs)
+  if (!args.success) {
+    throw new ToolError("invalid_argument", `Invalid arguments for ${spec.id}: ${describeIssues(args.error)}`, {
+      cause: args.error,
+    })
+  }
+  const result = await spec.execute(args.data as z.output<I>, ctx)
+  const output = spec.output.safeParse(result)
+  if (!output.success) {
+    throw new ToolError(
+      "github_error",
+      `${spec.id} returned a result that does not match its output schema (${describeIssues(output.error)}). The call may have gone through; its result was: ${describeResult(result)}`,
+      { cause: output.error },
+    )
+  }
+  return output.data
+}
+
+export function inputJsonSchema(spec: Pick<ToolSpec, "input">): z.core.JSONSchema.BaseSchema {
+  return z.toJSONSchema(spec.input, { io: "input" })
+}
+
+export function outputJsonSchema(spec: Pick<ToolSpec, "output">): z.core.JSONSchema.BaseSchema {
+  return z.toJSONSchema(spec.output)
+}
+
+/**
+ * Collects the failures of steps that run after a tool has already created
+ * something, so those steps never throw and the creation is not lost: the
+ * result lists them under `errors`, keyed by step. A cancellation is never
+ * recorded; it is rethrown.
+ */
+export class StepErrors {
+  readonly #errors: Record<string, string> = {}
+
+  /** Runs one step; a failure is recorded under `step` and the step yields `undefined`. */
+  async record<T>(step: string, fn: () => Promise<T>): Promise<T | undefined> {
+    try {
+      return await fn()
+    } catch (error) {
+      if (isAbortError(error)) throw error
+      this.#errors[step] = isToolError(error)
+        ? `${error.code}: ${error.message}`
+        : error instanceof Error
+          ? error.message
+          : String(error)
+      return undefined
+    }
+  }
+
+  get errors(): Record<string, string> {
+    return { ...this.#errors }
+  }
+
+  get any(): boolean {
+    return Object.keys(this.#errors).length > 0
+  }
+}

@@ -4,10 +4,14 @@ import { ToolError, isToolError } from "./errors"
 import {
   DEFAULT_TOOLSETS,
   REQUIRES_USER_INTERACTION,
+  StepErrors,
   TOOLSETS,
   annotations,
   confirmWrite,
   defineTool,
+  inputJsonSchema,
+  invoke,
+  outputJsonSchema,
   selectTools,
   toolMeta,
   type ToolContext,
@@ -310,5 +314,235 @@ describe("selectTools", () => {
       expect(isToolError(error)).toBe(false)
       expect((error as Error).message).toContain("github_issue_read")
     }
+  })
+})
+
+describe("invoke", () => {
+  const tool = (execute: ToolSpec<typeof input, typeof output>["execute"]) =>
+    defineTool({
+      id: "github_issue_count",
+      title: "Count",
+      description: "d",
+      toolset: "issues",
+      class: "add",
+      input,
+      output,
+      execute,
+    })
+
+  test("validates, executes and returns the parsed output", async () => {
+    const seen: unknown[] = []
+    const result = await invoke(
+      tool(async (args, ctx) => {
+        seen.push(args, ctx)
+        return { total: args.count * 2 }
+      }),
+      { count: 21 },
+      CTX,
+    )
+    expect(result).toEqual({ total: 42 })
+    expect(seen).toEqual([{ count: 21 }, CTX])
+  })
+
+  test("bad arguments are invalid_argument listing path: message", async () => {
+    const error = await thrown(
+      invoke(
+        tool(async () => ({ total: 1 })),
+        { count: "x", label: 3 },
+        CTX,
+      ),
+    )
+    expect(isToolError(error) && error.code).toBe("invalid_argument")
+    expect((error as Error).message).toContain("github_issue_count")
+    expect((error as Error).message).toContain("count: ")
+    expect((error as Error).message).toContain("label: ")
+  })
+
+  test("arguments that are not an object are invalid_argument", async () => {
+    const error = await thrown(
+      invoke(
+        tool(async () => ({ total: 1 })),
+        null,
+        CTX,
+      ),
+    )
+    expect(isToolError(error) && error.code).toBe("invalid_argument")
+  })
+
+  test("execute does not run when the arguments are bad", async () => {
+    let ran = false
+    await thrown(
+      invoke(
+        tool(async () => {
+          ran = true
+          return { total: 1 }
+        }),
+        {},
+        CTX,
+      ),
+    )
+    expect(ran).toBe(false)
+  })
+
+  test("unknown arguments are invalid_argument naming each unknown key", async () => {
+    let ran = false
+    const error = await thrown(
+      invoke(
+        tool(async () => {
+          ran = true
+          return { total: 1 }
+        }),
+        { count: 1, extra: true, other: 2 },
+        CTX,
+      ),
+    )
+    expect(isToolError(error) && error.code).toBe("invalid_argument")
+    expect((error as Error).message).toContain("extra: unknown argument")
+    expect((error as Error).message).toContain("other: unknown argument")
+    expect(ran).toBe(false)
+  })
+
+  test("strict parsing does not change the spec's own schema", async () => {
+    const spec = tool(async () => ({ total: 1 }))
+    await thrown(invoke(spec, { count: 1, extra: true }, CTX))
+    expect(spec.input.safeParse({ count: 1, extra: true }).success).toBe(true)
+  })
+
+  /** A tool whose `execute` returns whatever it is given, past the type checker. */
+  const returning = (result: unknown) =>
+    tool((async () => result) as unknown as ToolSpec<typeof input, typeof output>["execute"])
+
+  test("a result that breaks the output schema is a github_error carrying the raw result", async () => {
+    const bad = returning({ total: "many", created: "https://github.com/o/r/issues/7" })
+    const error = await thrown(invoke(bad, { count: 1 }, CTX))
+    expect(isToolError(error) && error.code).toBe("github_error")
+    const message = (error as Error).message
+    expect(message).toContain("github_issue_count returned a result that does not match its output schema")
+    expect(message).toContain("total")
+    expect(message).toContain('"created":"https://github.com/o/r/issues/7"')
+  })
+
+  test("the raw result in that message is capped", async () => {
+    const error = await thrown(invoke(returning({ total: "x".repeat(10_000) }), { count: 1 }, CTX))
+    expect(isToolError(error) && error.code).toBe("github_error")
+    expect((error as Error).message.length).toBeLessThan(2600)
+  })
+
+  test("a result that cannot be serialized still reports github_error", async () => {
+    const circular: Record<string, unknown> = {}
+    circular.self = circular
+    const error = await thrown(invoke(returning(circular), { count: 1 }, CTX))
+    expect(isToolError(error) && error.code).toBe("github_error")
+  })
+
+  test("a ToolError from execute passes through unchanged", async () => {
+    const failure = new ToolError("not_found", "no such issue")
+    const error = await thrown(
+      invoke(
+        tool(async () => {
+          throw failure
+        }),
+        { count: 1 },
+        CTX,
+      ),
+    )
+    expect(error).toBe(failure)
+  })
+
+  test("other errors, including aborts, pass through unchanged", async () => {
+    const plain = new Error("boom")
+    const abort = Object.assign(new Error("aborted"), { name: "AbortError" })
+    for (const failure of [plain, abort]) {
+      const error = await thrown(
+        invoke(
+          tool(async () => {
+            throw failure
+          }),
+          { count: 1 },
+          CTX,
+        ),
+      )
+      expect(error).toBe(failure)
+    }
+  })
+})
+
+describe("JSON schemas", () => {
+  const tool = defineTool({
+    id: "github_issue_count",
+    title: "Count",
+    description: "d",
+    toolset: "issues",
+    class: "add",
+    input: z.object({ count: z.number().int(), label: z.string().default("x") }),
+    output,
+    execute: async () => ({ total: 1 }),
+  })
+
+  test("input schema describes the arguments a caller sends", () => {
+    const schema = inputJsonSchema(tool)
+    expect(schema.type).toBe("object")
+    expect(Object.keys(schema.properties ?? {})).toEqual(["count", "label"])
+    expect(schema.required).toEqual(["count"])
+  })
+
+  test("output schema describes the result", () => {
+    const schema = outputJsonSchema(tool)
+    expect(schema.type).toBe("object")
+    expect(schema.required).toEqual(["total"])
+  })
+})
+
+describe("StepErrors", () => {
+  test("returns a step's value and records nothing", async () => {
+    const steps = new StepErrors()
+    expect(await steps.record("milestone", async () => 5)).toBe(5)
+    expect(steps.any).toBe(false)
+    expect(steps.errors).toEqual({})
+  })
+
+  test("a failing step yields undefined and is recorded, with the code of a ToolError", async () => {
+    const steps = new StepErrors()
+    expect(
+      await steps.record("milestone", async () => {
+        throw new ToolError("forbidden", "no access")
+      }),
+    ).toBeUndefined()
+    expect(
+      await steps.record("relation", async () => {
+        throw new Error("plain failure")
+      }),
+    ).toBeUndefined()
+    expect(steps.any).toBe(true)
+    expect(steps.errors).toEqual({ milestone: "forbidden: no access", relation: "plain failure" })
+  })
+
+  test("later steps still run after a failure", async () => {
+    const steps = new StepErrors()
+    await steps.record("a", async () => {
+      throw new Error("x")
+    })
+    expect(await steps.record("b", async () => "ok")).toBe("ok")
+  })
+
+  test("an AbortError is rethrown, never recorded", async () => {
+    const steps = new StepErrors()
+    const abort = Object.assign(new Error("aborted"), { name: "AbortError" })
+    const error = await thrown(
+      steps.record("a", async () => {
+        throw abort
+      }),
+    )
+    expect(error).toBe(abort)
+    expect(steps.any).toBe(false)
+  })
+
+  test("errors returns a copy", async () => {
+    const steps = new StepErrors()
+    await steps.record("a", async () => {
+      throw new Error("x")
+    })
+    steps.errors.a = "changed"
+    expect(steps.errors).toEqual({ a: "x" })
   })
 })
