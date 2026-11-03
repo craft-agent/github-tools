@@ -6,6 +6,8 @@ import { gqlReply } from "./gql"
 /** Each is a token only one of the queries holds, so a fake `gh` rule can pick it. */
 export const ISSUE_TYPES = "issueTypes\\(first"
 export const LABEL = "label\\(name:"
+export const MILESTONES = "milestones\\?state=all"
+export const MILESTONE_CREATE = "-X POST"
 
 /** The owner has no Issue Type, as a user does not. */
 export const noIssueTypesRule = (): GhRule => ({
@@ -27,6 +29,17 @@ export const issueTypesRule = (...names: string[]): GhRule => ({
 export const labelRule = (exists: boolean): GhRule => ({
   match: LABEL,
   stdout: gqlReply({ repository: { label: exists ? { id: "LA_1" } : null } }),
+})
+
+/** The milestones of the repository, as the REST list returns them (one page). */
+export const milestonesRule = (...titles: string[]): GhRule => ({
+  match: MILESTONES,
+  stdout: JSON.stringify([titles.map((title, index) => ({ number: index + 1, title }))]),
+})
+
+export const milestoneCreatedRule = (number: number, title: string): GhRule => ({
+  match: MILESTONE_CREATE,
+  stdout: JSON.stringify({ number, title }),
 })
 
 /** Every call the tool made to GitHub; the fake's version check is not one. */
