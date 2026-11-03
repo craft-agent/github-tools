@@ -1,0 +1,30 @@
+{
+  "name": "@craftsamo/agent-github",
+  "version": "0.0.0",
+  "description": "GitHub and git tools for coding agents: issues, project boards, pull requests, commits and stacks.",
+  "author": "craftsamo",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/craftsamo/agent-github.git"
+  },
+  "homepage": "https://github.com/craftsamo/agent-github#readme",
+  "bugs": "https://github.com/craftsamo/agent-github/issues",
+  "type": "module",
+  "scripts": {
+    "test": "bun test --pass-with-no-tests --timeout 30000",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "postinstall": "node -e \"const fs=require('fs');if(fs.existsSync('.git')&&fs.existsSync('node_modules/@craftsamo/repo-kit'))require('child_process').execFileSync('repo-kit',['agents','sync'],{stdio:'inherit'})\"",
+    "prepare": "node -e \"const fs=require('fs');if(fs.existsSync('.git')&&fs.existsSync('node_modules/husky'))require('child_process').execFileSync('husky',{stdio:'inherit'})\""
+  },
+  "devDependencies": {
+    "@craftsamo/repo-kit": "^1.0.1",
+    "husky": "^9.1.7",
+    "prettier": "3.9.10"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@11.5.3"
+}
