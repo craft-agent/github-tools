@@ -104,12 +104,19 @@ Every tool belongs to one class, and the class sets its MCP annotations.
 - **Overwriting counts as destructive**: it loses what was there, and
   harnesses that confirm only destructive tools should still ask before it.
 - **A tool takes the strictest class its arguments can reach.**
-- **Only administrative tools confirm during the call.** Where the entry point
-  can ask the person (form-mode elicitation, where the client advertises it),
-  the tool states what will happen in plain words and stops on anything but
-  an accept. Where it cannot, the harness's own approval is the confirmation.
-  These tools also carry `_meta["anthropic/requiresUserInteraction"]: true`,
-  which makes Claude Code ask even under an allow rule.
+- **The harness confirms writes.** Every MCP client asks before it runs a
+  write tool, so the tool does not ask again by default. Administrative tools
+  also carry `_meta["anthropic/requiresUserInteraction"]: true`, which makes
+  Claude Code ask even under an allow rule.
+- **A native plugin asks the harness's own permission before every non-read
+  call**, since the tools a native plugin adds pass through no harness
+  approval of their own.
+- **`confirm: "elicitation"` adds the tool's own form** for administrative
+  tools, where the client offers form-mode elicitation. It is for people who
+  switch the client's approvals off: the tool states what will happen in plain
+  words and stops on anything but an accept. Where the client does not offer
+  elicitation the setting adds nothing, and the harness's approval is then the
+  only confirmation.
 - **Annotations are hints, not a boundary.** The `read_only` setting
   (below) is what keeps writes out.
 
@@ -123,6 +130,9 @@ Every entry point takes the same settings:
 - **`read_only`** registers no write tool, and wins over every other setting.
 - **`tools` / `exclude_tools`** add or remove single tools; an exclusion wins
   over an inclusion.
+- **`confirm`** is `harness` (the default) or `elicitation`; it says who asks
+  before an administrative tool acts (see "Write classes"). The default leaves
+  the question to the harness, whose approval every user already knows.
 
 ## The core contract
 
@@ -131,8 +141,9 @@ Every entry point takes the same settings:
   it.
 - `execute(args, context)` gets the working directory, an abort signal and an
   optional `confirm(request) => Promise<boolean>` hook. Nothing in it names a
-  harness. A tool that needs a confirmation treats a missing hook as the
-  harness having approved the call.
+  harness. An entry point supplies `confirm` when the `elicitation` setting is
+  on; without it the harness's approval stands, and a tool that needs a
+  confirmation treats a missing hook as the harness having approved the call.
 - `src/core/` uses only the `node:*` modules and plain dependencies, never a
   runtime's own globals (`Bun.spawn`, `Bun.file`, …), so the same code runs on
   Node and on Bun.
