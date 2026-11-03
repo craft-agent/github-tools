@@ -21,7 +21,7 @@ export type ToolContext = {
   confirm?(request: ConfirmRequest): Promise<boolean>
 }
 
-export type ToolSpec<I extends z.ZodObject<any> = z.ZodObject<any>, O extends z.ZodType = z.ZodType> = {
+export type ToolSpec<I extends z.ZodObject<any> = z.ZodObject<any>, O extends z.ZodObject<any> = z.ZodObject<any>> = {
   /** `github_<domain>_<verb>`; a public interface, so it never changes once published. */
   id: string
   title: string
@@ -40,8 +40,14 @@ const TOOL_ID_PATTERN = /^github_[a-z]+(?:_[a-z]+)+$/
 const MAX_TOOL_ID_LENGTH = 40
 const READ_TOOL_SUFFIX = "_read"
 
-/** Returns the spec after checking what a type cannot: the ID's shape and length, and that a read tool is named `_read`. */
-export function defineTool<I extends z.ZodObject<any>, O extends z.ZodType>(spec: ToolSpec<I, O>): ToolSpec<I, O> {
+/**
+ * Returns the spec after checking what a type cannot: the ID's shape and
+ * length, that a read tool is named `_read`, and that the output schema is an
+ * object (a tool returns its data as a plain object).
+ */
+export function defineTool<I extends z.ZodObject<any>, O extends z.ZodObject<any>>(
+  spec: ToolSpec<I, O>,
+): ToolSpec<I, O> {
   if (!TOOL_ID_PATTERN.test(spec.id)) {
     throw new Error(`Tool id "${spec.id}" must look like github_<domain>_<verb> in lowercase letters.`)
   }
@@ -50,6 +56,9 @@ export function defineTool<I extends z.ZodObject<any>, O extends z.ZodType>(spec
   }
   if (spec.class === "read" && !spec.id.endsWith(READ_TOOL_SUFFIX)) {
     throw new Error(`Tool "${spec.id}" is a read tool, so its id must end in ${READ_TOOL_SUFFIX}.`)
+  }
+  if (!(spec.output instanceof z.ZodObject)) {
+    throw new Error(`Tool "${spec.id}" must have an object output schema, since a result is an object.`)
   }
   return spec
 }
@@ -178,7 +187,7 @@ function describeResult(result: unknown): string {
  * result, so whatever the call already created stays visible. Errors from
  * `execute` pass through unchanged.
  */
-export async function invoke<I extends z.ZodObject<any>, O extends z.ZodType>(
+export async function invoke<I extends z.ZodObject<any>, O extends z.ZodObject<any>>(
   spec: ToolSpec<I, O>,
   rawArgs: unknown,
   ctx: ToolContext,
