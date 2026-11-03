@@ -112,6 +112,17 @@ describe("view", () => {
     expect(error.message).toContain("issue")
   })
 
+  test.each(["state", "kind", "milestone", "label", "assignee", "query", "limit"])(
+    "the list argument %s is refused, by name",
+    async (name) => {
+      const error = await failure(
+        read({ method: "view", issue: "12", [name]: name === "limit" ? 5 : name === "state" ? "open" : "x" }),
+      )
+      expect(error.code).toBe("invalid_argument")
+      expect(error.message).toContain(`"${name}"`)
+    },
+  )
+
   test("an unknown method or argument is invalid_argument", async () => {
     useFake([])
     for (const args of [{ method: "show" }, { method: "view", issue: "12", sort: "asc" }, {}]) {
