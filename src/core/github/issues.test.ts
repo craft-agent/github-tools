@@ -1,6 +1,36 @@
-import { describe, expect, test } from "bun:test"
-import { EXPECTED_ISSUE, issueBrief } from "../../testing/issue-fixtures"
-import { issueBriefSchema, issueDetailSchema } from "./issues"
+import { afterEach, describe, expect, test } from "bun:test"
+import { installFakeGh, type FakeGh, type GhRule } from "../../testing/fake-gh"
+import { gqlErrors, gqlReply } from "../../testing/gql"
+import {
+  DEPENDENCIES,
+  DETAIL,
+  EXPECTED_ISSUE,
+  apiCalls,
+  dependenciesRule,
+  detailRule,
+  failure,
+  issueBrief,
+  rawIssue,
+  variable,
+} from "../../testing/issue-fixtures"
+import type { ToolError } from "../errors"
+import { parseRepo } from "../refs"
+import { issueBriefSchema, issueDetailSchema, readIssue } from "./issues"
+
+const CTX = { cwd: process.cwd() }
+const REF = { repo: parseRepo("octo/hello"), number: 12 }
+
+let fake: FakeGh | undefined
+
+afterEach(() => {
+  fake?.restore()
+  fake = undefined
+})
+
+function useFake(rules: GhRule[]): FakeGh {
+  fake = installFakeGh(rules)
+  return fake
+}
 
 describe("issueBriefSchema", () => {
   test("accepts a brief and refuses one without its repository", () => {
@@ -36,5 +66,133 @@ describe("issueDetailSchema", () => {
 
   test("a count that is not a whole number is refused", () => {
     expect(issueDetailSchema.safeParse({ ...EXPECTED_ISSUE, comment_count: 1.5 }).success).toBe(false)
+  })
+})
+
+describe("readIssue", () => {
+  test("returns the whole picture of an issue from two reads", async () => {
+    const installed = useFake([detailRule(), dependenciesRule()])
+    expect(await readIssue(REF, { comments: 5 }, CTX)).toEqual(EXPECTED_ISSUE)
+
+    const [detail, dependencies] = apiCalls(installed)
+    expect(apiCalls(installed)).toHaveLength(2)
+    expect(variable(detail!, "owner")).toBe("octo")
+    expect(variable(detail!, "name")).toBe("hello")
+    expect(variable(detail!, "n")).toBe("12")
+    expect(variable(detail!, "comments")).toBe("5")
+    expect(variable(detail!, "withComments")).toBe("true")
+    expect(variable(dependencies!, "n")).toBe("12")
+  })
+
+  test("the kind is the Issue Type's name when there is one, and the issue type is reported as it is", async () => {
+    useFake([detailRule(rawIssue({ issueType: { name: "Feature" } })), dependenciesRule()])
+    const issue = await readIssue(REF, { comments: 5 }, CTX)
+    expect(issue.kind).toBe("feature")
+    expect(issue.issue_type).toBe("Feature")
+  })
+
+  test("an issue with no relations, branches, boards or progress reads as empty", async () => {
+    useFake([
+      detailRule(
+        rawIssue({
+          parent: null,
+          milestone: null,
+          author: null,
+          labels: { nodes: [] },
+          subIssues: { nodes: [] },
+          subIssuesSummary: null,
+          linkedBranches: { nodes: [] },
+          closedByPullRequestsReferences: { nodes: [] },
+          projectItems: { nodes: [] },
+          comments: { totalCount: 0, nodes: [] },
+        }),
+      ),
+      {
+        match: DEPENDENCIES,
+        stdout: gqlReply({ repository: { issue: { blockedBy: { nodes: [] }, blocking: { nodes: [] } } } }),
+      },
+    ])
+    expect(await readIssue(REF, { comments: 5 }, CTX)).toMatchObject({
+      parent: null,
+      milestone: null,
+      author: null,
+      kind: null,
+      sub_issues: [],
+      sub_issue_progress: { total: 0, completed: 0, percent: 0 },
+      blocked_by: [],
+      blocking: [],
+      linked_branches: [],
+      closing_pull_requests: [],
+      projects: [],
+      comments: [],
+      comment_count: 0,
+    })
+  })
+
+  test("a failing dependencies read still returns the issue, saying why they are empty", async () => {
+    useFake([
+      detailRule(),
+      { match: DEPENDENCIES, stdout: gqlErrors([{ message: "Field 'blockedBy' doesn't exist on type 'Issue'" }]) },
+    ])
+    const issue = await readIssue(REF, { comments: 5 }, CTX)
+    expect(issue.title).toBe("Crash on save")
+    expect(issue.blocked_by).toEqual([])
+    expect(issue.blocking).toEqual([])
+    expect(issue.dependencies_error).toContain("blockedBy")
+  })
+
+  test("dependencies a repository does not allow are reported, not thrown", async () => {
+    useFake([
+      detailRule(),
+      { match: DEPENDENCIES, stdout: gqlErrors([{ type: "FORBIDDEN", message: "Dependencies are disabled" }]) },
+    ])
+    expect((await readIssue(REF, { comments: 5 }, CTX)).dependencies_error).toContain("forbidden")
+  })
+
+  test.each([
+    ["rate_limited", { type: "RATE_LIMITED", message: "API rate limit exceeded" }],
+    ["unauthenticated", { message: "HTTP 401: Bad credentials" }],
+  ])("a %s dependencies read fails the call instead of reading as no dependencies", async (code, entry) => {
+    useFake([detailRule(), { match: DEPENDENCIES, stdout: gqlErrors([entry]) }])
+    expect((await failure(readIssue(REF, { comments: 5 }, CTX))).code).toBe(code as ToolError["code"])
+  })
+
+  test("an issue gone before its dependencies are read is not_found", async () => {
+    useFake([detailRule(), { match: DEPENDENCIES, stdout: gqlReply({ repository: { issue: null } }) }])
+    expect((await failure(readIssue(REF, { comments: 5 }, CTX))).code).toBe("not_found")
+  })
+
+  test("comments: 0 asks for none but still reports the count", async () => {
+    const installed = useFake([detailRule(rawIssue({ comments: { totalCount: 9 } })), dependenciesRule()])
+    const issue = await readIssue(REF, { comments: 0 }, CTX)
+    const detail = apiCalls(installed)[0]!
+    expect(variable(detail, "withComments")).toBe("false")
+    expect(variable(detail, "comments")).toBe("1")
+    expect(issue.comments).toEqual([])
+    expect(issue.comment_count).toBe(9)
+  })
+
+  test("asks for as many comments as given", async () => {
+    const installed = useFake([detailRule(), dependenciesRule()])
+    await readIssue(REF, { comments: 50 }, CTX)
+    expect(variable(apiCalls(installed)[0]!, "comments")).toBe("50")
+  })
+
+  test("an issue that does not exist is not_found, whether GitHub answers with an error or with null", async () => {
+    useFake([
+      {
+        match: DETAIL,
+        stdout: gqlErrors([{ type: "NOT_FOUND", message: "Could not resolve to an Issue" }], {
+          repository: { issue: null },
+        }),
+      },
+    ])
+    const error = await failure(readIssue({ ...REF, number: 99 }, { comments: 5 }, CTX))
+    expect(error.code).toBe("not_found")
+    expect(error.message).toContain("octo/hello#99")
+    fake?.restore()
+
+    useFake([detailRule(null)])
+    expect((await failure(readIssue({ ...REF, number: 99 }, { comments: 5 }, CTX))).code).toBe("not_found")
   })
 })
