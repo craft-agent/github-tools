@@ -1,7 +1,7 @@
 {
   "name": "@craftsamo/agent-github",
   "version": "0.0.0",
-  "description": "GitHub and git tools for coding agents: issues, project boards, pull requests, commits and stacks.",
+  "description": "GitHub tools for coding agents: issues, project boards, pull requests, repositories, releases and Actions.",
   "author": "craftsamo",
   "license": "MIT",
   "repository": {
