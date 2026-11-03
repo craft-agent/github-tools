@@ -112,7 +112,7 @@ describe("view", () => {
     expect(error.message).toContain("issue")
   })
 
-  test.each(["state", "kind", "milestone", "label", "assignee", "query", "limit"])(
+  test.each(["state", "kind", "milestone", "label", "assignee", "parent", "query", "limit"])(
     "the list argument %s is refused, by name",
     async (name) => {
       const error = await failure(

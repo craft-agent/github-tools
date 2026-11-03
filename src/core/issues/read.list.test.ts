@@ -4,12 +4,15 @@ import { gqlErrors, gqlReply } from "../../testing/gql"
 import { tempRepo, type TempRepo } from "../../testing/git-repo"
 import {
   SEARCH,
+  SUB_ISSUES,
   apiCalls,
   failure,
+  issueBrief,
   rawRow,
   searchPage,
   searchRule,
   searchedFor,
+  subIssuesRule,
   variable,
 } from "../../testing/issue-fixtures"
 import { resetIssueTypeCache } from "../github/repository"
@@ -47,6 +50,7 @@ describe("list: building the search", () => {
     expect(searchedFor(installed)).toBe("repo:octo/hello is:issue state:open")
     expect(result.query).toBe("repo:octo/hello is:issue state:open")
     expect(result.repo).toBe("octo/hello")
+    expect(result.parent).toBeNull()
     expect(result.issues?.map((issue) => issue.number)).toEqual([1])
     expect(result.truncated).toBe(false)
     expect(variable(apiCalls(installed)[0]!, "first")).toBe("30")
@@ -230,6 +234,75 @@ describe("list: building the search", () => {
       await read({ method: "list", kind: "bug", label: "ui", query: "crash" })
       expect(searchedFor(installed)).toBe('repo:octo/hello is:issue state:open label:"type:bug" label:"ui" crash')
     })
+  })
+})
+
+describe("list: a parent's sub-issues", () => {
+  const subs = [rawRow(2), rawRow(3, { state: "CLOSED" }), rawRow(4), rawRow(5, { state: "CLOSED" })]
+
+  test("lists the open sub-issues by default, with the parent", async () => {
+    const installed = useFake([subIssuesRule(subs)])
+    const result = await read({ method: "list", parent: "1" })
+    expect(result.repo).toBe("octo/hello")
+    expect(result.query).toBeNull()
+    expect(result.parent).toEqual(issueBrief(1, { title: "Epic" }))
+    expect(result.issues?.map((issue) => issue.number)).toEqual([2, 4])
+    expect(result.truncated).toBe(false)
+    expect(variable(apiCalls(installed)[0]!, "n")).toBe("1")
+  })
+
+  test.each([
+    ["closed", [3, 5]],
+    ["all", [2, 3, 4, 5]],
+  ])("state %s", async (state, numbers) => {
+    useFake([subIssuesRule(subs)])
+    const result = await read({ method: "list", parent: "1", state })
+    expect(result.issues?.map((issue) => issue.number)).toEqual(numbers)
+  })
+
+  test("is cut to the limit, and says so", async () => {
+    useFake([subIssuesRule(subs)])
+    const result = await read({ method: "list", parent: "1", state: "all", limit: 3 })
+    expect(result.issues?.map((issue) => issue.number)).toEqual([2, 3, 4])
+    expect(result.truncated).toBe(true)
+  })
+
+  test("is not truncated when the limit fits exactly the matching sub-issues", async () => {
+    useFake([subIssuesRule(subs)])
+    const result = await read({ method: "list", parent: "1", state: "all", limit: 4 })
+    expect(result.truncated).toBe(false)
+  })
+
+  test("is truncated when GitHub holds more sub-issues than it returned", async () => {
+    useFake([subIssuesRule(subs, true)])
+    expect((await read({ method: "list", parent: "1" })).truncated).toBe(true)
+  })
+
+  test("the parent can be another repository's issue", async () => {
+    const installed = useFake([subIssuesRule([])])
+    const result = await read({ method: "list", parent: "other/thing#8" })
+    expect(result.repo).toBe("other/thing")
+    expect(variable(apiCalls(installed)[0]!, "name")).toBe("thing")
+  })
+
+  test("a parent that does not exist is not_found", async () => {
+    useFake([{ match: SUB_ISSUES, stdout: gqlErrors([{ type: "NOT_FOUND", message: "Could not resolve" }]) }])
+    expect((await failure(read({ method: "list", parent: "99" }))).code).toBe("not_found")
+  })
+
+  test("a pull request URL as the parent is invalid_argument", async () => {
+    const installed = useFake([subIssuesRule([])])
+    const error = await failure(read({ method: "list", parent: "https://github.com/octo/hello/pull/1" }))
+    expect(error.code).toBe("invalid_argument")
+    expect(apiCalls(installed)).toHaveLength(0)
+  })
+
+  test.each(["kind", "milestone", "label", "assignee", "query"])("%s cannot be combined with parent", async (name) => {
+    const installed = useFake([subIssuesRule([])])
+    const error = await failure(read({ method: "list", parent: "1", [name]: "x" }))
+    expect(error.code).toBe("invalid_argument")
+    expect(error.message).toContain(`"${name}"`)
+    expect(apiCalls(installed)).toHaveLength(0)
   })
 })
 
