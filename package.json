@@ -10,8 +10,41 @@
   },
   "homepage": "https://github.com/craftsamo/agent-github#readme",
   "bugs": "https://github.com/craftsamo/agent-github/issues",
+  "mcpName": "io.github.craftsamo/agent-github",
   "type": "module",
+  "main": "dist/opencode.js",
+  "exports": {
+    ".": "./dist/opencode.js",
+    "./opencode": "./dist/opencode.js"
+  },
+  "bin": {
+    "agent-github": "dist/mcp.js",
+    "agent-github-cli": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "plugin.json",
+    "mcp.json",
+    ".claude-plugin",
+    ".agents/plugins",
+    ".antigravity-plugin",
+    "mcp_config.json",
+    "plugin.yaml",
+    "__init__.py",
+    "src/hermes/agent_github_hermes",
+    "!**/__pycache__",
+    "!**/*.pyc"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
+    "build": "node scripts/build.mjs",
+    "manifests": "node scripts/manifests.mjs",
+    "manifests:check": "node scripts/manifests.mjs --check",
+    "smoke": "node scripts/smoke-mcp.mjs && node scripts/smoke-opencode.mjs && node scripts/smoke-cli.mjs",
     "test": "bun test --pass-with-no-tests --timeout 30000",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -21,8 +54,10 @@
   },
   "devDependencies": {
     "@craftsamo/repo-kit": "^1.1.0",
+    "@opencode-ai/plugin": "^1.19.5",
     "@types/bun": "^1.4.4",
     "@types/node": "^24.19.2",
+    "esbuild": "^0.28.2",
     "husky": "^9.1.7",
     "prettier": "3.9.10",
     "typescript": "^7.0.2"
@@ -32,6 +67,7 @@
   },
   "packageManager": "pnpm@11.5.3",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "zod": "^4.6.7"
   }
 }

@@ -89,6 +89,11 @@ describe("defineTool", () => {
     expect(() => defineTool({ ...base, id: "github_issue_read", class: "read" })).not.toThrow()
   })
 
+  test("rejects an output schema that is not an object", () => {
+    const given = { ...base, id: "github_issue_create", output: z.array(z.string()) }
+    expect(() => defineTool(given as unknown as Parameters<typeof defineTool>[0])).toThrow(/object output schema/)
+  })
+
   test("throws a plain Error, not a ToolError", () => {
     try {
       defineTool({ ...base, id: "nope" })

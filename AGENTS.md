@@ -39,3 +39,4 @@ Hermes Agent) from this repository. Releases are GitHub Releases tagged
 
 - `pnpm test`, `pnpm run format`, `pnpm run format:check`
 - Single file: `bun test <path>`
+- Hermes plugin (Python): `python -m unittest discover -s src/hermes/tests`

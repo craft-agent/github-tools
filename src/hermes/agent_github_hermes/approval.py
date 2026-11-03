@@ -1,0 +1,62 @@
+"""Asking the person before a tool that changes something runs."""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Callable
+from typing import Any
+
+from .context import PluginContext
+from .listing import READ_CLASS, ToolInfo
+from .runtime import Runtime, agent_cwd
+
+#: How long ``target`` may take, in seconds. Hermes stops a ``pre_tool_call`` hook after 30 s and blocks the call.
+TARGET_TIMEOUT_SECONDS = 20
+
+#: What an approval rule matches when the repository a call targets cannot be told.
+ANY_RESOURCE = "*"
+
+#: The Hermes hook that can hold a tool call for the person's approval.
+HOOK_NAME = "pre_tool_call"
+
+
+def resolve_target(runtime: Runtime, tool_id: str, args: Any) -> str:
+    """The repository a call acts on, in lowercase, or ``*`` when it cannot be told."""
+    try:
+        result = runtime.run(
+            ["target", tool_id, "--cwd", agent_cwd()],
+            stdin=json.dumps(args if isinstance(args, dict) else {}),
+            timeout=TARGET_TIMEOUT_SECONDS,
+        )
+        resource = json.loads(result.stdout).get("resource") if result.code == 0 else None
+    except Exception:  # an approval is asked for either way; only its resource is lost
+        return ANY_RESOURCE
+    return resource if isinstance(resource, str) and resource else ANY_RESOURCE
+
+
+def make_hook(runtime: Runtime, tools: list[ToolInfo]) -> Callable[..., dict[str, str] | None]:
+    """The ``pre_tool_call`` hook: it sends every call of these tools but a read to the person's approval.
+
+    Whether a person is there to ask, and what happens when none is, is
+    Hermes' own gate to decide.
+    """
+    by_id = {tool.id: tool for tool in tools}
+
+    def hook(tool_name: str = "", args: Any = None, **kwargs: Any) -> dict[str, str] | None:
+        tool = by_id.get(tool_name)
+        if tool is None or tool.write_class == READ_CLASS:
+            return None
+        resource = resolve_target(runtime, tool.id, args)
+        subject = tool.title if resource == ANY_RESOURCE else f"{tool.title} on {resource}"
+        return {
+            "action": "approve",
+            "message": f"{subject} ({tool.id})",
+            "rule_key": f"agent-github:{tool.id}:{resource}",
+        }
+
+    return hook
+
+
+def register_approval(ctx: PluginContext, runtime: Runtime, tools: list[ToolInfo]) -> None:
+    """Hold every non-read call of ``tools`` for approval."""
+    ctx.register_hook(HOOK_NAME, make_hook(runtime, tools))

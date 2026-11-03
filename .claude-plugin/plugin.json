@@ -1,0 +1,18 @@
+{
+  "name": "agent-github",
+  "version": "0.0.0",
+  "description": "GitHub tools for coding agents: issues, project boards, pull requests, repositories, releases and Actions.",
+  "author": {
+    "name": "craftsamo",
+    "url": "https://github.com/craftsamo"
+  },
+  "homepage": "https://github.com/craftsamo/agent-github#readme",
+  "repository": "https://github.com/craftsamo/agent-github",
+  "license": "MIT",
+  "mcpServers": {
+    "github": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/mcp.js"]
+    }
+  }
+}

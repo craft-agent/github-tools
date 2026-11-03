@@ -28,7 +28,13 @@ Run these before you push:
 pnpm run format:check
 pnpm run typecheck
 pnpm test
+python -m unittest discover -s src/hermes/tests
+pnpm run build
+pnpm run manifests:check
+pnpm run smoke
 ```
+
+The Hermes plugin needs Python 3.11 or later and no packages. After a change to a tool's ID, run `pnpm run build && pnpm run manifests` to update `plugin.yaml`.
 
 ## Commits
 
