@@ -15,6 +15,6 @@ Closes #
 
 ## Checklist
 
-- [ ] `pnpm run format:check`, `pnpm run typecheck` and `pnpm test` pass
+- [ ] `pnpm run format:check`, `pnpm run typecheck`, `pnpm test`, `pnpm run build` and `pnpm run smoke` pass
 - [ ] Tests cover the change, or it changes no behavior
 - [ ] The documentation describes any change users see

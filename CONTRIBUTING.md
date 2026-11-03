@@ -28,6 +28,8 @@ Run these before you push:
 pnpm run format:check
 pnpm run typecheck
 pnpm test
+pnpm run build
+pnpm run smoke
 ```
 
 ## Commits

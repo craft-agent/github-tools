@@ -52,6 +52,10 @@ jobs:
         run: pnpm run typecheck
       - name: Test
         run: pnpm test
+      - name: Build
+        run: pnpm run build
+      - name: Smoke test the MCP server under Node
+        run: pnpm run smoke
 
   # The one check the protection of main requires (`repo-kit setup github
   # --required-check`), so jobs can be added or renamed without touching it.

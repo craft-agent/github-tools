@@ -11,7 +11,12 @@
   "homepage": "https://github.com/craftsamo/agent-github#readme",
   "bugs": "https://github.com/craftsamo/agent-github/issues",
   "type": "module",
+  "bin": {
+    "agent-github-mcp": "dist/mcp.js"
+  },
   "scripts": {
+    "build": "node scripts/build.mjs",
+    "smoke": "node scripts/smoke-mcp.mjs",
     "test": "bun test --pass-with-no-tests --timeout 30000",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
