@@ -26,6 +26,7 @@
   },
   "devDependencies": {
     "@craftsamo/repo-kit": "^1.1.0",
+    "@opencode-ai/plugin": "^1.19.5",
     "@types/bun": "^1.4.4",
     "@types/node": "^24.19.2",
     "esbuild": "^0.28.2",
