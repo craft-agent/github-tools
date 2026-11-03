@@ -18,7 +18,7 @@ export const EXIT_OK = 0
 export const EXIT_FAILED = 1
 export const EXIT_USAGE = 2
 
-const PROGRAM = "agent-github"
+const PROGRAM = "agent-github-cli"
 const CWD_FLAG = "--cwd"
 
 /** What a command line needs from its surroundings; `main.ts` wires the process, a test supplies its own. */

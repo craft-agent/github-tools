@@ -26,6 +26,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  process.stderr.write(`agent-github: ${error instanceof Error ? error.message : String(error)}\n`)
+  process.stderr.write(`agent-github-cli: ${error instanceof Error ? error.message : String(error)}\n`)
   process.exitCode = EXIT_FAILED
 })

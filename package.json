@@ -17,8 +17,8 @@
     "./opencode": "./dist/opencode.js"
   },
   "bin": {
-    "agent-github": "dist/cli.js",
-    "agent-github-mcp": "dist/mcp.js"
+    "agent-github": "dist/mcp.js",
+    "agent-github-cli": "dist/cli.js"
   },
   "scripts": {
     "build": "node scripts/build.mjs",

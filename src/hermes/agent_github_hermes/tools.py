@@ -47,7 +47,7 @@ def _failure(code: int, stdout: str, stderr: str) -> str:
     if isinstance(error, dict) and isinstance(error.get("code"), str) and isinstance(error.get("message"), str):
         return error_result(f"{error['code']}: {error['message']}")
     detail = stderr.strip() or f"exit status {code}"
-    return error_result(f"agent-github failed: {detail}")
+    return error_result(f"agent-github-cli failed: {detail}")
 
 
 def make_handler(runtime: Runtime, tool_id: str, flags: list[str]) -> Callable[..., str]:

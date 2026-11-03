@@ -42,7 +42,7 @@ class ListingTest(FakeCliCase):
 
     def test_a_failing_list_registers_nothing_and_warns_once(self) -> None:
         for fields in (
-            {"code": 2, "stderr": "agent-github: Unknown toolset \"bogus\"\n"},
+            {"code": 2, "stderr": "agent-github-cli: Unknown toolset \"bogus\"\n"},
             {"code": 0, "stdout": "not json"},
             {"code": 0, "stdout": '{"not": "a list"}'},
             {"code": 0, "stdout": '[{"id": "github_issue_read"}]'},

@@ -16,7 +16,7 @@ async function main(): Promise<void> {
     })
   } catch (error) {
     if (!isToolError(error)) throw error
-    process.stderr.write(`agent-github-mcp: ${error.message}\n`)
+    process.stderr.write(`agent-github: ${error.message}\n`)
     process.exitCode = EXIT_USAGE
     return
   }
@@ -24,6 +24,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  process.stderr.write(`agent-github-mcp: ${error instanceof Error ? error.message : String(error)}\n`)
+  process.stderr.write(`agent-github: ${error instanceof Error ? error.message : String(error)}\n`)
   process.exitCode = 1
 })

@@ -41,7 +41,7 @@ class ToolInfo:
             or not all(isinstance(entry.get(field), str) for field in _TEXT_FIELDS)
             or not isinstance(entry.get("input_schema"), dict)
         ):
-            raise Unavailable(f"agent-github listed a tool the plugin cannot read: {entry!r}")
+            raise Unavailable(f"agent-github-cli listed a tool the plugin cannot read: {entry!r}")
         return cls(
             id=entry["id"],
             title=entry["title"],
@@ -64,11 +64,11 @@ def list_tools(runtime: Runtime, flags: list[str]) -> list[ToolInfo]:
         raise Unavailable(str(error)) from error
     if result.code != 0:
         detail = result.stderr.strip() or f"exit status {result.code}"
-        raise Unavailable(f"`agent-github list` failed: {detail}")
+        raise Unavailable(f"`agent-github-cli list` failed: {detail}")
     try:
         listing = json.loads(result.stdout)
     except json.JSONDecodeError as error:
-        raise Unavailable("`agent-github list` did not answer with JSON") from error
+        raise Unavailable("`agent-github-cli list` did not answer with JSON") from error
     if not isinstance(listing, list):
-        raise Unavailable("`agent-github list` did not answer with a list")
+        raise Unavailable("`agent-github-cli list` did not answer with a list")
     return [ToolInfo.from_listing(entry) for entry in listing]
