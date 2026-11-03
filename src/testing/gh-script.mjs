@@ -12,6 +12,13 @@ const args = process.argv.slice(2)
 const joined = args.join(" ")
 appendFileSync(join(dir, "calls.log"), `${JSON.stringify(args)}\n`)
 
+// A call without stdin has it on /dev/null, so this reads an empty text rather than waiting.
+let stdin = ""
+try {
+  stdin = readFileSync(0, "utf8")
+} catch {}
+appendFileSync(join(dir, "stdin.log"), `${JSON.stringify(stdin)}\n`)
+
 const { rules, version } = JSON.parse(readFileSync(join(dir, "rules.json"), "utf8"))
 const usedFile = join(dir, "used.json")
 const used = existsSync(usedFile) ? JSON.parse(readFileSync(usedFile, "utf8")) : []
