@@ -1,16 +1,19 @@
 import { z } from "zod"
 import { ToolError, isToolError, type ErrorCode } from "../errors"
-import { graphql, type Vars } from "../gh"
+import { graphql, paginate, type Vars } from "../gh"
 import type { RefContext, RepoName } from "../refs"
 import { readKind } from "./kind"
 
-/** Issue reads shared by the issue tools: one issue in full. */
+/** Issue reads shared by the issue tools: one issue in full, a search over a repository and a parent's sub-issues. */
 
 const PREVIEW_ASSIGNEES = 20
 const PREVIEW_LABELS = 30
+const ROW_ASSIGNEES = 10
+const ROW_LABELS = 20
 const MAX_SUB_ISSUES = 100
 const MAX_DEPENDENCIES = 50
 const MAX_LINKED = 20
+const MAX_SEARCH_PAGE = 100
 
 export const issueBriefSchema = z.object({
   number: z.number().int(),
@@ -73,8 +76,23 @@ export const issueDetailSchema = z.object({
   updated_at: z.string(),
 })
 
+export const issueRowSchema = z.object({
+  number: z.number().int(),
+  title: z.string(),
+  url: z.string(),
+  state: z.string(),
+  kind: z.string().nullable(),
+  labels: z.array(z.string()),
+  assignees: z.array(z.string()),
+  milestone: z.string().nullable(),
+  parent: issueBriefSchema.nullable(),
+  sub_issue_progress: subIssueProgressSchema.nullable(),
+  updated_at: z.string(),
+})
+
 export type IssueBrief = z.output<typeof issueBriefSchema>
 export type IssueDetail = z.output<typeof issueDetailSchema>
+export type IssueRow = z.output<typeof issueRowSchema>
 export type SubIssueProgress = z.output<typeof subIssueProgressSchema>
 
 type Connection<T> = { nodes?: (T | null)[] | null } | null | undefined
@@ -88,6 +106,16 @@ type RawBrief = {
 }
 
 type RawSummary = { total: number; completed: number; percentCompleted: number }
+
+type RawRow = RawBrief & {
+  updatedAt: string
+  issueType?: { name?: string } | null
+  labels?: Connection<{ name: string }>
+  assignees?: Connection<{ login: string }>
+  milestone?: { title: string } | null
+  parent?: RawBrief | null
+  subIssuesSummary?: RawSummary | null
+}
 
 type RawIssue = RawBrief & {
   id: string
@@ -125,6 +153,7 @@ type RawIssue = RawBrief & {
 
 const BRIEF_FIELDS = "number title url state repository{nameWithOwner}"
 const SUMMARY_FIELDS = "subIssuesSummary{total completed percentCompleted}"
+const ROW_FIELDS = `${BRIEF_FIELDS} updatedAt issueType{name} labels(first:${ROW_LABELS}){nodes{name}} assignees(first:${ROW_ASSIGNEES}){nodes{login}} milestone{title} parent{${BRIEF_FIELDS}} ${SUMMARY_FIELDS}`
 
 const DETAIL_QUERY = `query($owner:String!,$name:String!,$n:Int!,$comments:Int!,$withComments:Boolean!){repository(owner:$owner,name:$name){issue(number:$n){
   id ${BRIEF_FIELDS} stateReason body createdAt updatedAt author{login}
@@ -139,6 +168,19 @@ const DETAIL_QUERY = `query($owner:String!,$name:String!,$n:Int!,$comments:Int!,
 }}}`
 
 const DEPENDENCIES_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){issue(number:$n){blockedBy(first:${MAX_DEPENDENCIES}){nodes{${BRIEF_FIELDS}}} blocking(first:${MAX_DEPENDENCIES}){nodes{${BRIEF_FIELDS}}}}}}`
+
+const SUB_ISSUES_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){issue(number:$n){
+  ${BRIEF_FIELDS}
+  subIssues(first:${MAX_SUB_ISSUES}){pageInfo{hasNextPage} nodes{${ROW_FIELDS}}}
+}}}`
+
+/**
+ * `type:ISSUE`, not `ISSUE_ADVANCED`: the plain search applies every
+ * qualifier to the whole query, so `repo:a/b x OR y` stays in `a/b`, while the
+ * advanced search reads it as `(repo:a/b x) OR y` and leaves the repository.
+ * The issue tools rely on this to keep a caller's words inside one repository.
+ */
+const SEARCH_QUERY = `query($q:String!,$first:Int!,$after:String){search(type:ISSUE,query:$q,first:$first,after:$after){pageInfo{hasNextPage endCursor} nodes{... on Issue{${ROW_FIELDS}}}}}`
 
 function nodesOf<T>(connection: Connection<T>): T[] {
   return (connection?.nodes ?? []).filter((node): node is T => node != null)
@@ -156,6 +198,23 @@ function brief(node: RawBrief): IssueBrief {
 
 function progress(summary: RawSummary): SubIssueProgress {
   return { total: summary.total, completed: summary.completed, percent: summary.percentCompleted }
+}
+
+function row(node: RawRow): IssueRow {
+  const labels = nodesOf(node.labels).map((label) => label.name)
+  return {
+    number: node.number,
+    title: node.title,
+    url: node.url,
+    state: node.state,
+    kind: readKind(node.issueType?.name, labels),
+    labels,
+    assignees: nodesOf(node.assignees).map((assignee) => assignee.login),
+    milestone: node.milestone?.title ?? null,
+    parent: node.parent ? brief(node.parent) : null,
+    sub_issue_progress: node.subIssuesSummary ? progress(node.subIssuesSummary) : null,
+    updated_at: node.updatedAt,
+  }
 }
 
 function issueNotFound(repo: RepoName, number: number, cause?: unknown): ToolError {
@@ -273,5 +332,44 @@ export async function readIssue(
     comment_count: issue.comments?.totalCount ?? 0,
     created_at: issue.createdAt,
     updated_at: issue.updatedAt,
+  }
+}
+
+/**
+ * Issues matching a GitHub search query, at most `limit`, with `truncated` set
+ * when more matched. The query is sent as it is; the caller builds and checks it.
+ */
+export async function searchIssues(
+  query: string,
+  limit: number,
+  ctx: RefContext,
+): Promise<{ issues: IssueRow[]; truncated: boolean }> {
+  const { items, truncated } = await paginate<RawRow | Record<string, never> | null>(
+    SEARCH_QUERY,
+    { q: query, first: Math.min(limit, MAX_SEARCH_PAGE) },
+    (data: { search?: { nodes: (RawRow | Record<string, never> | null)[] } | null } | null) => data?.search,
+    { cwd: ctx.cwd, signal: ctx.signal, limit },
+  )
+  // A search hit that is not an issue comes back as an empty object.
+  const issues = items.filter((node): node is RawRow => node != null && "number" in node).map(row)
+  return { issues, truncated }
+}
+
+/**
+ * The sub-issues of `parent` in GitHub's order, as list rows, with the parent
+ * itself and `more` set when GitHub holds sub-issues beyond the page read (an
+ * issue has at most 100, which is the page size).
+ */
+export async function readSubIssues(
+  parent: { repo: RepoName; number: number },
+  ctx: RefContext,
+): Promise<{ parent: IssueBrief; issues: IssueRow[]; more: boolean }> {
+  const issue = await readIssueData<
+    RawBrief & { subIssues?: Connection<RawRow> & { pageInfo?: { hasNextPage?: boolean } } }
+  >(SUB_ISSUES_QUERY, parent, {}, ctx)
+  return {
+    parent: brief(issue),
+    issues: nodesOf(issue.subIssues).map(row),
+    more: Boolean(issue.subIssues?.pageInfo?.hasNextPage),
   }
 }

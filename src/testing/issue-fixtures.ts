@@ -7,6 +7,8 @@ import { gqlReply } from "./gql"
 /** Each is a token only one of the issue queries holds, so a fake `gh` rule can pick that query. */
 export const DETAIL = "closedByPullRequestsReferences"
 export const DEPENDENCIES = "blockedBy\\(first"
+export const SEARCH = "search\\(type:ISSUE"
+export const SUB_ISSUES = "subIssues\\(first:100\\)\\{pageInfo"
 
 /** An issue as the tools return it in a relation or a list: a brief. */
 export const issueBrief = (number: number, extra: Record<string, unknown> = {}) => ({
@@ -75,6 +77,34 @@ export const brief = (number: number, extra: Record<string, unknown> = {}) => ({
   ...extra,
 })
 
+/** What a tool makes of `rawRow(number)`: an issue as a list row. */
+export const issueRow = (number: number, extra: Record<string, unknown> = {}) => ({
+  number,
+  title: `Issue ${number}`,
+  url: `https://github.com/octo/hello/issues/${number}`,
+  state: "OPEN",
+  kind: null,
+  labels: [],
+  assignees: [],
+  milestone: null,
+  parent: null,
+  sub_issue_progress: null,
+  updated_at: "2026-11-02T00:00:00Z",
+  ...extra,
+})
+
+export const rawRow = (number: number, extra: Record<string, unknown> = {}) => ({
+  ...brief(number),
+  updatedAt: "2026-11-02T00:00:00Z",
+  issueType: null,
+  labels: { nodes: [] },
+  assignees: { nodes: [] },
+  milestone: null,
+  parent: null,
+  subIssuesSummary: null,
+  ...extra,
+})
+
 export const rawIssue = (extra: Record<string, unknown> = {}) => ({
   ...brief(12, { title: "Crash on save" }),
   id: "I_12",
@@ -139,6 +169,18 @@ export const dependenciesRule = (): GhRule => ({
   }),
 })
 
+export const searchPage = (nodes: unknown[], next: string | null = null) =>
+  gqlReply({ search: { pageInfo: { hasNextPage: next !== null, endCursor: next }, nodes } })
+
+export const searchRule = (nodes: unknown[] = []): GhRule => ({ match: SEARCH, stdout: searchPage(nodes) })
+
+export const subIssuesRule = (nodes: unknown[], hasNextPage = false): GhRule => ({
+  match: SUB_ISSUES,
+  stdout: gqlReply({
+    repository: { issue: { ...brief(1, { title: "Epic" }), subIssues: { pageInfo: { hasNextPage }, nodes } } },
+  }),
+})
+
 /** The error a promise rejects with, which must be a `ToolError`. */
 export async function failure(promise: Promise<unknown>): Promise<ToolError> {
   const error = await promise.then(
@@ -156,4 +198,14 @@ export function apiCalls(installed: FakeGh): string[][] {
 /** The value of a `-f`/`-F` variable of one `gh api graphql` call. */
 export function variable(args: string[], name: string): string | undefined {
   return args.find((arg) => arg.startsWith(`${name}=`))?.slice(name.length + 1)
+}
+
+/** The search string of the last search the fake saw. */
+export function searchedFor(installed: FakeGh): string {
+  const call = apiCalls(installed)
+    .reverse()
+    .find((args) => args.join(" ").includes("search(type:ISSUE"))
+  const query = call && variable(call, "q")
+  if (query === undefined) throw new Error("no search was made")
+  return query
 }

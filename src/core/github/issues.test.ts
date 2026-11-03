@@ -5,17 +5,25 @@ import {
   DEPENDENCIES,
   DETAIL,
   EXPECTED_ISSUE,
+  SEARCH,
+  SUB_ISSUES,
   apiCalls,
+  brief,
   dependenciesRule,
   detailRule,
   failure,
   issueBrief,
+  issueRow,
   rawIssue,
+  rawRow,
+  searchPage,
+  searchRule,
+  subIssuesRule,
   variable,
 } from "../../testing/issue-fixtures"
 import type { ToolError } from "../errors"
 import { parseRepo } from "../refs"
-import { issueBriefSchema, issueDetailSchema, readIssue } from "./issues"
+import { issueBriefSchema, issueDetailSchema, readIssue, readSubIssues, searchIssues } from "./issues"
 
 const CTX = { cwd: process.cwd() }
 const REF = { repo: parseRepo("octo/hello"), number: 12 }
@@ -194,5 +202,109 @@ describe("readIssue", () => {
 
     useFake([detailRule(null)])
     expect((await failure(readIssue({ ...REF, number: 99 }, { comments: 5 }, CTX))).code).toBe("not_found")
+  })
+})
+
+describe("searchIssues", () => {
+  const QUERY = "repo:octo/hello is:issue state:open"
+
+  test("sends the query as it is, with a page as big as the limit up to 100", async () => {
+    const installed = useFake([searchRule()])
+    await searchIssues(QUERY, 5, CTX)
+    await searchIssues(QUERY, 100, CTX)
+    const [small, big] = apiCalls(installed)
+    expect(variable(small!, "q")).toBe(QUERY)
+    expect(variable(small!, "first")).toBe("5")
+    expect(variable(big!, "first")).toBe("100")
+  })
+
+  test("rows carry the kind, labels, assignees, milestone, parent and progress", async () => {
+    useFake([
+      searchRule([
+        rawRow(3, {
+          issueType: { name: "Task" },
+          labels: { nodes: [{ name: "ui" }] },
+          assignees: { nodes: [{ login: "bob" }, { login: "carol" }] },
+          milestone: { title: "v1" },
+          parent: brief(1),
+          subIssuesSummary: { total: 4, completed: 1, percentCompleted: 25 },
+        }),
+        rawRow(2, { labels: { nodes: [{ name: "type:Bug" }] } }),
+      ]),
+    ])
+    const { issues, truncated } = await searchIssues(QUERY, 30, CTX)
+    expect(truncated).toBe(false)
+    expect(issues).toEqual([
+      issueRow(3, {
+        kind: "task",
+        labels: ["ui"],
+        assignees: ["bob", "carol"],
+        milestone: "v1",
+        parent: issueBrief(1),
+        sub_issue_progress: { total: 4, completed: 1, percent: 25 },
+      }),
+      issueRow(2, { kind: "bug", labels: ["type:Bug"] }),
+    ])
+  })
+
+  test("a hit that is not an issue is skipped", async () => {
+    useFake([searchRule([{}, rawRow(2), null])])
+    expect((await searchIssues(QUERY, 30, CTX)).issues.map((issue) => issue.number)).toEqual([2])
+  })
+
+  test("walks the pages up to the limit and is not truncated when the search ran out", async () => {
+    const installed = useFake([
+      { match: SEARCH, stdout: searchPage([rawRow(1), rawRow(2)], "c1"), times: 1 },
+      { match: SEARCH, stdout: searchPage([rawRow(3)]) },
+    ])
+    const { issues, truncated } = await searchIssues(QUERY, 30, CTX)
+    expect(issues.map((issue) => issue.number)).toEqual([1, 2, 3])
+    expect(truncated).toBe(false)
+    expect(apiCalls(installed).map((args) => variable(args, "after"))).toEqual(["null", "c1"])
+  })
+
+  test("is truncated when more matched than the limit", async () => {
+    useFake([{ match: SEARCH, stdout: searchPage([rawRow(1), rawRow(2)], "c1") }])
+    const { issues, truncated } = await searchIssues(QUERY, 2, CTX)
+    expect(issues.map((issue) => issue.number)).toEqual([1, 2])
+    expect(truncated).toBe(true)
+  })
+
+  test("is truncated when a page holds more than the limit", async () => {
+    useFake([searchRule([rawRow(1), rawRow(2), rawRow(3)])])
+    const { issues, truncated } = await searchIssues(QUERY, 2, CTX)
+    expect(issues).toHaveLength(2)
+    expect(truncated).toBe(true)
+  })
+
+  test("a search GitHub refuses fails with GitHub's text", async () => {
+    useFake([{ match: SEARCH, stdout: gqlErrors([{ message: "The listed users cannot be searched" }]) }])
+    expect((await failure(searchIssues(QUERY, 30, CTX))).message).toContain("cannot be searched")
+  })
+})
+
+describe("readSubIssues", () => {
+  test("reads the parent and its sub-issues as rows, in GitHub's order", async () => {
+    const installed = useFake([subIssuesRule([rawRow(4), rawRow(2, { state: "CLOSED" })])])
+    const read = await readSubIssues(REF, CTX)
+    expect(read.parent).toEqual(issueBrief(1, { title: "Epic" }))
+    expect(read.issues.map((issue) => [issue.number, issue.state])).toEqual([
+      [4, "OPEN"],
+      [2, "CLOSED"],
+    ])
+    expect(read.more).toBe(false)
+    expect(variable(apiCalls(installed)[0]!, "n")).toBe("12")
+  })
+
+  test("says when GitHub holds more sub-issues than it returned", async () => {
+    useFake([subIssuesRule([rawRow(2)], true)])
+    expect((await readSubIssues(REF, CTX)).more).toBe(true)
+  })
+
+  test("a parent that does not exist is not_found", async () => {
+    useFake([{ match: SUB_ISSUES, stdout: gqlErrors([{ type: "NOT_FOUND", message: "Could not resolve" }]) }])
+    const error = await failure(readSubIssues(REF, CTX))
+    expect(error.code).toBe("not_found")
+    expect(error.message).toContain("octo/hello#12")
   })
 })
