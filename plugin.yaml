@@ -4,6 +4,7 @@ description: "GitHub tools for coding agents: issues, project boards, pull reque
 manifest_version: 1
 requires_hermes: ">=0.22"
 provides_tools:
+  - github_issue_comment
   - github_issue_create
   - github_issue_edit
   - github_issue_read
