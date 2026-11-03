@@ -3,15 +3,20 @@ import { mkdtempSync, realpathSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { installFakeGh, type FakeGh, type GhRule } from "../testing/fake-gh"
+import { gqlErrors, gqlReply } from "../testing/gql"
 import { isToolError, type ErrorCode } from "./errors"
 import {
   DEFAULT_GH_TIMEOUT_MS,
+  GraphQLToolError,
   MIN_GH_VERSION,
   classifyGhFailure,
   ensureGh,
   gh,
   ghEnv,
   ghJson,
+  graphql,
+  lit,
+  paginate,
   passthroughEnv,
   resetGhCheck,
 } from "./gh"
@@ -283,5 +288,139 @@ describe("gh", () => {
     expect(await ghJson<{ n: number }>(["a"], OPTIONS)).toEqual({ n: 1 })
     expect(await ghJson(["b"], OPTIONS)).toBeNull()
     expect(await codeOf(ghJson(["c"], OPTIONS))).toBe("github_error")
+  })
+})
+
+describe("graphql", () => {
+  test("returns data and sends the query and typed variables as flags", async () => {
+    const installed = useFake([{ match: "^api graphql", stdout: gqlReply({ viewer: { login: "me" } }) }])
+    const data = await graphql<{ viewer: { login: string } }>(
+      "query($s:String,$n:Int,$b:Boolean,$z:String){viewer{login}}",
+      { s: "text", n: 12, b: true, z: null, skipped: undefined },
+      OPTIONS,
+    )
+    expect(data).toEqual({ viewer: { login: "me" } })
+    const call = installed.calls().find((args) => args[0] === "api")
+    expect(call).toEqual([
+      "api",
+      "graphql",
+      "-f",
+      "query=query($s:String,$n:Int,$b:Boolean,$z:String){viewer{login}}",
+      "-f",
+      "s=text",
+      "-F",
+      "n=12",
+      "-F",
+      "b=true",
+      "-F",
+      "z=null",
+    ])
+  })
+
+  test("a NOT_FOUND error maps to not_found and keeps errors and data", async () => {
+    useFake([
+      {
+        match: "^api graphql",
+        stdout: gqlErrors([{ type: "NOT_FOUND", message: "Could not resolve to an Issue" }], {
+          repository: { issue: null },
+        }),
+        stderr: "gh: Could not resolve to an Issue\n",
+        code: 1,
+      },
+    ])
+    const error = await graphql("query{x}", {}, OPTIONS).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(GraphQLToolError)
+    const failure = error as GraphQLToolError
+    expect(failure.code).toBe("not_found")
+    expect(failure.message).toContain("Could not resolve to an Issue")
+    expect(failure.data).toEqual({ repository: { issue: null } })
+    expect(failure.graphqlErrors).toEqual([{ type: "NOT_FOUND", message: "Could not resolve to an Issue" }])
+  })
+
+  test.each([
+    ["FORBIDDEN", "forbidden"],
+    ["INSUFFICIENT_SCOPES", "forbidden"],
+    ["RATE_LIMITED", "rate_limited"],
+  ] as const)("a %s error maps to %s, even when gh exits 0", async (type, code) => {
+    useFake([{ match: "^api graphql", stdout: gqlErrors([{ type, message: "nope" }]) }])
+    expect(await codeOf(graphql("query{x}", {}, OPTIONS))).toBe(code)
+  })
+
+  test("an error without a known type is classified by its message", async () => {
+    useFake([{ match: "^api graphql", stdout: gqlErrors([{ type: "OTHER", message: "API rate limit exceeded" }]) }])
+    expect(await codeOf(graphql("query{x}", {}, OPTIONS))).toBe("rate_limited")
+    fake?.restore()
+    useFake([{ match: "^api graphql", stdout: gqlErrors([{ message: "Something odd" }]) }])
+    expect(await codeOf(graphql("query{x}", {}, OPTIONS))).toBe("github_error")
+  })
+
+  test("an error type named like an object property is not mistaken for a known one", async () => {
+    useFake([{ match: "^api graphql", stdout: gqlErrors([{ type: "constructor", message: "odd" }]) }])
+    expect(await codeOf(graphql("query{x}", {}, OPTIONS))).toBe("github_error")
+  })
+
+  test("a non-zero exit without a GraphQL reply is classified from stderr", async () => {
+    useFake([{ match: "^api graphql", stderr: "gh: Bad credentials (HTTP 401)\n", code: 1 }])
+    expect(await codeOf(graphql("query{x}", {}, OPTIONS))).toBe("unauthenticated")
+  })
+
+  test("a reply that is not JSON, with exit 0, yields null data", async () => {
+    useFake([{ match: "^api graphql", stdout: "" }])
+    expect(await graphql("query{x}", {}, OPTIONS)).toBeNull()
+  })
+})
+
+describe("paginate", () => {
+  const page = (nodes: number[], next: string | null) =>
+    gqlReply({ items: { nodes, pageInfo: { hasNextPage: next !== null, endCursor: next } } })
+  const pick = (data: { items: { nodes: number[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } } }) =>
+    data.items
+
+  test("walks pages with the cursor until there is no next page", async () => {
+    const installed = useFake([
+      { match: "^api graphql", stdout: page([1, 2], "c1"), times: 1 },
+      { match: "^api graphql", stdout: page([3], null) },
+    ])
+    const result = await paginate("query($after:String){items}", { owner: "o" }, pick, OPTIONS)
+    expect(result).toEqual({ items: [1, 2, 3], truncated: false })
+    const calls = installed.calls().filter((args) => args[0] === "api")
+    expect(calls).toHaveLength(2)
+    expect(calls[0]).toContain("after=null")
+    expect(calls[1]).toContain("after=c1")
+  })
+
+  test("stops at the limit without fetching further pages, and says it truncated", async () => {
+    const installed = useFake([{ match: "^api graphql", stdout: page([1, 2, 3], "c1") }])
+    const result = await paginate("query{items}", {}, pick, { ...OPTIONS, limit: 2 })
+    expect(result).toEqual({ items: [1, 2], truncated: true })
+    expect(installed.calls().filter((args) => args[0] === "api")).toHaveLength(1)
+  })
+
+  test("a page that ends exactly at the limit is truncated only when more pages follow", async () => {
+    useFake([{ match: "^api graphql", stdout: page([1, 2], "c1") }])
+    expect(await paginate("query{items}", {}, pick, { ...OPTIONS, limit: 2 })).toEqual({
+      items: [1, 2],
+      truncated: true,
+    })
+    fake?.restore()
+    useFake([{ match: "^api graphql", stdout: page([1, 2], null) }])
+    expect(await paginate("query{items}", {}, pick, { ...OPTIONS, limit: 2 })).toEqual({
+      items: [1, 2],
+      truncated: false,
+    })
+  })
+
+  test("a missing connection ends the walk", async () => {
+    useFake([{ match: "^api graphql", stdout: gqlReply({ items: null }) }])
+    expect(await paginate("query{items}", {}, (data: { items: null }) => data.items, OPTIONS)).toEqual({
+      items: [],
+      truncated: false,
+    })
+  })
+})
+
+describe("lit", () => {
+  test("quotes and escapes a GraphQL string literal", () => {
+    expect(lit('say "hi"\n')).toBe('"say \\"hi\\"\\n"')
   })
 })

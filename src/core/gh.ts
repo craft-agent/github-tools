@@ -241,3 +241,113 @@ export async function ghJson<T>(args: string[], options: GhOptions): Promise<T |
     })
   }
 }
+
+/**
+ * GraphQL over `gh api graphql`, the one transport the tools share.
+ *
+ * Variables travel as `-f` (string) / `-F` (typed: number, boolean, null)
+ * flags, so a query, its variables and the fake `gh` of the tests all meet on
+ * argv. Composite values (lists, input objects) are inlined into the query
+ * text with `lit()` instead; GitHub accepts a JSON string as a GraphQL string
+ * literal, and enum values stay bare.
+ */
+export type Vars = Record<string, string | number | boolean | null | undefined>
+
+export type GraphQLErrorEntry = { type?: string; message?: string; [key: string]: unknown }
+
+/** A failure GitHub reported inside a GraphQL reply; keeps the reply's `errors` and whatever `data` came with them. */
+export class GraphQLToolError extends ToolError {
+  readonly graphqlErrors: GraphQLErrorEntry[]
+  readonly data: unknown
+
+  constructor(code: ErrorCode, message: string, graphqlErrors: GraphQLErrorEntry[], data: unknown) {
+    super(code, message)
+    this.name = "GraphQLToolError"
+    this.graphqlErrors = graphqlErrors
+    this.data = data
+  }
+}
+
+const GRAPHQL_ERROR_CODES = new Map<string, ErrorCode>([
+  ["NOT_FOUND", "not_found"],
+  ["FORBIDDEN", "forbidden"],
+  ["INSUFFICIENT_SCOPES", "forbidden"],
+  ["RATE_LIMITED", "rate_limited"],
+])
+
+function varFlags(vars: Vars): string[] {
+  const flags: string[] = []
+  for (const [key, value] of Object.entries(vars)) {
+    if (value === undefined) continue
+    if (typeof value === "string") flags.push("-f", `${key}=${value}`)
+    else flags.push("-F", `${key}=${value === null ? "null" : String(value)}`)
+  }
+  return flags
+}
+
+function parseReply(stdout: string): { data?: unknown; errors?: unknown } | undefined {
+  const text = stdout.trim()
+  if (!text) return undefined
+  try {
+    const parsed: unknown = JSON.parse(text)
+    return typeof parsed === "object" && parsed !== null ? parsed : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** The first error's `type` decides the code; an untyped or unknown one is classified by its message like a `gh` failure. */
+function graphqlFailure(errors: GraphQLErrorEntry[], data: unknown): GraphQLToolError {
+  const text = failureText(
+    errors.map((entry) => (typeof entry.message === "string" ? entry.message : JSON.stringify(entry))).join("; "),
+    "",
+  )
+  const type = errors[0]?.type
+  const code = (type === undefined ? undefined : GRAPHQL_ERROR_CODES.get(type)) ?? classifyGhFailure(text, "", 0).code
+  return new GraphQLToolError(code, `${FAILURE_HINTS[code] ?? "GitHub GraphQL error:"} ${text}`, errors, data)
+}
+
+/** Runs one query or mutation and returns its `data`; errors in the reply throw a `GraphQLToolError`. */
+export async function graphql<T = unknown>(query: string, vars: Vars, options: Omit<GhOptions, "stdin">): Promise<T> {
+  const result = await runGh(["api", "graphql", "-f", `query=${query}`, ...varFlags(vars)], options)
+  const reply = parseReply(result.stdout)
+  const errors = Array.isArray(reply?.errors) ? (reply.errors as GraphQLErrorEntry[]) : []
+  if (errors.length) throw graphqlFailure(errors, reply?.data ?? null)
+  if (result.code !== 0) throw classifyGhFailure(result.stderr, result.stdout, result.code)
+  return (reply?.data ?? null) as T
+}
+
+export type Page<T> = { nodes: T[]; pageInfo?: { hasNextPage?: boolean; endCursor?: string | null } }
+
+const DEFAULT_PAGE_LIMIT = 500
+
+/**
+ * Walks a connection whose query declares `$after: String` and passes it as
+ * `after: $after`. `pick` returns the connection from one page's data. Stops
+ * at `limit` nodes (default 500) so a runaway board cannot pull everything;
+ * `truncated` is true when the limit left items out.
+ */
+export async function paginate<T>(
+  query: string,
+  vars: Vars,
+  pick: (data: any) => Page<T> | null | undefined,
+  options: Omit<GhOptions, "stdin"> & { limit?: number },
+): Promise<{ items: T[]; truncated: boolean }> {
+  const limit = options.limit ?? DEFAULT_PAGE_LIMIT
+  const items: T[] = []
+  let after: string | null = null
+  for (;;) {
+    const data: unknown = await graphql(query, { ...vars, after }, options)
+    const page = pick(data)
+    if (!page) break
+    items.push(...(page.nodes ?? []))
+    const next = page.pageInfo?.hasNextPage ? (page.pageInfo.endCursor ?? null) : null
+    if (items.length >= limit) return { items: items.slice(0, limit), truncated: items.length > limit || next !== null }
+    if (next === null) break
+    after = next
+  }
+  return { items, truncated: false }
+}
+
+/** A GraphQL string literal (JSON escaping is valid GraphQL). */
+export const lit = (value: string): string => JSON.stringify(value)
