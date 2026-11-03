@@ -21,9 +21,10 @@ import {
   subIssuesRule,
   variable,
 } from "../../testing/issue-fixtures"
+import { FIELDS, issueFieldsRule } from "../../testing/write-fixtures"
 import type { ToolError } from "../errors"
 import { parseRepo } from "../refs"
-import { issueBriefSchema, issueDetailSchema, readIssue, readSubIssues, searchIssues } from "./issues"
+import { issueBriefSchema, issueDetailSchema, readIssue, readIssueFields, readSubIssues, searchIssues } from "./issues"
 
 const CTX = { cwd: process.cwd() }
 const REF = { repo: parseRepo("octo/hello"), number: 12 }
@@ -304,6 +305,36 @@ describe("readSubIssues", () => {
   test("a parent that does not exist is not_found", async () => {
     useFake([{ match: SUB_ISSUES, stdout: gqlErrors([{ type: "NOT_FOUND", message: "Could not resolve" }]) }])
     const error = await failure(readSubIssues(REF, CTX))
+    expect(error.code).toBe("not_found")
+    expect(error.message).toContain("octo/hello#12")
+  })
+})
+
+describe("readIssueFields", () => {
+  test("reads the state, the reason, the body and the labels in one query", async () => {
+    const installed = useFake([
+      issueFieldsRule({ state: "CLOSED", stateReason: "NOT_PLANNED", body: "Text", labels: ["bug", "type:bug"] }),
+    ])
+    expect(await readIssueFields(REF, CTX)).toEqual({
+      state: "CLOSED",
+      state_reason: "NOT_PLANNED",
+      body: "Text",
+      labels: ["bug", "type:bug"],
+    })
+    expect(apiCalls(installed)).toHaveLength(1)
+    expect(variable(apiCalls(installed)[0]!, "n")).toBe("12")
+  })
+
+  test("a missing body is empty and a missing reason is null", async () => {
+    useFake([
+      { match: FIELDS, stdout: gqlReply({ repository: { issue: { state: "OPEN", body: null, labels: null } } }) },
+    ])
+    expect(await readIssueFields(REF, CTX)).toEqual({ state: "OPEN", state_reason: null, body: "", labels: [] })
+  })
+
+  test("an issue that does not exist is not_found", async () => {
+    useFake([{ match: FIELDS, stdout: gqlReply({ repository: { issue: null } }) }])
+    const error = await failure(readIssueFields(REF, CTX))
     expect(error.code).toBe("not_found")
     expect(error.message).toContain("octo/hello#12")
   })

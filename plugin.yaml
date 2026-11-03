@@ -5,6 +5,7 @@ manifest_version: 1
 requires_hermes: ">=0.22"
 provides_tools:
   - github_issue_create
+  - github_issue_edit
   - github_issue_read
 provides_hooks:
   - pre_tool_call

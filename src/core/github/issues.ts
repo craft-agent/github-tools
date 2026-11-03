@@ -14,6 +14,7 @@ const MAX_SUB_ISSUES = 100
 const MAX_DEPENDENCIES = 50
 const MAX_LINKED = 20
 const MAX_SEARCH_PAGE = 100
+const MAX_LABELS = 100
 
 export const issueBriefSchema = z.object({
   number: z.number().int(),
@@ -172,6 +173,10 @@ const DEPENDENCIES_QUERY = `query($owner:String!,$name:String!,$n:Int!){reposito
 const SUB_ISSUES_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){issue(number:$n){
   ${BRIEF_FIELDS}
   subIssues(first:${MAX_SUB_ISSUES}){pageInfo{hasNextPage} nodes{${ROW_FIELDS}}}
+}}}`
+
+const FIELDS_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){issue(number:$n){
+  state stateReason body labels(first:${MAX_LABELS}){nodes{name}}
 }}}`
 
 /**
@@ -353,6 +358,25 @@ export async function searchIssues(
   // A search hit that is not an issue comes back as an empty object.
   const issues = items.filter((node): node is RawRow => node != null && "number" in node).map(row)
   return { issues, truncated }
+}
+
+/** What a write needs to know about an issue before it changes it: its state, body and labels. */
+export type IssueFields = { state: string; state_reason: string | null; body: string; labels: string[] }
+
+/** The state, body and labels of one issue, in one small read. */
+export async function readIssueFields(ref: { repo: RepoName; number: number }, ctx: RefContext): Promise<IssueFields> {
+  const issue = await readIssueData<Pick<RawIssue, "state" | "stateReason" | "body" | "labels">>(
+    FIELDS_QUERY,
+    ref,
+    {},
+    ctx,
+  )
+  return {
+    state: issue.state,
+    state_reason: issue.stateReason ?? null,
+    body: issue.body ?? "",
+    labels: nodesOf(issue.labels).map((label) => label.name),
+  }
 }
 
 /**

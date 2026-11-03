@@ -6,6 +6,10 @@ import type { ToolContext } from "../tool"
 
 /** What the issue write tools share: argument checks, the permission gate and `gh issue edit`. */
 
+export const REPO_DESCRIPTION =
+  "owner/name; defaults to the working tree's repository (its origin). Used for a bare number."
+export const ISSUE_DESCRIPTION = "The issue, as 12, #12, owner/repo#12 or its URL."
+
 /** `gh` reads `--label` and `--assignee` values as CSV: a comma splits one name into two, and a quote or a line break is syntax. */
 const LIST_SYNTAX = /[,"\r\n]/
 const URL_LINE = /^https?:\/\/\S+$/

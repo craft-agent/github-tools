@@ -11,6 +11,7 @@ export const ISSUE_TYPES = "issueTypes\\(first"
 export const LABEL = "label\\(name:"
 export const MILESTONES = "milestones\\?state=all"
 export const MILESTONE_CREATE = "-X POST"
+export const FIELDS = "labels\\(first:100\\)"
 
 /** The repository query's reply: `octo/hello` unless `repo` says otherwise, owned by the viewer unless `viewer` does. */
 export function repositoryRule(options: { repo?: string; permission?: string | null; viewer?: string } = {}): GhRule {
@@ -31,10 +32,7 @@ export function repositoryRule(options: { repo?: string; permission?: string | n
 }
 
 /** The owner has no Issue Type, as a user does not. */
-export const noIssueTypesRule = (): GhRule => ({
-  match: ISSUE_TYPES,
-  stdout: gqlReply({ repositoryOwner: null }),
-})
+export const noIssueTypesRule = (): GhRule => ({ match: ISSUE_TYPES, stdout: gqlReply({ repositoryOwner: null }) })
 
 /** The owner is an organization with these Issue Types enabled. */
 export const issueTypesRule = (...names: string[]): GhRule => ({
@@ -63,6 +61,12 @@ export const milestoneCreatedRule = (number: number, title: string): GhRule => (
   stdout: JSON.stringify({ number, title }),
 })
 
+/** What `gh issue edit` prints: the issue's URL. */
+export const editedRule = (number: number): GhRule => ({
+  match: "^issue edit",
+  stdout: `https://github.com/octo/hello/issues/${number}\n`,
+})
+
 /** The rules most calls need, after the ones a test adds: write permission, no Issue Types and any edit succeeding. */
 export const writeRules = (...rules: GhRule[]): GhRule[] => [
   ...rules,
@@ -70,6 +74,23 @@ export const writeRules = (...rules: GhRule[]): GhRule[] => [
   noIssueTypesRule(),
   { match: "^issue edit" },
 ]
+
+/** The state, body and labels of the issue, as the fields query returns them. */
+export const issueFieldsRule = (
+  fields: { state?: string; stateReason?: string | null; body?: string; labels?: string[] } = {},
+): GhRule => ({
+  match: FIELDS,
+  stdout: gqlReply({
+    repository: {
+      issue: {
+        state: fields.state ?? "OPEN",
+        stateReason: fields.stateReason ?? null,
+        body: fields.body ?? "",
+        labels: { nodes: (fields.labels ?? []).map((name) => ({ name })) },
+      },
+    },
+  }),
+})
 
 /** What `gh issue create` prints: the new issue's URL. */
 export const createdRule = (number: number, repo = "octo/hello"): GhRule => ({
