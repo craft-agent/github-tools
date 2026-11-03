@@ -16,11 +16,25 @@ const MAX_LINKED = 20
 const MAX_SEARCH_PAGE = 100
 const MAX_LABELS = 100
 
+const ISSUE_STATE_DESCRIPTION = "open or closed."
+
+/**
+ * GitHub's enum value as the lower-case word the tools use in arguments and
+ * results (`OPEN` is `open`, `NOT_PLANNED` is `not_planned`). A value GitHub
+ * adds later is lower-cased too, so it is reported and never dropped; an
+ * absent value stays `null`.
+ */
+export function stateWord(value: string): string
+export function stateWord(value: string | null | undefined): string | null
+export function stateWord(value: string | null | undefined): string | null {
+  return value == null ? null : value.toLowerCase()
+}
+
 export const issueBriefSchema = z.object({
   number: z.number().int(),
   title: z.string(),
   url: z.string(),
-  state: z.string(),
+  state: z.string().describe(ISSUE_STATE_DESCRIPTION),
   repo: z.string(),
 })
 
@@ -35,8 +49,11 @@ export const issueDetailSchema = z.object({
   number: z.number().int(),
   title: z.string(),
   url: z.string(),
-  state: z.string(),
-  state_reason: z.string().nullable(),
+  state: z.string().describe(ISSUE_STATE_DESCRIPTION),
+  state_reason: z
+    .string()
+    .nullable()
+    .describe("completed, not_planned, duplicate or reopened; null for an issue that was never closed."),
   body: z.string(),
   author: z.string().nullable(),
   assignees: z.array(z.string()),
@@ -56,7 +73,7 @@ export const issueDetailSchema = z.object({
       number: z.number().int(),
       title: z.string(),
       url: z.string(),
-      state: z.string(),
+      state: z.string().describe("open, closed or merged."),
       merged: z.boolean(),
     }),
   ),
@@ -81,7 +98,7 @@ export const issueRowSchema = z.object({
   number: z.number().int(),
   title: z.string(),
   url: z.string(),
-  state: z.string(),
+  state: z.string().describe(ISSUE_STATE_DESCRIPTION),
   kind: z.string().nullable(),
   labels: z.array(z.string()),
   assignees: z.array(z.string()),
@@ -196,7 +213,7 @@ function brief(node: RawBrief): IssueBrief {
     number: node.number,
     title: node.title,
     url: node.url,
-    state: node.state,
+    state: stateWord(node.state),
     repo: node.repository?.nameWithOwner ?? "",
   }
 }
@@ -211,7 +228,7 @@ function row(node: RawRow): IssueRow {
     number: node.number,
     title: node.title,
     url: node.url,
-    state: node.state,
+    state: stateWord(node.state),
     kind: readKind(node.issueType?.name, labels),
     labels,
     assignees: nodesOf(node.assignees).map((assignee) => assignee.login),
@@ -294,8 +311,8 @@ export async function readIssue(
     number: issue.number,
     title: issue.title,
     url: issue.url,
-    state: issue.state,
-    state_reason: issue.stateReason ?? null,
+    state: stateWord(issue.state),
+    state_reason: stateWord(issue.stateReason),
     body: issue.body ?? "",
     author: issue.author?.login ?? null,
     assignees: nodesOf(issue.assignees).map((assignee) => assignee.login),
@@ -318,7 +335,7 @@ export async function readIssue(
       number: pull.number,
       title: pull.title,
       url: pull.url,
-      state: pull.state,
+      state: stateWord(pull.state),
       merged: Boolean(pull.merged),
     })),
     projects: nodesOf(issue.projectItems).map((item) => ({
@@ -360,7 +377,7 @@ export async function searchIssues(
   return { issues, truncated }
 }
 
-/** What a write needs to know about an issue before it changes it: its state, body and labels. */
+/** What a write needs to know about an issue before it changes it: its state and reason (as `stateWord` gives them), body and labels. */
 export type IssueFields = { state: string; state_reason: string | null; body: string; labels: string[] }
 
 /** The state, body and labels of one issue, in one small read. */
@@ -372,8 +389,8 @@ export async function readIssueFields(ref: { repo: RepoName; number: number }, c
     ctx,
   )
   return {
-    state: issue.state,
-    state_reason: issue.stateReason ?? null,
+    state: stateWord(issue.state),
+    state_reason: stateWord(issue.stateReason),
     body: issue.body ?? "",
     labels: nodesOf(issue.labels).map((label) => label.name),
   }

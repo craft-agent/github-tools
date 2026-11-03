@@ -5,7 +5,7 @@ import { parseNumberRef } from "../refs"
 import { defineTool } from "../tool"
 import { ISSUE_DESCRIPTION, REPO_DESCRIPTION, given, writableContext } from "./write-support"
 
-const OPEN = "OPEN"
+const OPEN = "open"
 
 const input = z.object({
   issue: z.string().describe(ISSUE_DESCRIPTION),

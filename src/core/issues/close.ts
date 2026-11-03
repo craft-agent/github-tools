@@ -17,14 +17,7 @@ const GH_REASONS: Record<Reason, string> = {
   duplicate: "duplicate",
 }
 
-/** The reasons GitHub reports for a closed issue; any other value (a reopened issue has its own) is no reason. */
-const STATE_REASONS: Record<string, Reason> = {
-  COMPLETED: "completed",
-  NOT_PLANNED: "not_planned",
-  DUPLICATE: "duplicate",
-}
-
-const CLOSED = "CLOSED"
+const CLOSED = "closed"
 
 const input = z.object({
   issue: z.string().describe(ISSUE_DESCRIPTION),
@@ -79,7 +72,8 @@ export const issueClose = defineTool({
       return {
         repo: target.full,
         issue: ref.number,
-        state_reason: (current.state_reason && STATE_REASONS[current.state_reason]) || null,
+        // Any other reason GitHub reports (a reopened issue has its own) is not one this tool closes with.
+        state_reason: REASONS.find((reason) => reason === current.state_reason) ?? null,
         changed: false,
         foreign: context.foreign,
       }

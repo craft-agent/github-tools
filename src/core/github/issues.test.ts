@@ -24,7 +24,15 @@ import {
 import { FIELDS, issueFieldsRule } from "../../testing/write-fixtures"
 import type { ToolError } from "../errors"
 import { parseRepo } from "../refs"
-import { issueBriefSchema, issueDetailSchema, readIssue, readIssueFields, readSubIssues, searchIssues } from "./issues"
+import {
+  issueBriefSchema,
+  issueDetailSchema,
+  readIssue,
+  readIssueFields,
+  readSubIssues,
+  searchIssues,
+  stateWord,
+} from "./issues"
 
 const CTX = { cwd: process.cwd() }
 const REF = { repo: parseRepo("octo/hello"), number: 12 }
@@ -91,6 +99,31 @@ describe("readIssue", () => {
     expect(variable(detail!, "comments")).toBe("5")
     expect(variable(detail!, "withComments")).toBe("true")
     expect(variable(dependencies!, "n")).toBe("12")
+  })
+
+  test("every state is a lower-case word: the issue, its reason, its relations and its pull requests", async () => {
+    useFake([
+      detailRule(
+        rawIssue({
+          state: "CLOSED",
+          stateReason: "DUPLICATE",
+          parent: brief(1, { state: "CLOSED" }),
+          closedByPullRequestsReferences: {
+            nodes: [
+              { number: 20, title: "A", url: "u", state: "MERGED", merged: true },
+              { number: 21, title: "B", url: "u", state: "OPEN" },
+              { number: 22, title: "C", url: "u", state: "CLOSED" },
+            ],
+          },
+        }),
+      ),
+      dependenciesRule(),
+    ])
+    const issue = await readIssue(REF, { comments: 0 }, CTX)
+    expect([issue.state, issue.state_reason, issue.parent?.state]).toEqual(["closed", "duplicate", "closed"])
+    expect(issue.sub_issues.map((sub) => sub.state)).toEqual(["open", "closed"])
+    expect(issue.blocked_by.map((blocker) => blocker.state)).toEqual(["open"])
+    expect(issue.closing_pull_requests.map((pull) => pull.state)).toEqual(["merged", "open", "closed"])
   })
 
   test("the kind is the Issue Type's name when there is one, and the issue type is reported as it is", async () => {
@@ -290,8 +323,8 @@ describe("readSubIssues", () => {
     const read = await readSubIssues(REF, CTX)
     expect(read.parent).toEqual(issueBrief(1, { title: "Epic" }))
     expect(read.issues.map((issue) => [issue.number, issue.state])).toEqual([
-      [4, "OPEN"],
-      [2, "CLOSED"],
+      [4, "open"],
+      [2, "closed"],
     ])
     expect(read.more).toBe(false)
     expect(variable(apiCalls(installed)[0]!, "n")).toBe("12")
@@ -310,14 +343,23 @@ describe("readSubIssues", () => {
   })
 })
 
+describe("stateWord", () => {
+  test("lower-cases GitHub's enum values, and keeps an absent one null", () => {
+    expect(stateWord("NOT_PLANNED")).toBe("not_planned")
+    expect(stateWord("FUTURE_VALUE")).toBe("future_value")
+    expect(stateWord(null)).toBeNull()
+    expect(stateWord(undefined)).toBeNull()
+  })
+})
+
 describe("readIssueFields", () => {
   test("reads the state, the reason, the body and the labels in one query", async () => {
     const installed = useFake([
       issueFieldsRule({ state: "CLOSED", stateReason: "NOT_PLANNED", body: "Text", labels: ["bug", "type:bug"] }),
     ])
     expect(await readIssueFields(REF, CTX)).toEqual({
-      state: "CLOSED",
-      state_reason: "NOT_PLANNED",
+      state: "closed",
+      state_reason: "not_planned",
       body: "Text",
       labels: ["bug", "type:bug"],
     })
@@ -325,11 +367,16 @@ describe("readIssueFields", () => {
     expect(variable(apiCalls(installed)[0]!, "n")).toBe("12")
   })
 
+  test("a reason GitHub adds later is lower-cased, not dropped", async () => {
+    useFake([issueFieldsRule({ state: "CLOSED", stateReason: "SOMETHING_NEW" })])
+    expect((await readIssueFields(REF, CTX)).state_reason).toBe("something_new")
+  })
+
   test("a missing body is empty and a missing reason is null", async () => {
     useFake([
       { match: FIELDS, stdout: gqlReply({ repository: { issue: { state: "OPEN", body: null, labels: null } } }) },
     ])
-    expect(await readIssueFields(REF, CTX)).toEqual({ state: "OPEN", state_reason: null, body: "", labels: [] })
+    expect(await readIssueFields(REF, CTX)).toEqual({ state: "open", state_reason: null, body: "", labels: [] })
   })
 
   test("an issue that does not exist is not_found", async () => {

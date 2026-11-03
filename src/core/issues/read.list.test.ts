@@ -260,6 +260,12 @@ describe("list: a parent's sub-issues", () => {
     expect(result.issues?.map((issue) => issue.number)).toEqual(numbers)
   })
 
+  test("reports each state as the word the state argument uses", async () => {
+    useFake([subIssuesRule(subs)])
+    const result = await read({ method: "list", parent: "1", state: "all" })
+    expect(result.issues?.map((issue) => issue.state)).toEqual(["open", "closed", "open", "closed"])
+  })
+
   test("is cut to the limit, and says so", async () => {
     useFake([subIssuesRule(subs)])
     const result = await read({ method: "list", parent: "1", state: "all", limit: 3 })

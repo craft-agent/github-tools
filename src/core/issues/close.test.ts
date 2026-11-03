@@ -76,6 +76,7 @@ describe("an issue that is closed already", () => {
     ["NOT_PLANNED", "not_planned"],
     ["DUPLICATE", "duplicate"],
     ["REOPENED", null],
+    ["SOMETHING_NEW", null],
     [null, null],
   ])("state reason %p is reported as %p, and nothing is sent", async (stateReason, reported) => {
     const installed = use([repositoryRule(), issueFieldsRule({ state: "CLOSED", stateReason }), CLOSED])

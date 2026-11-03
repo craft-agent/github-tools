@@ -172,7 +172,7 @@ async function listSubIssues(args: Args, parent: string, ctx: ToolContext) {
   const limit = args.limit ?? DEFAULT_LIMIT
   const ref = await parseNumberRef(parent, args.repo, ctx, { accept: "issue" })
   const subIssues = await readSubIssues(ref, ctx)
-  const matching = subIssues.issues.filter((issue) => state === "all" || issue.state.toLowerCase() === state)
+  const matching = subIssues.issues.filter((issue) => state === "all" || issue.state === state)
   return {
     repo: ref.repo.full,
     query: null,
