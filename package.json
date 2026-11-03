@@ -10,6 +10,7 @@
   },
   "homepage": "https://github.com/craftsamo/agent-github#readme",
   "bugs": "https://github.com/craftsamo/agent-github/issues",
+  "mcpName": "io.github.craftsamo/agent-github",
   "type": "module",
   "main": "dist/opencode.js",
   "exports": {
@@ -35,6 +36,10 @@
     "!**/__pycache__",
     "!**/*.pyc"
   ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "build": "node scripts/build.mjs",
     "manifests": "node scripts/manifests.mjs",
