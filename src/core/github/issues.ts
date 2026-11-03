@@ -10,9 +10,11 @@ const PREVIEW_ASSIGNEES = 20
 const PREVIEW_LABELS = 30
 const ROW_ASSIGNEES = 10
 const ROW_LABELS = 20
-const MAX_SUB_ISSUES = 100
-const MAX_DEPENDENCIES = 50
+/** The page sizes of the relation reads: a list this long may hold more than was read. */
+export const MAX_SUB_ISSUES = 100
+export const MAX_DEPENDENCIES = 50
 const MAX_LINKED = 20
+const MAX_LINKED_BRANCHES = 100
 const MAX_SEARCH_PAGE = 100
 const MAX_LABELS = 100
 
@@ -94,6 +96,11 @@ export const issueDetailSchema = z.object({
   updated_at: z.string(),
 })
 
+export const linkedBranchSchema = z.object({
+  name: z.string(),
+  repo: z.string().describe("owner/name of the repository that holds the branch."),
+})
+
 export const issueRowSchema = z.object({
   number: z.number().int(),
   title: z.string(),
@@ -111,6 +118,7 @@ export const issueRowSchema = z.object({
 export type IssueBrief = z.output<typeof issueBriefSchema>
 export type IssueDetail = z.output<typeof issueDetailSchema>
 export type IssueRow = z.output<typeof issueRowSchema>
+export type LinkedBranch = z.output<typeof linkedBranchSchema>
 export type SubIssueProgress = z.output<typeof subIssueProgressSchema>
 
 type Connection<T> = { nodes?: (T | null)[] | null } | null | undefined
@@ -191,6 +199,10 @@ const SUB_ISSUES_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository
   ${BRIEF_FIELDS}
   subIssues(first:${MAX_SUB_ISSUES}){pageInfo{hasNextPage} nodes{${ROW_FIELDS}}}
 }}}`
+
+const LINKED_BRANCHES_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){issue(number:$n){id linkedBranches(first:${MAX_LINKED_BRANCHES}){nodes{ref{name repository{nameWithOwner}}}}}}}`
+
+const CREATE_LINKED_BRANCH_MUTATION = `mutation($issueId:ID!,$oid:GitObjectID!,$repositoryId:ID!,$name:String){createLinkedBranch(input:{issueId:$issueId,oid:$oid,repositoryId:$repositoryId,name:$name}){linkedBranch{ref{name repository{nameWithOwner}}}}}`
 
 const FIELDS_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){issue(number:$n){
   state stateReason body labels(first:${MAX_LABELS}){nodes{name}}
@@ -394,6 +406,57 @@ export async function readIssueFields(ref: { repo: RepoName; number: number }, c
     body: issue.body ?? "",
     labels: nodesOf(issue.labels).map((label) => label.name),
   }
+}
+
+type RawLinkedBranch = { ref?: { name?: string; repository?: { nameWithOwner?: string } | null } | null }
+
+/** A linked branch as the tools report it; `undefined` for a link without a branch or repository. */
+function linkedBranch(node: RawLinkedBranch | null | undefined): LinkedBranch | undefined {
+  const { name, repository } = node?.ref ?? {}
+  return name && repository?.nameWithOwner ? { name, repo: repository.nameWithOwner } : undefined
+}
+
+/**
+ * The branches linked to an issue, each with the repository that holds it
+ * (the issue's own, or the one a branch was created in), and the issue's node
+ * id. At most 100, the page size; a link without a branch or repository is
+ * left out.
+ */
+export async function readLinkedBranches(
+  ref: { repo: RepoName; number: number },
+  ctx: RefContext,
+): Promise<{ issueId: string; branches: LinkedBranch[] }> {
+  const issue = await readIssueData<{ id: string; linkedBranches?: Connection<RawLinkedBranch> }>(
+    LINKED_BRANCHES_QUERY,
+    ref,
+    {},
+    ctx,
+  )
+  const branches = nodesOf(issue.linkedBranches).flatMap((node) => linkedBranch(node) ?? [])
+  return { issueId: issue.id, branches }
+}
+
+/**
+ * Creates a branch on GitHub at `oid` in the repository `repositoryId` and
+ * links it to the issue `issueId`, the API behind `gh issue develop` without
+ * its local fetch. Without `name` GitHub names the branch from the issue's
+ * number and title. A failure keeps the code `graphql` maps it to.
+ */
+export async function createLinkedBranch(
+  input: { issueId: string; oid: string; repositoryId: string; name?: string },
+  ctx: RefContext,
+): Promise<LinkedBranch> {
+  const data = await graphql<{
+    createLinkedBranch?: { linkedBranch?: RawLinkedBranch | null } | null
+  } | null>(CREATE_LINKED_BRANCH_MUTATION, input, ctx)
+  const created = linkedBranch(data?.createLinkedBranch?.linkedBranch)
+  if (!created) {
+    throw new ToolError(
+      "github_error",
+      "GitHub did not return the branch it created; look at the issue's Development panel before running this again.",
+    )
+  }
+  return created
 }
 
 /**
