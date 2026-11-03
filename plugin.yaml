@@ -9,6 +9,7 @@ provides_tools:
   - github_issue_create
   - github_issue_edit
   - github_issue_read
+  - github_issue_reopen
 provides_hooks:
   - pre_tool_call
 config_schema:
