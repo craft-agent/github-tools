@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { z } from "zod"
 import { REQUIRES_USER_INTERACTION, ToolError, annotations, defineTool, selectTools } from "../core"
 import type { EntrySettings } from "../entry/settings"
+import { ALL_TOOLS } from "../tools"
 import { createServer } from "./server"
 import {
   call,
@@ -82,6 +83,24 @@ describe("tool list", () => {
       expect(listed.outputSchema?.required).toEqual(["tool"])
       expect(listed.inputSchema.type).toBe("object")
       expect(listed.inputSchema.additionalProperties).toBe(false)
+    }
+  })
+})
+
+describe("the package's tools", () => {
+  test("github_issue_read is listed as a read tool, under the default toolsets, even with read_only", async () => {
+    for (const given of [{}, { read_only: true }]) {
+      const { client } = await connect(ALL_TOOLS, settings(given))
+      const listed = (await client.listTools()).tools.find((t) => t.name === "github_issue_read")!
+      expect(listed.annotations).toEqual({
+        title: listed.title!,
+        readOnlyHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+      })
+      expect(listed._meta).toBeUndefined()
+      expect(listed.inputSchema.additionalProperties).toBe(false)
+      expect(listed.inputSchema.required).toEqual(["method"])
     }
   })
 })
