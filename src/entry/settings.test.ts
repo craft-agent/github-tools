@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { isToolError } from "../core"
-import { parseSettings } from "./settings"
+import { parseSettings, settingsFromOptions } from "./settings"
 
 function failure(run: () => unknown): Error {
   try {
@@ -155,5 +155,59 @@ describe("parseSettings", () => {
     expect(failure(() => parseSettings([], { AGENT_GITHUB_TOOLSETS: "bogus" })).message).toContain(
       "AGENT_GITHUB_TOOLSETS",
     )
+  })
+})
+
+describe("settingsFromOptions", () => {
+  test("gives no setting for no options", () => {
+    expect(settingsFromOptions(undefined, {})).toEqual({})
+    expect(settingsFromOptions({}, {})).toEqual({})
+  })
+
+  test("reads each option", () => {
+    expect(
+      settingsFromOptions(
+        { toolsets: ["issues", "projects"], read_only: true, tools: ["github_repo_read"], exclude_tools: ["a"] },
+        {},
+      ),
+    ).toEqual({
+      toolsets: ["issues", "projects"],
+      read_only: true,
+      tools: ["github_repo_read"],
+      exclude_tools: ["a"],
+    })
+    expect(settingsFromOptions({ toolsets: "all" }, {}).toolsets).toBe("all")
+    expect(settingsFromOptions({ toolsets: ["issues", "all"] }, {}).toolsets).toBe("all")
+    expect(settingsFromOptions({ toolsets: [] }, {}).toolsets).toBeUndefined()
+  })
+
+  test("falls back to the environment, and an option wins over it", () => {
+    const env = { AGENT_GITHUB_TOOLSETS: "actions", AGENT_GITHUB_READ_ONLY: "true", AGENT_GITHUB_TOOLS: "a,b" }
+    expect(settingsFromOptions({}, env)).toEqual({ toolsets: ["actions"], read_only: true, tools: ["a", "b"] })
+    expect(
+      settingsFromOptions({ toolsets: ["repos"], read_only: false }, { ...env, AGENT_GITHUB_READ_ONLY: "yes" }),
+    ).toEqual({ toolsets: ["repos"], read_only: false, tools: ["a", "b"] })
+  })
+
+  test("an option of the wrong type is rejected, naming it", () => {
+    expect(failure(() => settingsFromOptions({ toolsets: "issues" }, {})).message).toContain('"toolsets"')
+    expect(failure(() => settingsFromOptions({ toolsets: [1] }, {})).message).toContain('"toolsets"')
+    expect(failure(() => settingsFromOptions({ read_only: "true" }, {})).message).toContain('"read_only"')
+    expect(failure(() => settingsFromOptions({ tools: "a" }, {})).message).toContain('"tools"')
+    expect(failure(() => settingsFromOptions({ exclude_tools: [null] }, {})).message).toContain('"exclude_tools"')
+  })
+
+  test("an unknown toolset or option is rejected, naming it", () => {
+    const toolset = failure(() => settingsFromOptions({ toolsets: ["bogus"] }, {})).message
+    expect(toolset).toContain('"bogus"')
+    expect(toolset).toContain('option "toolsets"')
+    expect(failure(() => settingsFromOptions({ confirm: "harness" }, {})).message).toContain('"confirm"')
+  })
+
+  test("a bad environment variable is rejected only when no option overrides it", () => {
+    expect(failure(() => settingsFromOptions({}, { AGENT_GITHUB_READ_ONLY: "yes" })).message).toContain(
+      "AGENT_GITHUB_READ_ONLY",
+    )
+    expect(settingsFromOptions({ read_only: true }, { AGENT_GITHUB_READ_ONLY: "yes" }).read_only).toBe(true)
   })
 })

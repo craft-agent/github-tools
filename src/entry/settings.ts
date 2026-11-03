@@ -55,8 +55,7 @@ function splitList(value: string): string[] {
     .filter((item) => item !== "")
 }
 
-function parseToolsets(value: string, source: string): Toolset[] | "all" | undefined {
-  const names = splitList(value)
+function checkToolsets(names: string[], source: string): Toolset[] | "all" | undefined {
   if (names.includes(ALL_TOOLSETS)) return ALL_TOOLSETS
   const unknown = names.find((name) => !(TOOLSETS as readonly string[]).includes(name))
   if (unknown !== undefined) {
@@ -89,6 +88,15 @@ function parseConfirm(value: string, source: string): ConfirmMode {
   return mode
 }
 
+/** A setting given as text, and where it came from, for error messages. */
+type SettingText = { text: string; source: string }
+
+function envText(name: OptionName, env: Record<string, string | undefined>): SettingText | undefined {
+  const option = OPTIONS[name]
+  const text = env[option.env]
+  return text === undefined || text.trim() === "" ? undefined : { text, source: option.env }
+}
+
 /**
  * Reads the settings every entry point takes from its command line and
  * environment. A flag wins over its environment variable; an empty list
@@ -96,16 +104,12 @@ function parseConfirm(value: string, source: string): ConfirmMode {
  */
 export function parseSettings(argv: string[], env: Record<string, string | undefined>): EntrySettings {
   const flags = readFlags(argv)
-  const value = (name: OptionName): { text: string; source: string } | undefined => {
-    const option = OPTIONS[name]
-    if (flags[name] !== undefined) return { text: flags[name], source: option.flag }
-    const fromEnv = env[option.env]
-    return fromEnv === undefined || fromEnv.trim() === "" ? undefined : { text: fromEnv, source: option.env }
-  }
+  const value = (name: OptionName): SettingText | undefined =>
+    flags[name] !== undefined ? { text: flags[name], source: OPTIONS[name].flag } : envText(name, env)
 
   const settings: EntrySettings = { confirm: "harness" }
   const toolsets = value("toolsets")
-  if (toolsets) settings.toolsets = parseToolsets(toolsets.text, toolsets.source)
+  if (toolsets) settings.toolsets = checkToolsets(splitList(toolsets.text), toolsets.source)
   const readOnly = value("read_only")
   if (readOnly) settings.read_only = parseBoolean(readOnly.text, readOnly.source)
   const tools = value("tools")
@@ -114,5 +118,75 @@ export function parseSettings(argv: string[], env: Record<string, string | undef
   if (excluded) settings.exclude_tools = splitList(excluded.text)
   const confirm = value("confirm")
   if (confirm) settings.confirm = parseConfirm(confirm.text.trim(), confirm.source)
+  return settings
+}
+
+const TOOL_OPTION_NAMES = ["toolsets", "read_only", "tools", "exclude_tools"] as const satisfies readonly OptionName[]
+type ToolOptionName = (typeof TOOL_OPTION_NAMES)[number]
+
+function stringList(value: unknown): string[] | undefined {
+  return Array.isArray(value) && value.every((item): item is string => typeof item === "string") ? value : undefined
+}
+
+function optionError(name: string, expected: string): ToolError {
+  return new ToolError("invalid_argument", `Option "${name}" must be ${expected}.`)
+}
+
+function toolsetsOption(value: unknown): Toolset[] | "all" | undefined {
+  if (value === ALL_TOOLSETS) return ALL_TOOLSETS
+  const names = stringList(value)
+  if (!names) throw optionError("toolsets", `a list of toolset names or "${ALL_TOOLSETS}"`)
+  return checkToolsets(names, 'option "toolsets"')
+}
+
+function booleanOption(value: unknown): boolean {
+  if (typeof value !== "boolean") throw optionError("read_only", "true or false")
+  return value
+}
+
+function listOption(name: "tools" | "exclude_tools"): (value: unknown) => string[] {
+  return (value) => {
+    const list = stringList(value)
+    if (!list) throw optionError(name, "a list of tool ids")
+    return list
+  }
+}
+
+/**
+ * Reads the tool settings from the options a plugin is configured with, for
+ * entry points that have no command line. An option wins over its environment
+ * variable; an option of the wrong type, or one this function does not know,
+ * is `invalid_argument` naming it. `confirm` is not an option here: the
+ * harness asks.
+ */
+export function settingsFromOptions(
+  options: Record<string, unknown> | undefined,
+  env: Record<string, string | undefined>,
+): ToolSettings {
+  const given = options ?? {}
+  const unknown = Object.keys(given).find((name) => !(TOOL_OPTION_NAMES as readonly string[]).includes(name))
+  if (unknown !== undefined) {
+    throw new ToolError("invalid_argument", `Unknown option "${unknown}"; use one of ${TOOL_OPTION_NAMES.join(", ")}.`)
+  }
+
+  const resolve = <T>(
+    name: ToolOptionName,
+    fromOption: (value: unknown) => T,
+    fromText: (text: SettingText) => T,
+  ): T | undefined => {
+    if (given[name] !== undefined) return fromOption(given[name])
+    const text = envText(name, env)
+    return text !== undefined ? fromText(text) : undefined
+  }
+
+  const settings: ToolSettings = {}
+  const toolsets = resolve("toolsets", toolsetsOption, ({ text, source }) => checkToolsets(splitList(text), source))
+  if (toolsets !== undefined) settings.toolsets = toolsets
+  const readOnly = resolve("read_only", booleanOption, ({ text, source }) => parseBoolean(text, source))
+  if (readOnly !== undefined) settings.read_only = readOnly
+  const tools = resolve("tools", listOption("tools"), ({ text }) => splitList(text))
+  if (tools !== undefined) settings.tools = tools
+  const excluded = resolve("exclude_tools", listOption("exclude_tools"), ({ text }) => splitList(text))
+  if (excluded !== undefined) settings.exclude_tools = excluded
   return settings
 }
