@@ -20,6 +20,21 @@
     "agent-github": "dist/mcp.js",
     "agent-github-cli": "dist/cli.js"
   },
+  "files": [
+    "dist",
+    "skills",
+    "plugin.json",
+    "mcp.json",
+    ".claude-plugin",
+    ".agents/plugins",
+    ".antigravity-plugin",
+    "mcp_config.json",
+    "plugin.yaml",
+    "__init__.py",
+    "src/hermes/agent_github_hermes",
+    "!**/__pycache__",
+    "!**/*.pyc"
+  ],
   "scripts": {
     "build": "node scripts/build.mjs",
     "manifests": "node scripts/manifests.mjs",
