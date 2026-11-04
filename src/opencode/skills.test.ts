@@ -8,7 +8,7 @@ import { loadSkills } from "./skills"
 let dir: string
 
 beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), "agent-github-skills-"))
+  dir = await mkdtemp(join(tmpdir(), "github-tools-skills-"))
 })
 
 afterEach(async () => {

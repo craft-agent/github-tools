@@ -18,14 +18,14 @@ export const EXIT_OK = 0
 export const EXIT_FAILED = 1
 export const EXIT_USAGE = 2
 
-const PROGRAM = "agent-github-cli"
+const PROGRAM = "craft-agent-github-cli"
 const CWD_FLAG = "--cwd"
 
 /** What a command line needs from its surroundings; `main.ts` wires the process, a test supplies its own. */
 export type CliIo = {
   /** The tools the command line can select from. */
   specs: ToolSpec[]
-  /** Where the `AGENT_GITHUB_*` settings fall back to. */
+  /** Where the `CRAFT_AGENT_GITHUB_*` settings fall back to. */
   env: Record<string, string | undefined>
   /** Reads standard input to its end; an empty string when there is none. */
   readStdin(): Promise<string>

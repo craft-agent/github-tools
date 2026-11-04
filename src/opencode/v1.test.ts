@@ -56,7 +56,7 @@ describe("V1 server", () => {
     expect(Object.keys((await setUp({ options: { toolsets: "all" } })).tool)).toContain(ADMIN_ID)
     expect(Object.keys((await setUp({ options: { read_only: true } })).tool)).toEqual([READ_ID])
     expect(Object.keys((await setUp({ options: { exclude_tools: [ADD_ID] } })).tool)).toEqual([READ_ID, FAILING_ID])
-    expect(Object.keys((await setUp({ env: { AGENT_GITHUB_TOOLSETS: "releases" } })).tool)).toEqual([ADMIN_ID])
+    expect(Object.keys((await setUp({ env: { CRAFT_AGENT_GITHUB_TOOLSETS: "releases" } })).tool)).toEqual([ADMIN_ID])
   })
 
   // Validation crosses, JSON Schema only partly: `.describe()` writes to the registry of the Zod copy that made the

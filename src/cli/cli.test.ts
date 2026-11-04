@@ -133,7 +133,7 @@ describe("list", () => {
   })
 
   test("reads the environment behind the flags", async () => {
-    const run = await cli(["list"], "", { env: { AGENT_GITHUB_TOOLSETS: "releases" } })
+    const run = await cli(["list"], "", { env: { CRAFT_AGENT_GITHUB_TOOLSETS: "releases" } })
     expect(json(run).map((entry: { id: string }) => entry.id)).toEqual([ADMIN_ID])
   })
 
@@ -153,8 +153,8 @@ describe("run", () => {
   })
 
   test("hands the install directory to the tool", async () => {
-    const run = await cli(["run", ADD_ID, "--cwd", "/work/tree"], "", { ownDir: "/opt/agent-github" })
-    expect(json(run).result).toEqual({ tool: ADD_ID, cwd: "/work/tree", own_dir: "/opt/agent-github" })
+    const run = await cli(["run", ADD_ID, "--cwd", "/work/tree"], "", { ownDir: "/opt/github-tools" })
+    expect(json(run).result).toEqual({ tool: ADD_ID, cwd: "/work/tree", own_dir: "/opt/github-tools" })
   })
 
   test("takes --cwd after the settings flags and in its --cwd=dir form", async () => {
@@ -304,7 +304,7 @@ describe("usage", () => {
     expect(run.stderr).toContain(message)
   })
 
-  test("ignores AGENT_GITHUB_CONFIRM", async () => {
-    expect((await cli(["list"], "", { env: { AGENT_GITHUB_CONFIRM: "ask" } })).code).toBe(EXIT_OK)
+  test("ignores CRAFT_AGENT_GITHUB_CONFIRM", async () => {
+    expect((await cli(["list"], "", { env: { CRAFT_AGENT_GITHUB_CONFIRM: "ask" } })).code).toBe(EXIT_OK)
   })
 })
