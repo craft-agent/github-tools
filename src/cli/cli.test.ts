@@ -9,6 +9,7 @@ const input = z.object({
   count: z.number().int().optional(),
 })
 const output = z.object({ tool: z.string(), cwd: z.string(), count: z.number().optional() })
+const writeInput = input.extend({ issue: z.string().optional(), parent: z.string().optional() })
 
 const READ_ID = "github_issue_read"
 const ADD_ID = "github_issue_comment"
@@ -24,7 +25,8 @@ function fixture(id: string, toolset: ToolSpec["toolset"], writeClass: ToolSpec[
     description: `Description of ${id}`,
     toolset,
     class: writeClass,
-    input,
+    ...(id === ADD_ID && { targets: { issue: "issue", repo: "repo", parent: "issue" } as const }),
+    input: id === ADD_ID ? writeInput : input,
     output,
     async execute(args, ctx) {
       return { tool: id, cwd: ctx.cwd, count: args.count }
@@ -208,21 +210,45 @@ describe("run", () => {
 describe("target", () => {
   test("is the lowercased repo argument", async () => {
     const run = await cli(["target", ADD_ID, "--cwd", "/x"], JSON.stringify({ repo: "Octo/Hello" }))
-    expect(run).toEqual({ code: EXIT_OK, stdout: '{"resource":"octo/hello"}\n', stderr: "" })
+    expect(run).toEqual({ code: EXIT_OK, stdout: '{"resources":["octo/hello"]}\n', stderr: "" })
   })
 
   test("is the working tree's origin without a repo argument", async () => {
     const repo = tempRepo("git@github.com:Octo/Hello.git")
     cleanups.push(repo.cleanup)
-    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir]))).toEqual({ resource: "octo/hello" })
+    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir]))).toEqual({ resources: ["octo/hello"] })
+  })
+
+  test("is the repository a qualified issue names, not the working tree's", async () => {
+    const repo = tempRepo("git@github.com:Octo/Hello.git")
+    cleanups.push(repo.cleanup)
+    const stdin = JSON.stringify({ issue: "Other/Repo#4", body: "x" })
+    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir], stdin))).toEqual({ resources: ["other/repo"] })
+  })
+
+  test("lists every repository the call writes to", async () => {
+    const repo = tempRepo("git@github.com:Octo/Hello.git")
+    cleanups.push(repo.cleanup)
+    const stdin = JSON.stringify({ issue: "4", parent: "Other/Repo#2" })
+    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir], stdin))).toEqual({
+      resources: ["octo/hello", "other/repo"],
+    })
   })
 
   test("is * when the repository cannot be resolved", async () => {
     const repo = tempRepo()
     cleanups.push(repo.cleanup)
-    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir]))).toEqual({ resource: "*" })
-    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir], '{"repo":"not a repo"}'))).toEqual({ resource: "*" })
-    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir], '{"repo":3}'))).toEqual({ resource: "*" })
+    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir]))).toEqual({ resources: ["*"] })
+    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir], '{"repo":"not a repo"}'))).toEqual({
+      resources: ["*"],
+    })
+    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir], '{"repo":3}'))).toEqual({ resources: ["*"] })
+  })
+
+  test("an unknown tool is invalid_argument", async () => {
+    const run = await cli(["target", "github_nonexistent_read", "--cwd", "/x"])
+    expect(run.code).toBe(EXIT_FAILED)
+    expect(json(run).error.code).toBe("invalid_argument")
   })
 
   test("rejects stdin that is not JSON", async () => {

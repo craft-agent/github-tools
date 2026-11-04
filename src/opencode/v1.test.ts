@@ -185,6 +185,36 @@ describe("V1 tool calls", () => {
     expect(asks.map((request) => request.patterns)).toEqual([["octo/hello"]])
   })
 
+  test("a qualified issue in another repository asks for that repository, not the working tree's", async () => {
+    const repo = tempRepo("git@github.com:Octo/Hello.git")
+    cleanups.push(repo.cleanup)
+    const { tool, asks, context } = await setUp()
+    await tool[ADD_ID]!.execute({ issue: "Other/Repo#4" }, { ...context, worktree: repo.dir })
+    expect(asks.map((request) => [request.patterns, request.always])).toEqual([[["other/repo"], ["other/repo"]]])
+  })
+
+  test("a call that writes to two repositories asks for both, and the message names them", async () => {
+    const repo = tempRepo("git@github.com:Octo/Hello.git")
+    cleanups.push(repo.cleanup)
+    const { tool, asks, context } = await setUp()
+    await tool[ADD_ID]!.execute({ issue: "3", branch_repo: "Fork/Hello" }, { ...context, worktree: repo.dir })
+    expect(asks.map((request) => [request.patterns, request.always])).toEqual([
+      [
+        ["fork/hello", "octo/hello"],
+        ["fork/hello", "octo/hello"],
+      ],
+    ])
+    expect(asks[0]!.metadata.message).toBe(`Title of ${ADD_ID} on fork/hello, octo/hello`)
+  })
+
+  test("a repository that cannot be told is asked for as * beside the others", async () => {
+    const repo = tempRepo()
+    cleanups.push(repo.cleanup)
+    const { tool, asks, context } = await setUp()
+    await tool[ADD_ID]!.execute({ issue: "a/b#1", branch_repo: "not a repo" }, { ...context, worktree: repo.dir })
+    expect(asks.map((request) => request.patterns)).toEqual([["a/b", "*"]])
+  })
+
   test("the pattern is * when the repository cannot be resolved", async () => {
     const repo = tempRepo()
     cleanups.push(repo.cleanup)

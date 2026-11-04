@@ -1,5 +1,5 @@
 import type { ToolSpec } from "../core"
-import { permissionResource } from "../entry/permission"
+import { permissionResources } from "../entry/permission"
 import { loadSkills } from "./skills"
 import { needsPermission, permissionMetadata, runTool, selectedTools, type PluginDeps } from "./shared"
 import type { OpenCodePlugin, V2Context, V2Tool, V2ToolContext, V2ToolResult } from "./types"
@@ -27,12 +27,12 @@ function v2Tool(ctx: V2Context, spec: ToolSpec): V2Tool {
             `invalid_argument: The session's directory could not be read, so ${spec.id} cannot tell which repository it changes; pass \`repo\` as owner/name or retry.`,
           )
         }
-        const resource = await permissionResource(input, { cwd: directory, signal })
+        const resources = await permissionResources(spec, input, { cwd: directory, signal })
         await ctx.permission.assert({
           action: spec.id,
-          resources: [resource],
-          save: [resource],
-          metadata: permissionMetadata(spec, input, resource),
+          resources,
+          save: resources,
+          metadata: permissionMetadata(spec, input, resources),
           sessionID,
         })
       }

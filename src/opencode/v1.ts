@@ -1,5 +1,5 @@
 import { inputJsonSchema, type ToolSpec } from "../core"
-import { permissionResource } from "../entry/permission"
+import { permissionResources } from "../entry/permission"
 import { needsPermission, permissionMetadata, runTool, selectedTools, type PluginDeps } from "./shared"
 import type { OpenCodePlugin, PluginOptions, V1Hooks, V1Tool, V1ToolContext } from "./types"
 
@@ -47,12 +47,12 @@ function v1Tool(spec: ToolSpec): V1Tool {
     async execute(args: unknown, context: V1ToolContext): Promise<string> {
       const ctx = { cwd: workingDir(context), signal: context.abort }
       if (needsPermission(spec)) {
-        const resource = await permissionResource(args, ctx)
+        const resources = await permissionResources(spec, args, ctx)
         await context.ask({
           permission: spec.id,
-          patterns: [resource],
-          always: [resource],
-          metadata: permissionMetadata(spec, args, resource),
+          patterns: resources,
+          always: resources,
+          metadata: permissionMetadata(spec, args, resources),
         })
       }
       const result = await runTool(spec, args, ctx)

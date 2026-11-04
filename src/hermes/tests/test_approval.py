@@ -18,7 +18,7 @@ class ApprovalHookTest(FakeCliCase):
         return [call for call in self.calls() if call["argv"][0] == "target"]
 
     def test_a_write_is_sent_to_approval_with_message_and_rule_key(self) -> None:
-        self.reply("target github_issue_comment", stdout='{"resource":"octo/hello"}\n')
+        self.reply("target github_issue_comment", stdout='{"resources":["octo/hello"]}\n')
         decision = self.hook()(tool_name="github_issue_comment", args={"repo": "Octo/Hello", "body": "hi"}, task_id="t")
         self.assertEqual(
             decision,
@@ -34,7 +34,7 @@ class ApprovalHookTest(FakeCliCase):
 
     def test_every_non_read_class_is_sent_to_approval(self) -> None:
         for tool_id in ("github_pr_merge", "github_project_item_add", "github_repo_edit", "github_run_rerun"):
-            self.reply(f"target {tool_id}", stdout='{"resource":"octo/hello"}')
+            self.reply(f"target {tool_id}", stdout='{"resources":["octo/hello"]}')
             with self.subTest(tool=tool_id):
                 self.assertEqual(self.hook()(tool_name=tool_id, args={})["action"], "approve")
 
@@ -46,11 +46,23 @@ class ApprovalHookTest(FakeCliCase):
         self.assertIsNone(self.hook()(tool_name="write_file", args={"path": "/tmp/x"}))
         self.assertEqual(self.target_calls(), [])
 
+    def test_every_repository_a_write_names_is_in_the_message_and_the_rule_key(self) -> None:
+        self.reply("target github_issue_comment", stdout='{"resources":["octo/hello","other/repo"]}')
+        decision = self.hook()(tool_name="github_issue_comment", args={"issue": "other/repo#2", "body": "hi"})
+        self.assertEqual(decision["message"], "Comment on an issue on octo/hello, other/repo (github_issue_comment)")
+        self.assertEqual(decision["rule_key"], "agent-github:github_issue_comment:octo/hello,other/repo")
+
     def test_an_unresolved_target_is_any_resource(self) -> None:
-        self.reply("target github_pr_merge", stdout='{"resource":"*"}')
+        self.reply("target github_pr_merge", stdout='{"resources":["*"]}')
         decision = self.hook()(tool_name="github_pr_merge", args={})
         self.assertEqual(decision["message"], "Merge a pull request (github_pr_merge)")
         self.assertEqual(decision["rule_key"], "agent-github:github_pr_merge:*")
+
+    def test_a_resource_that_cannot_be_told_stays_beside_the_others(self) -> None:
+        self.reply("target github_pr_merge", stdout='{"resources":["octo/hello","*"]}')
+        decision = self.hook()(tool_name="github_pr_merge", args={})
+        self.assertEqual(decision["message"], "Merge a pull request on octo/hello, * (github_pr_merge)")
+        self.assertEqual(decision["rule_key"], "agent-github:github_pr_merge:octo/hello,*")
 
     def test_a_failing_target_falls_back_to_any_resource(self) -> None:
         for fields in (
@@ -58,8 +70,11 @@ class ApprovalHookTest(FakeCliCase):
             {"code": 2, "stderr": "usage"},
             {"code": 0, "stdout": "not json"},
             {"code": 0, "stdout": "[]"},
-            {"code": 0, "stdout": '{"resource": 3}'},
-            {"code": 0, "stdout": '{"resource": ""}'},
+            {"code": 0, "stdout": '{"resources": "octo/hello"}'},
+            {"code": 0, "stdout": '{"resources": []}'},
+            {"code": 0, "stdout": '{"resources": [3]}'},
+            {"code": 0, "stdout": '{"resources": ["octo/hello", ""]}'},
+            {"code": 0, "stdout": '{"resource": "octo/hello"}'},
         ):
             self.reply("target github_pr_merge", **fields)
             with self.subTest(fields=fields):
@@ -67,7 +82,7 @@ class ApprovalHookTest(FakeCliCase):
                 self.assertEqual(decision["rule_key"], "agent-github:github_pr_merge:*")
 
     def test_a_target_that_times_out_or_cannot_start_falls_back_to_any_resource(self) -> None:
-        self.reply("target github_pr_merge", sleep=5, stdout='{"resource":"octo/hello"}')
+        self.reply("target github_pr_merge", sleep=5, stdout='{"resources":["octo/hello"]}')
         hook = self.hook()
         with mock.patch.object(approval, "TARGET_TIMEOUT_SECONDS", 0.3):
             self.assertEqual(hook(tool_name="github_pr_merge", args={})["rule_key"], "agent-github:github_pr_merge:*")
@@ -77,13 +92,13 @@ class ApprovalHookTest(FakeCliCase):
         self.assertEqual(decision["rule_key"], "agent-github:github_pr_merge:*")
 
     def test_arguments_that_are_not_a_dict_still_ask(self) -> None:
-        self.reply("target github_pr_merge", stdout='{"resource":"octo/hello"}')
+        self.reply("target github_pr_merge", stdout='{"resources":["octo/hello"]}')
         decision = self.hook()(tool_name="github_pr_merge", args=None)
         self.assertEqual(decision["action"], "approve")
         self.assertEqual(json.loads(self.target_calls()[0]["stdin"]), {})
 
     def test_it_does_not_look_for_a_person_itself(self) -> None:
-        self.reply("target github_pr_merge", stdout='{"resource":"octo/hello"}')
+        self.reply("target github_pr_merge", stdout='{"resources":["octo/hello"]}')
         with mock.patch.dict("os.environ", {"HERMES_CRON": "1", "HERMES_YOLO_MODE": "1"}):
             self.assertEqual(self.hook()(tool_name="github_pr_merge", args={})["action"], "approve")
 

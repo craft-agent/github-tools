@@ -151,6 +151,28 @@ describe("V2 tool calls", () => {
     expect(asserts.map((request) => request.resources)).toEqual([["octo/hello"]])
   })
 
+  test("a qualified issue in another repository asks for that repository, not the session directory's", async () => {
+    const repo = tempRepo("https://github.com/Octo/Hello.git")
+    cleanups.push(repo.cleanup)
+    const { tools, asserts } = await setUp({ location: { directory: repo.dir } })
+    await tools.get(ADD_ID)!.execute({ issue: "Other/Repo#4" }, { sessionID: SESSION_ID, signal })
+    expect(asserts.map((request) => [request.resources, request.save])).toEqual([[["other/repo"], ["other/repo"]]])
+  })
+
+  test("a call that writes to two repositories asks for both, and the message names them", async () => {
+    const repo = tempRepo("https://github.com/Octo/Hello.git")
+    cleanups.push(repo.cleanup)
+    const { tools, asserts } = await setUp({ location: { directory: repo.dir } })
+    await tools.get(ADD_ID)!.execute({ issue: "3", branch_repo: "Fork/Hello" }, { sessionID: SESSION_ID, signal })
+    expect(asserts.map((request) => [request.resources, request.save])).toEqual([
+      [
+        ["fork/hello", "octo/hello"],
+        ["fork/hello", "octo/hello"],
+      ],
+    ])
+    expect(asserts[0]!.metadata?.message).toBe(`Title of ${ADD_ID} on fork/hello, octo/hello`)
+  })
+
   test("the resource is * when the repository cannot be resolved", async () => {
     const repo = tempRepo()
     cleanups.push(repo.cleanup)
