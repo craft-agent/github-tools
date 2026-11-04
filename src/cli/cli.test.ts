@@ -133,7 +133,7 @@ describe("list", () => {
   })
 
   test("reads the environment behind the flags", async () => {
-    const run = await cli(["list"], "", { env: { CRAFT_AGENT_GITHUB_TOOLSETS: "releases" } })
+    const run = await cli(["list"], "", { env: { GITHUB_TOOLS_TOOLSETS: "releases" } })
     expect(json(run).map((entry: { id: string }) => entry.id)).toEqual([ADMIN_ID])
   })
 
@@ -304,7 +304,7 @@ describe("usage", () => {
     expect(run.stderr).toContain(message)
   })
 
-  test("ignores CRAFT_AGENT_GITHUB_CONFIRM", async () => {
-    expect((await cli(["list"], "", { env: { CRAFT_AGENT_GITHUB_CONFIRM: "ask" } })).code).toBe(EXIT_OK)
+  test("ignores GITHUB_TOOLS_CONFIRM", async () => {
+    expect((await cli(["list"], "", { env: { GITHUB_TOOLS_CONFIRM: "ask" } })).code).toBe(EXIT_OK)
   })
 })

@@ -79,10 +79,10 @@ class HandlerTest(FakeCliCase):
         self.assertEqual(json.loads(self.handler()({})), {"error": "not_found: No such issue."})
 
     def test_maps_an_exit_without_a_document_to_its_stderr(self) -> None:
-        self.reply("run github_issue_comment", stderr="craft-agent-github-cli: boom\n", code=2)
-        self.assertEqual(json.loads(self.handler()({})), {"error": "craft-agent-github-cli failed: craft-agent-github-cli: boom"})
+        self.reply("run github_issue_comment", stderr="github-tools-cli: boom\n", code=2)
+        self.assertEqual(json.loads(self.handler()({})), {"error": "github-tools-cli failed: github-tools-cli: boom"})
         self.reply("run github_issue_comment", code=3)
-        self.assertEqual(json.loads(self.handler()({})), {"error": "craft-agent-github-cli failed: exit status 3"})
+        self.assertEqual(json.loads(self.handler()({})), {"error": "github-tools-cli failed: exit status 3"})
 
     def test_maps_a_success_that_is_not_a_result_document_to_an_error(self) -> None:
         self.reply("run github_issue_comment", stdout="garbage")

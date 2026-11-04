@@ -5,7 +5,7 @@ import type { PluginOptions } from "./types"
 
 /** What a plugin takes from its surroundings; each has a default, and a test supplies its own. */
 export type PluginDeps = {
-  /** Where the `CRAFT_AGENT_GITHUB_*` settings fall back to; defaults to `process.env`. */
+  /** Where the `GITHUB_TOOLS_*` settings fall back to; defaults to `process.env`. */
   env?: Record<string, string | undefined>
   /** The directory holding `<name>/SKILL.md` files, for the harness version that registers skills. */
   skillsDir?: URL | string

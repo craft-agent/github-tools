@@ -15,7 +15,7 @@ agent harness in the form that suits it best.
 | Hermes Agent   | native plugin (Python, calls the command line)   | the release commit, as the SHA                |
 | other MCP host | MCP server from npm                              | the version in the package                    |
 
-0.3.0 moved the package from `craftsamo/agent-github` to `craft-agent/github-tools` and renamed it: npm `@craftsamo/github-tools` (was `@craftsamo/agent-github`, now deprecated), plugin and MCP server `github-tools`, programs `craft-agent-github` and `craft-agent-github-cli`, settings `CRAFT_AGENT_GITHUB_*`. Allow rules, plugin installs and MCP configurations written for 0.2.0 change; the tool IDs do not.
+0.3.0 moved the package from `craftsamo/agent-github` to `craft-agent/github-tools` and renamed it: npm `@craftsamo/github-tools` (was `@craftsamo/agent-github`, now deprecated), plugin and MCP server `github-tools`, programs `github-tools` and `github-tools-cli`, settings `GITHUB_TOOLS_*`. Allow rules, plugin installs and MCP configurations written for 0.2.0 change; the tool IDs do not.
 
 The tools need [Node.js](https://nodejs.org/) 24 or later and the
 [GitHub CLI](https://cli.github.com/), authenticated as you.
@@ -186,15 +186,19 @@ Where a write is asked about, and where it is not:
 Every entry point takes the same settings. A flag wins over its environment
 variable, and an option or setting wins over the variable too.
 
-| Setting         | Flag              | Variable                           | Meaning                                                                                                              |
-| --------------- | ----------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `toolsets`      | `--toolsets`      | `CRAFT_AGENT_GITHUB_TOOLSETS`      | `issues`, `pull_requests`, `projects`, `repos`, `releases`, `actions` or `all`; default `issues` and `pull_requests` |
-| `read_only`     | `--read-only`     | `CRAFT_AGENT_GITHUB_READ_ONLY`     | registers no tool that writes; wins over every other setting                                                         |
-| `tools`         | `--tools`         | `CRAFT_AGENT_GITHUB_TOOLS`         | single tools to add by ID, whatever their toolset                                                                    |
-| `exclude_tools` | `--exclude-tools` | `CRAFT_AGENT_GITHUB_EXCLUDE_TOOLS` | single tools to remove by ID; wins over `tools` and `toolsets`                                                       |
-| `confirm`       | `--confirm`       | `CRAFT_AGENT_GITHUB_CONFIRM`       | MCP server only: `harness` (default) or `elicitation`, as `docs/conventions.md` describes                            |
+| Setting         | Flag              | Variable                     | Meaning                                                                                                              |
+| --------------- | ----------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `toolsets`      | `--toolsets`      | `GITHUB_TOOLS_TOOLSETS`      | `issues`, `pull_requests`, `projects`, `repos`, `releases`, `actions` or `all`; default `issues` and `pull_requests` |
+| `read_only`     | `--read-only`     | `GITHUB_TOOLS_READ_ONLY`     | registers no tool that writes; wins over every other setting                                                         |
+| `tools`         | `--tools`         | `GITHUB_TOOLS_TOOLS`         | single tools to add by ID, whatever their toolset                                                                    |
+| `exclude_tools` | `--exclude-tools` | `GITHUB_TOOLS_EXCLUDE_TOOLS` | single tools to remove by ID; wins over `tools` and `toolsets`                                                       |
+| `confirm`       | `--confirm`       | `GITHUB_TOOLS_CONFIRM`       | MCP server only: `harness` (default) or `elicitation`, as `docs/conventions.md` describes                            |
 
-Lists are comma-separated in a flag or a variable. Where each harness reads them:
+Lists are comma-separated in a flag or a variable. GitHub Actions does not let a
+secret or configuration variable be named `GITHUB_*`, so in a workflow pass a
+value through `env:` from a secret of another name, e.g.
+`GITHUB_TOOLS_READ_ONLY: ${{ secrets.TOOLS_READ_ONLY }}` (setting such an
+environment variable in `env:` is allowed). Where each harness reads them:
 
 - **OpenCode** takes the plugin `options` shown above, with lists as arrays and
   `read_only` as a boolean.
@@ -214,17 +218,17 @@ Lists are comma-separated in a flag or a variable. Where each harness reads them
   Code passes the client's environment, so set the variables in the environment
   the harness runs in.
 - **Codex and Grok Build** pass no environment to a plugin's MCP server, so the
-  `CRAFT_AGENT_GITHUB_*` variables have no effect there. To change settings in Codex,
+  `GITHUB_TOOLS_*` variables have no effect there. To change settings in Codex,
   add the server under `[mcp_servers]` in Codex's config with flags in `args` (as
   in [Any other MCP host](#any-other-mcp-host)) instead of using the plugin.
 
 ## Layout
 
 - `src/core/` — the tools, free of any harness.
-- `src/mcp/` — the MCP server, built to `dist/mcp.js` and run by `craft-agent-github`.
+- `src/mcp/` — the MCP server, built to `dist/mcp.js` and run by `github-tools`.
 - `src/opencode/` — the OpenCode plugin, built to `dist/opencode.js`.
 - `src/cli/` — the command line the Hermes plugin calls, built to `dist/cli.js`
-  and run by `craft-agent-github-cli`.
+  and run by `github-tools-cli`.
 - `src/hermes/`, `plugin.yaml` and `__init__.py` — the Hermes plugin.
 - `skills/` — one skill per toolset, `skills/<name>/SKILL.md`, which every
   harness that takes skills loads from the package or plugin root.

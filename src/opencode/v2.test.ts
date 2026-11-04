@@ -86,9 +86,9 @@ describe("V2 setup", () => {
   })
 
   test("falls back to the environment, and an option wins over it", async () => {
-    expect([...(await setUp({}, { CRAFT_AGENT_GITHUB_READ_ONLY: "true" })).tools.keys()]).toEqual([READ_ID])
+    expect([...(await setUp({}, { GITHUB_TOOLS_READ_ONLY: "true" })).tools.keys()]).toEqual([READ_ID])
     expect([
-      ...(await setUp({ options: { read_only: false } }, { CRAFT_AGENT_GITHUB_READ_ONLY: "true" })).tools.keys(),
+      ...(await setUp({ options: { read_only: false } }, { GITHUB_TOOLS_READ_ONLY: "true" })).tools.keys(),
     ]).toEqual([READ_ID, ADD_ID, FAILING_ID])
   })
 

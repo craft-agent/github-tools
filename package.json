@@ -18,8 +18,8 @@
     "./opencode": "./dist/opencode.js"
   },
   "bin": {
-    "craft-agent-github": "dist/mcp.js",
-    "craft-agent-github-cli": "dist/cli.js"
+    "github-tools": "dist/mcp.js",
+    "github-tools-cli": "dist/cli.js"
   },
   "files": [
     "dist",

@@ -78,8 +78,11 @@ describe("MCP configurations", () => {
     }
   })
 
-  test("craft-agent-github runs the MCP server, and craft-agent-github-cli the command line", () => {
-    expect(pkg.bin).toEqual({ "craft-agent-github": MCP_ENTRY, "craft-agent-github-cli": "dist/cli.js" })
+  test("github-tools runs the MCP server, and github-tools-cli the command line", () => {
+    expect(pkg.bin).toEqual({ "github-tools": MCP_ENTRY, "github-tools-cli": "dist/cli.js" })
+    // npx runs the bin named like the unscoped package name when a package provides several bins.
+    const unscoped = pkg.name.replace(/^@[^/]+\//, "")
+    expect(pkg.bin[unscoped]).toBe(MCP_ENTRY)
   })
 })
 
