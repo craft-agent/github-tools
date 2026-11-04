@@ -15,7 +15,7 @@ agent harness in the form that suits it best.
 | Hermes Agent   | native plugin (Python, calls the command line)   | the release commit, as the SHA                |
 | other MCP host | MCP server from npm                              | the version in the package                    |
 
-0.3.0 moved the package from `craftsamo/agent-github` to `craft-agent/github-tools` and renamed it: npm `@craftsamo/github-tools` (was `@craftsamo/agent-github`, now deprecated), plugin and MCP server `github-tools`, programs `github-tools` and `github-tools-cli`, settings `GITHUB_TOOLS_*`. Allow rules, plugin installs and MCP configurations written for 0.2.0 change; the tool IDs do not.
+0.3.0 moved the package from `craftsamo/agent-github` to `craft-agent/github-tools` and renamed it: npm `@craftsamo/github-tools` (was `@craftsamo/agent-github`, now removed from npm), plugin and MCP server `github-tools`, programs `github-tools` and `github-tools-cli`, settings `GITHUB_TOOLS_*`. Allow rules, plugin installs and MCP configurations written for 0.2.0 change; the tool IDs do not.
 
 The tools need [Node.js](https://nodejs.org/) 24 or later and the
 [GitHub CLI](https://cli.github.com/), authenticated as you.

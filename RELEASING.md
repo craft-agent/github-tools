@@ -66,7 +66,9 @@ A tool ID change also changes `provides_tools` in `plugin.yaml`; run
   proves that the npm package belongs to the entry.
 - **Repository.** `repo-kit setup github` creates the release deploy key
   (`RELEASE_DEPLOY_KEY`) that lets the version commit past the protection of
-  `main`.
+  `main`. The organization must allow deploy keys in its repositories
+  (member privileges); where it does not, the key is disabled and the
+  `release` job fails when it pushes the version commit.
 
 `mcp-publisher` is pinned to one release and verified against its Sigstore
 bundle before it runs; raise `MCP_PUBLISHER_VERSION` in the workflow when a new
@@ -76,5 +78,6 @@ one is wanted.
 
 Up to 0.2.0 the package was `@craftsamo/agent-github`, from
 `craftsamo/agent-github`, in the registry as `io.github.craftsamo/agent-github`.
-Both are deprecated with a pointer to `@craftsamo/github-tools` and
+The npm package was unpublished and every version of the registry entry is
+marked deleted; their successors are `@craftsamo/github-tools` and
 `io.github.craft-agent/github-tools`.
