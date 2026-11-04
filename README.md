@@ -15,6 +15,9 @@ agent harness in the form that suits it best.
 | Hermes Agent   | native plugin (Python, calls the command line)   | the release commit, as the SHA                |
 | other MCP host | MCP server from npm                              | the version in the package                    |
 
+0.2.0 renamed the MCP server from `github` to `agent-github`, so allow rules
+and MCP configurations written for 0.1.0 change.
+
 The tools need [Node.js](https://nodejs.org/) 24 or later and the
 [GitHub CLI](https://cli.github.com/), authenticated as you.
 [`docs/conventions.md`](docs/conventions.md) describes how the tools are named
@@ -102,7 +105,7 @@ Add the server to the host's MCP configuration. Flags go in `args`:
 ```json
 {
   "mcpServers": {
-    "github": {
+    "agent-github": {
       "command": "npx",
       "args": ["-y", "@craftsamo/agent-github@<version>", "--toolsets", "issues,pull_requests,projects"]
     }
@@ -131,19 +134,28 @@ The skill is [`github-issues`](skills/github-issues/SKILL.md). An issue's kind
 is the organization's Issue Type of that name when it defines one, otherwise a
 `type:<kind>` label.
 
-## Read tools without asking
+## Reads and writes
 
-Every read tool is named `github_<domain>_read`. Writes are confirmed by the
-harness.
+Every read tool is named `github_<domain>_read`. Reads can run unasked; writes
+are confirmed by the harness.
 
-| Harness     | Reads without asking                                                                                                             |
-| ----------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| OpenCode    | always; the plugin asks only before a write                                                                                      |
-| Claude Code | `permissions.allow` rule `mcp__plugin_agent-github_github__*_read`; a glob is allowed after the literal `mcp__<server>__` prefix |
-| Codex       | always; Codex runs tools that declare `readOnlyHint` unasked, as the read tools do                                               |
-| Grok Build  | `grok --allow 'MCPTool(github__*_read)'`                                                                                         |
-| Antigravity | an Allow rule `mcp(github/<tool>)` for each read tool; not yet verified                                                          |
-| Hermes      | always; the plugin asks only before a write                                                                                      |
+| Harness     | Reads without asking                                                                                                      |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------- |
+| OpenCode    | always; the plugin asks only before a write                                                                               |
+| Claude Code | the rule `mcp__plugin_agent-github_agent-github__*_read` in `permissions.allow` of `~/.claude/settings.json` or a project |
+| Codex       | always; Codex runs tools that declare `readOnlyHint` unasked, as the read tools do                                        |
+| Grok Build  | `grok --allow 'MCPTool(agent-github__*_read)'`                                                                            |
+| Antigravity | an Allow rule `mcp(agent-github/<tool>)` for each read tool; not yet verified                                             |
+| Hermes      | always; the plugin asks only before a write                                                                               |
+
+Where a write is asked about, and where it is not:
+
+- **OpenCode** grants any action no rule names, so a write runs unasked unless
+  a rule asks for it: add the `github_*` rule shown under [OpenCode](#opencode).
+- **Codex** under `codex exec`, and **Grok Build** under `grok -p`, refuse a
+  write they cannot ask about, unless it is allowed beforehand.
+- **Hermes** `hermes chat -q` refuses a write it cannot ask about; `hermes -z`
+  and `--yolo` skip approval, so writes then run unasked.
 
 ## Settings
 
@@ -188,11 +200,12 @@ Lists are comma-separated in a flag or a variable. Where each harness reads them
 - `src/hermes/`, `plugin.yaml` and `__init__.py` — the Hermes plugin.
 - `skills/` — one skill per toolset, `skills/<name>/SKILL.md`, which every
   harness that takes skills loads from the package or plugin root.
-- `plugin.json`, `mcp.json`, `.claude-plugin/`, `.agents/plugins/`,
+- `plugin.json`, `mcp.json`, `.mcp.json`, `.claude-plugin/`, `.agents/plugins/`,
   `.antigravity-plugin/` and `mcp_config.json` — the plugin manifests of the
-  other harnesses. Claude Code's server is declared inside
-  `.claude-plugin/plugin.json`, since a `.mcp.json` in the repository root would
-  be read as this project's own MCP configuration.
+  other harnesses. The root `.mcp.json` is the configuration Grok Build reads
+  (with `${CLAUDE_PLUGIN_ROOT}`, the variable both Grok Build and Claude Code
+  expand); when working on this repository in Claude Code, decline the project
+  MCP server it offers from that file.
 
 How a release is made is in [`RELEASING.md`](RELEASING.md).
 

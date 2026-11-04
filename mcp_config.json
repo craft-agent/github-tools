@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "github": {
+    "agent-github": {
       "command": "node",
       "args": ["${PLUGIN_ROOT}/dist/mcp.js"]
     }

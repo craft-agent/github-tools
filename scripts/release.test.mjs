@@ -9,7 +9,7 @@ import { VERSION_FILES } from "./version-files.mjs"
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url))
 const PLUGIN_NAME = "agent-github"
-const SERVER_NAME = "github"
+const SERVER_NAME = "agent-github"
 const MCP_ENTRY = "dist/mcp.js"
 const REGISTRY_DESCRIPTION_LIMIT = 100
 
@@ -18,6 +18,7 @@ const MCP_CONFIGS = {
   "mcp.json": "${PLUGIN_ROOT}",
   ".claude-plugin/plugin.json": "${CLAUDE_PLUGIN_ROOT}",
   "mcp_config.json": "${PLUGIN_ROOT}",
+  ".mcp.json": "${CLAUDE_PLUGIN_ROOT}",
 }
 
 /** Each marketplace and the plugin entries it lists. */
@@ -68,6 +69,13 @@ describe("MCP configurations", () => {
     expect(readJson(file).mcpServers).toEqual({
       [SERVER_NAME]: expect.objectContaining({ command: "node", args: [`${root}/${MCP_ENTRY}`] }),
     })
+  })
+
+  test("every MCP configuration declares exactly one server and all use the same name", () => {
+    for (const file of Object.keys(MCP_CONFIGS)) {
+      const servers = Object.keys(readJson(file).mcpServers ?? {})
+      expect(servers).toEqual([SERVER_NAME])
+    }
   })
 
   test("the package's own name runs the MCP server, and agent-github-cli the command line", () => {
