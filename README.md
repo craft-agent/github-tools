@@ -98,6 +98,9 @@ fails there with a message saying so).
 grok plugin install craft-agent/github-tools@v<version> --trust
 ```
 
+Grok starts the MCP server in the session's working directory, so inside a clone
+a bare issue number names an issue of that repository.
+
 ### Antigravity
 
 Install from the tree of the release tag, never from the default branch, which
@@ -138,7 +141,7 @@ Add the server to the host's MCP configuration. Flags go in `args`:
 ## Tools and skills
 
 Each toolset comes with a skill that tells an agent how to use its tools. A
-toolset with no tools yet registers none (0.2.0 ships the `issues` tools).
+toolset with no tools yet registers none (so far only `issues` has tools).
 
 ### Issues (`issues`)
 
