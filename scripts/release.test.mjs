@@ -111,6 +111,12 @@ describe("package files", () => {
   test("the Hermes tests are not packed", () => {
     expect(isPacked("src/hermes/tests", pkg.files)).toBe(false)
   })
+
+  // The builds bundle everything they import, and plugin installs that clone
+  // the repository install no packages (Claude Code reports the pnpm lockfile).
+  test("the package installs no runtime dependencies", () => {
+    expect(pkg.dependencies ?? {}).toEqual({})
+  })
 })
 
 describe("server.json", () => {
