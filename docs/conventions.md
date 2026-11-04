@@ -3,8 +3,8 @@
 The rules every tool in this package follows, so tools read alike across
 domains and harnesses. Each rule carries the reason it was chosen; the
 discussion behind them is on
-[#2](https://github.com/craftsamo/agent-github/issues/2) and
-[#3](https://github.com/craftsamo/agent-github/issues/3).
+[#2](https://github.com/craft-agent/github-tools/issues/2) and
+[#3](https://github.com/craft-agent/github-tools/issues/3).
 
 ## Names
 

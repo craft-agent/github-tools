@@ -145,7 +145,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # id-token for the registry's GitHub OIDC login, which proves the
-    # `io.github.craftsamo` namespace without a token.
+    # `io.github.craft-agent` namespace without a token.
     permissions:
       contents: read
       id-token: write

@@ -49,16 +49,20 @@ A tool ID change also changes `provides_tools` in `plugin.yaml`; run
 
 ## One-time setup
 
-- **npm.** On npmjs.com, open the settings of `@craftsamo/agent-github` and add
-  a trusted publisher: GitHub Actions, repository `craftsamo/agent-github`,
+- **npm.** On npmjs.com, open the settings of `@craftsamo/github-tools` and add
+  a trusted publisher: GitHub Actions, organization `craft-agent`, repository `github-tools`,
   workflow `release-publish.yml`. npm does not check the entry when it is saved,
   and expires it unless a publish succeeds within two days. The package must
-  exist before its settings do, so the first version is published once by hand.
-  Right after a manual publish, `npm view` may still answer E404 for a minute;
-  the release workflow treats npm's refusal to overwrite the version as already
-  published, so the job may then be re-run, or it passes on its own.
+  exist before its settings do, so the first version of `@craftsamo/github-tools` is
+  published by hand from the tag with
+  `npm publish --access public --ignore-scripts --provenance=false`, since
+  `publishConfig.provenance` is true and a local publish cannot make provenance;
+  then add the trusted publisher. Right after a manual publish, `npm view` may
+  still answer E404 for a minute; the release workflow treats npm's refusal to
+  overwrite the version as already published, so the job may then be re-run, or
+  it passes on its own.
 - **MCP Registry.** Nothing beyond the workflow's OIDC token: the GitHub login
-  proves the `io.github.craftsamo/*` namespace, and `mcpName` in `package.json`
+  proves the `io.github.craft-agent/*` namespace, and `mcpName` in `package.json`
   proves that the npm package belongs to the entry.
 - **Repository.** `repo-kit setup github` creates the release deploy key
   (`RELEASE_DEPLOY_KEY`) that lets the version commit past the protection of
@@ -67,3 +71,10 @@ A tool ID change also changes `provides_tools` in `plugin.yaml`; run
 `mcp-publisher` is pinned to one release and verified against its Sigstore
 bundle before it runs; raise `MCP_PUBLISHER_VERSION` in the workflow when a new
 one is wanted.
+
+## Earlier names
+
+Up to 0.2.0 the package was `@craftsamo/agent-github`, from
+`craftsamo/agent-github`, in the registry as `io.github.craftsamo/agent-github`.
+Both are deprecated with a pointer to `@craftsamo/github-tools` and
+`io.github.craft-agent/github-tools`.

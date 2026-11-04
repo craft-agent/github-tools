@@ -1,6 +1,6 @@
 # AGENTS
 
-agent-github is one set of GitHub tools for coding agents — issues, project
+github-tools is one set of GitHub tools for coding agents — issues, project
 boards, pull requests, repositories, releases and Actions — delivered to
 several harnesses (OpenCode, Claude Code, Codex, Grok Build, Antigravity,
 Hermes Agent) from this repository. Releases are GitHub Releases tagged
