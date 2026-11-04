@@ -1,20 +1,17 @@
-import { isAbortError, resolveRepo, type ToolContext } from "../core"
+import { ANY_TARGET, writeTargets, type RefContext, type ToolSpec } from "../core"
 
-/** What a permission rule matches when the call's target repository cannot be told. */
-export const ANY_RESOURCE = "*"
+/** What a permission rule matches when a repository the call writes to cannot be told. */
+export const ANY_RESOURCE = ANY_TARGET
 
 /**
- * The resource a permission rule matches: the repository the call targets, in
- * lowercase (its `repo` argument, or else the working tree's `origin`). When
- * that cannot be resolved the resource is `*`, and the call fails its own way.
+ * The resources a permission rule matches: every repository the call writes
+ * to, in lowercase (see `writeTargets`), with `*` for one that cannot be told;
+ * the call then fails its own way.
  */
-export async function permissionResource(args: unknown, ctx: Pick<ToolContext, "cwd" | "signal">): Promise<string> {
-  const repo = typeof args === "object" && args !== null ? (args as { repo?: unknown }).repo : undefined
-  if (repo !== undefined && typeof repo !== "string") return ANY_RESOURCE
-  try {
-    return (await resolveRepo(repo, ctx)).full.toLowerCase()
-  } catch (error) {
-    if (isAbortError(error)) throw error
-    return ANY_RESOURCE
-  }
+export function permissionResources(
+  spec: Pick<ToolSpec, "targets">,
+  args: unknown,
+  ctx: RefContext,
+): Promise<string[]> {
+  return writeTargets(spec, args, ctx)
 }

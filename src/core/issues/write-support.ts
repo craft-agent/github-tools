@@ -2,13 +2,16 @@ import { ToolError } from "../errors"
 import { gh } from "../gh"
 import { assertWritable, repositoryContext, type RepositoryContext } from "../github/repository"
 import type { RepoName } from "../refs"
-import type { ToolContext } from "../tool"
+import type { TargetKind, ToolContext } from "../tool"
 
 /** What the issue write tools share: argument checks, the permission gate and `gh issue edit`. */
 
 export const REPO_DESCRIPTION =
   "owner/name; defaults to the working tree's repository (its origin). Used for a bare number."
 export const ISSUE_DESCRIPTION = "The issue, as 12, #12, owner/repo#12 or its URL."
+
+/** The targets of a tool that writes to one issue, named by `issue` and `repo`. */
+export const ISSUE_TARGETS = { issue: "issue", repo: "repo" } as const satisfies Readonly<Record<string, TargetKind>>
 
 /** `gh` reads `--label` and `--assignee` values as CSV: a comma splits one name into two, and a quote or a line break is syntax. */
 const LIST_SYNTAX = /[,"\r\n]/

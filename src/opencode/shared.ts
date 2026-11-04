@@ -9,16 +9,25 @@ export type PluginDeps = {
   env?: Record<string, string | undefined>
   /** The directory holding `<name>/SKILL.md` files, for the harness version that registers skills. */
   skillsDir?: URL | string
+  /** Where the plugin is installed: never a call's working tree, so a bare number there fails. */
+  ownDir?: string
 }
 
-/** The one plain line a person reads when the harness asks to run a tool. */
-export function permissionMessage(spec: Pick<ToolSpec, "title">, resource: string): string {
-  return resource === ANY_RESOURCE ? spec.title : `${spec.title} on ${resource}`
+/** The one plain line a person reads when the harness asks to run a tool; it names every repository the call writes to. */
+export function permissionMessage(spec: Pick<ToolSpec, "title">, resources: string[]): string {
+  return resources.length === 1 && resources[0] === ANY_RESOURCE
+    ? spec.title
+    : `${spec.title} on ${resources.join(", ")}`
+}
+
+/** The resources an "always" answer may persist: all but `*`, which would grant every repository. */
+export function persistableResources(resources: string[]): string[] {
+  return resources.filter((resource) => resource !== ANY_RESOURCE)
 }
 
 /** What the harness is told about a call it is asked to allow. */
-export function permissionMetadata(spec: Pick<ToolSpec, "title" | "class">, args: unknown, resource: string) {
-  return { arguments: args, class: spec.class, message: permissionMessage(spec, resource) }
+export function permissionMetadata(spec: Pick<ToolSpec, "title" | "class">, args: unknown, resources: string[]) {
+  return { arguments: args, class: spec.class, message: permissionMessage(spec, resources) }
 }
 
 /** Whether a call must be allowed by the harness first: every tool but a read tool. */

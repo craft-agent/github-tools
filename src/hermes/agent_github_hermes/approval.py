@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 from collections.abc import Callable
 from typing import Any
 
@@ -13,25 +14,27 @@ from .runtime import Runtime, agent_cwd
 #: How long ``target`` may take, in seconds. Hermes stops a ``pre_tool_call`` hook after 30 s and blocks the call.
 TARGET_TIMEOUT_SECONDS = 20
 
-#: What an approval rule matches when the repository a call targets cannot be told.
+#: What an approval rule matches when a repository a call writes to cannot be told.
 ANY_RESOURCE = "*"
 
 #: The Hermes hook that can hold a tool call for the person's approval.
 HOOK_NAME = "pre_tool_call"
 
 
-def resolve_target(runtime: Runtime, tool_id: str, args: Any) -> str:
-    """The repository a call acts on, in lowercase, or ``*`` when it cannot be told."""
+def resolve_resources(runtime: Runtime, tool_id: str, args: Any) -> list[str]:
+    """The repositories a call writes to, in lowercase, or ``["*"]`` when they cannot be told."""
     try:
         result = runtime.run(
             ["target", tool_id, "--cwd", agent_cwd()],
             stdin=json.dumps(args if isinstance(args, dict) else {}),
             timeout=TARGET_TIMEOUT_SECONDS,
         )
-        resource = json.loads(result.stdout).get("resource") if result.code == 0 else None
-    except Exception:  # an approval is asked for either way; only its resource is lost
-        return ANY_RESOURCE
-    return resource if isinstance(resource, str) and resource else ANY_RESOURCE
+        resources = json.loads(result.stdout).get("resources") if result.code == 0 else None
+    except Exception:  # an approval is asked for either way; only its resources are lost
+        return [ANY_RESOURCE]
+    if isinstance(resources, list) and resources and all(isinstance(item, str) and item for item in resources):
+        return resources
+    return [ANY_RESOURCE]
 
 
 def make_hook(runtime: Runtime, tools: list[ToolInfo]) -> Callable[..., dict[str, str] | None]:
@@ -46,13 +49,14 @@ def make_hook(runtime: Runtime, tools: list[ToolInfo]) -> Callable[..., dict[str
         tool = by_id.get(tool_name)
         if tool is None or tool.write_class == READ_CLASS:
             return None
-        resource = resolve_target(runtime, tool.id, args)
-        subject = tool.title if resource == ANY_RESOURCE else f"{tool.title} on {resource}"
-        return {
-            "action": "approve",
-            "message": f"{subject} ({tool.id})",
-            "rule_key": f"agent-github:{tool.id}:{resource}",
-        }
+        resources = resolve_resources(runtime, tool.id, args)
+        subject = tool.title if resources == [ANY_RESOURCE] else f"{tool.title} on {', '.join(resources)}"
+        rule_key = f"agent-github:{tool.id}:{','.join(resources)}"
+        if ANY_RESOURCE in resources:
+            # Hermes falls back to the bare tool name for a missing rule_key, which an "always" would turn into a
+            # grant for every repository; a key no later call repeats leaves nothing reusable.
+            rule_key = f"{rule_key}:once-{uuid.uuid4().hex}"
+        return {"action": "approve", "message": f"{subject} ({tool.id})", "rule_key": rule_key}
 
     return hook
 

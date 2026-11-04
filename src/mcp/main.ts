@@ -1,5 +1,6 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { isToolError } from "../core"
+import { packageRoot } from "../entry/package-root"
 import { parseSettings } from "../entry/settings"
 import { ALL_TOOLS } from "../tools"
 import { createServer } from "./server"
@@ -12,6 +13,7 @@ async function main(): Promise<void> {
   try {
     const settings = parseSettings(process.argv.slice(2), process.env)
     server = createServer(ALL_TOOLS, settings, {
+      ownDir: packageRoot(import.meta.url),
       version: typeof __VERSION__ === "string" ? __VERSION__ : undefined,
     })
   } catch (error) {

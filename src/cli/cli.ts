@@ -10,7 +10,7 @@ import {
   type ErrorCode,
   type ToolSpec,
 } from "../core"
-import { permissionResource } from "../entry/permission"
+import { permissionResources } from "../entry/permission"
 import { parseToolSettings } from "../entry/settings"
 
 /** The exit codes of a command: it did its work, the work failed, or the command line was wrong. */
@@ -33,6 +33,8 @@ export type CliIo = {
   stdout(text: string): void
   /** Receives usage lines and the detail of unexpected errors. */
   stderr(text: string): void
+  /** Where the tools are installed: never a call's working tree, so a bare number there fails. */
+  ownDir?: string
   /** Stops a running tool when it aborts. */
   signal?: AbortSignal
 }
@@ -124,7 +126,11 @@ async function runTool(command: Extract<Command, { name: "run" }>, io: CliIo): P
   const spec = command.selected.find((candidate) => candidate.id === command.toolId)
   if (!spec) return writeError(io, "invalid_argument", `Unknown tool "${command.toolId}".`)
   try {
-    const result = await invoke(spec, await readArguments(io), { cwd: command.cwd, signal: io.signal })
+    const result = await invoke(spec, await readArguments(io), {
+      cwd: command.cwd,
+      ownDir: io.ownDir,
+      signal: io.signal,
+    })
     writeJson(io, { result })
     return EXIT_OK
   } catch (error) {
@@ -136,9 +142,15 @@ async function runTool(command: Extract<Command, { name: "run" }>, io: CliIo): P
 }
 
 async function targetOf(command: Extract<Command, { name: "target" }>, io: CliIo): Promise<number> {
+  const spec = io.specs.find((candidate) => candidate.id === command.toolId)
+  if (!spec) return writeError(io, "invalid_argument", `Unknown tool "${command.toolId}".`)
   try {
-    const resource = await permissionResource(await readArguments(io), { cwd: command.cwd, signal: io.signal })
-    writeJson(io, { resource })
+    const resources = await permissionResources(spec, await readArguments(io), {
+      cwd: command.cwd,
+      ownDir: io.ownDir,
+      signal: io.signal,
+    })
+    writeJson(io, { resources })
     return EXIT_OK
   } catch (error) {
     if (isToolError(error)) return writeError(io, error.code, error.message)
@@ -155,8 +167,8 @@ function errorDetail(error: unknown): string {
 /**
  * The command line of the package, for callers that are not a harness's own
  * plugin: `list` answers with the selected tools, `run` runs one with the
- * arguments on standard input, and `target` answers with the repository a
- * call would act on. Standard output carries only the JSON document; a
+ * arguments on standard input, and `target` answers with the repositories a
+ * call would write to (`{"resources": [...]}`). Standard output carries only the JSON document; a
  * mistake in the command line is one line on standard error and `EXIT_USAGE`.
  * Resolves to the exit code.
  */

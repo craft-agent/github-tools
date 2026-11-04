@@ -1,3 +1,5 @@
+import { realpath } from "node:fs/promises"
+import { isAbsolute, relative, sep } from "node:path"
 import { ToolError } from "./errors"
 import { exec, type ExecResult } from "./exec"
 import { passthroughEnv } from "./gh"
@@ -5,7 +7,7 @@ import type { ToolContext } from "./tool"
 
 export type RepoName = { owner: string; name: string; full: string }
 
-export type RefContext = Pick<ToolContext, "cwd" | "signal">
+export type RefContext = Pick<ToolContext, "cwd" | "signal" | "ownDir">
 
 const DEFAULT_HOST = "github.com"
 /** GitHub's SSH-over-443 endpoint, which serves the repositories of `github.com`. */
@@ -110,14 +112,33 @@ function gitEnv(): Record<string, string> {
   return { ...env, GIT_TERMINAL_PROMPT: "0" }
 }
 
-/** The working tree's repository, read from its `origin` remote. */
-export async function repoFromOrigin(cwd: string, signal?: AbortSignal): Promise<RepoName> {
+/** Whether `dir` is `root` or inside it, compared by real path; a path that cannot be resolved is not. */
+export async function isWithin(dir: string, root: string): Promise<boolean> {
+  try {
+    const path = relative(await realpath(root), await realpath(dir))
+    return path === "" || !(path === ".." || path.startsWith(`..${sep}`) || isAbsolute(path))
+  } catch {
+    return false
+  }
+}
+
+/**
+ * The working tree's repository, read from its `origin` remote. A `cwd` that is
+ * `ownDir` or inside it is never a working tree, so it fails without asking git.
+ */
+export async function repoFromOrigin(cwd: string, signal?: AbortSignal, ownDir?: string): Promise<RepoName> {
   const env = gitEnv()
-  const unresolved = (why: string) =>
+  const unresolved = (why: string, advice = "") =>
     invalid(
-      `Cannot tell which repository to use: ${why}. Run the call inside a clone of a GitHub repository, or pass \`repo\` as owner/name.`,
+      `Cannot tell which repository to use: ${why}. Run the call inside a clone of a GitHub repository, or pass \`repo\` as owner/name.${advice}`,
     )
 
+  if (ownDir !== undefined && (await isWithin(cwd, ownDir))) {
+    throw unresolved(
+      `${cwd} is where these tools are installed, not a project`,
+      " An issue can be given as `owner/repo#N`.",
+    )
+  }
   let result: ExecResult
   try {
     result = await exec(["git", "remote", "get-url", "origin"], { cwd, env, signal })
@@ -134,7 +155,12 @@ export async function repoFromOrigin(cwd: string, signal?: AbortSignal): Promise
 
 /** An explicit `repo` wins; without one the working tree's `origin` decides. */
 export async function resolveRepo(repo: string | undefined, ctx: RefContext): Promise<RepoName> {
-  return repo === undefined || repo.trim() === "" ? repoFromOrigin(ctx.cwd, ctx.signal) : parseRepo(repo)
+  return repo === undefined || repo.trim() === "" ? repoFromOrigin(ctx.cwd, ctx.signal, ctx.ownDir) : parseRepo(repo)
+}
+
+/** Whether a reference is a number alone (`12` or `#12`), which names no repository of its own. */
+export function isBareNumber(ref: string): boolean {
+  return BARE_NUMBER_PATTERN.test(ref.trim())
 }
 
 function parseNumber(digits: string, ref: string): number {

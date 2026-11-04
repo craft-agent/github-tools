@@ -20,6 +20,7 @@ export {
   type Vars,
 } from "./gh"
 export {
+  isWithin,
   parseNumberRef,
   parseRepo,
   repoFromOrigin,
@@ -29,6 +30,7 @@ export {
   type RefContext,
   type RepoName,
 } from "./refs"
+export { ANY_TARGET, writeTargets } from "./targets"
 export {
   DEFAULT_TOOLSETS,
   REQUIRES_USER_INTERACTION,
@@ -43,6 +45,7 @@ export {
   selectTools,
   toolMeta,
   type ConfirmRequest,
+  type TargetKind,
   type ToolAnnotations,
   type ToolContext,
   type ToolSettings,

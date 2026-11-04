@@ -1,7 +1,14 @@
 import type { ToolSpec } from "../core"
-import { permissionResource } from "../entry/permission"
+import { permissionResources } from "../entry/permission"
 import { loadSkills } from "./skills"
-import { needsPermission, permissionMetadata, runTool, selectedTools, type PluginDeps } from "./shared"
+import {
+  needsPermission,
+  permissionMetadata,
+  persistableResources,
+  runTool,
+  selectedTools,
+  type PluginDeps,
+} from "./shared"
 import type { OpenCodePlugin, V2Context, V2Tool, V2ToolContext, V2ToolResult } from "./types"
 
 /** The directory of a session, or `undefined` when the harness cannot name it. */
@@ -13,7 +20,7 @@ async function sessionDirectory(ctx: V2Context, sessionID: string): Promise<stri
   }
 }
 
-function v2Tool(ctx: V2Context, spec: ToolSpec): V2Tool {
+function v2Tool(ctx: V2Context, spec: ToolSpec, ownDir: string | undefined): V2Tool {
   return {
     name: spec.id,
     description: spec.description,
@@ -27,16 +34,16 @@ function v2Tool(ctx: V2Context, spec: ToolSpec): V2Tool {
             `invalid_argument: The session's directory could not be read, so ${spec.id} cannot tell which repository it changes; pass \`repo\` as owner/name or retry.`,
           )
         }
-        const resource = await permissionResource(input, { cwd: directory, signal })
+        const resources = await permissionResources(spec, input, { cwd: directory, ownDir, signal })
         await ctx.permission.assert({
           action: spec.id,
-          resources: [resource],
-          save: [resource],
-          metadata: permissionMetadata(spec, input, resource),
+          resources,
+          save: persistableResources(resources),
+          metadata: permissionMetadata(spec, input, resources),
           sessionID,
         })
       }
-      const result = await runTool(spec, input, { cwd: directory ?? process.cwd(), signal })
+      const result = await runTool(spec, input, { cwd: directory ?? process.cwd(), ownDir, signal })
       return { content: JSON.stringify(result), output: result }
     },
   }
@@ -50,7 +57,7 @@ function v2Tool(ctx: V2Context, spec: ToolSpec): V2Tool {
  */
 export function createV2Setup(specs: ToolSpec[], deps: PluginDeps = {}): OpenCodePlugin["setup"] {
   return async function setup(ctx: V2Context): Promise<void> {
-    const tools = selectedTools(specs, ctx.options, deps.env).map((spec) => v2Tool(ctx, spec))
+    const tools = selectedTools(specs, ctx.options, deps.env).map((spec) => v2Tool(ctx, spec, deps.ownDir))
     const skills = deps.skillsDir === undefined ? [] : await loadSkills(deps.skillsDir)
 
     if (tools.length > 0) {

@@ -31,7 +31,7 @@ describe("working directory", () => {
       await call(connected.client, "github_issue_read")
       return calls.at(-1)!.ctx.cwd
     }
-    return { ...connected, cwd }
+    return { ...connected, calls, cwd }
   }
 
   test("a root inside a git work tree is the working directory", async () => {
@@ -69,6 +69,36 @@ describe("working directory", () => {
     const git = repo()
     const { cwd } = await setup({ capabilities: roots, roots: { dirs: [pathToFileURL("/no/such/dir").href, git] } })
     expect(await cwd()).toBe(git)
+  })
+
+  test("a root inside the install directory is skipped like a non-git root", async () => {
+    const own = repo()
+    const nested = join(own, "src")
+    mkdirSync(nested)
+    const git = repo()
+    const { cwd } = await setup({ capabilities: roots, roots: { dirs: [nested, own, git] } }, { ownDir: own })
+    expect(await cwd()).toBe(git)
+  })
+
+  test("with only roots inside the install directory the fallback directory is used", async () => {
+    const own = repo()
+    const { cwd } = await setup(
+      { capabilities: roots, roots: { dirs: [own] } },
+      { cwd: () => "/fallback", ownDir: own },
+    )
+    expect(await cwd()).toBe("/fallback")
+  })
+
+  test("without an install directory a root is used wherever it is", async () => {
+    const own = repo()
+    const { cwd } = await setup({ capabilities: roots, roots: { dirs: [own] } })
+    expect(await cwd()).toBe(own)
+  })
+
+  test("the install directory reaches the tool's context", async () => {
+    const { calls, cwd } = await setup({}, { ownDir: "/opt/agent-github" })
+    await cwd()
+    expect(calls.at(-1)!.ctx.ownDir).toBe("/opt/agent-github")
   })
 
   test("only bad roots fall back to the fallback directory", async () => {

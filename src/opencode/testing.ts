@@ -7,7 +7,16 @@ export const toolInput = z.object({
   repo: z.string().describe("The repository, as owner/name.").optional(),
   count: z.number().int().describe("How many.").optional(),
 })
-export const toolOutput = z.object({ tool: z.string(), cwd: z.string(), count: z.number().optional() })
+export const toolOutput = z.object({
+  tool: z.string(),
+  cwd: z.string(),
+  count: z.number().optional(),
+  own_dir: z.string().optional(),
+})
+
+/** What a write fixture takes beyond a read one: an issue, and a second repository it may write to. */
+const writeInput = toolInput.extend({ issue: z.string().optional(), branch_repo: z.string().optional() })
+const WRITE_TARGETS = { issue: "issue", repo: "repo", branch_repo: "repo" } as const
 
 export const READ_ID = "github_issue_read"
 export const ADD_ID = "github_issue_comment"
@@ -21,11 +30,12 @@ function fixture(id: string, toolset: Toolset, writeClass: WriteClass, events: s
     description: `Description of ${id}`,
     toolset,
     class: writeClass,
-    input: toolInput,
+    ...(writeClass === "read" ? {} : { targets: WRITE_TARGETS }),
+    input: writeClass === "read" ? toolInput : writeInput,
     output: toolOutput,
     async execute(args, ctx) {
       events.push(`execute:${id}`)
-      return { tool: id, cwd: ctx.cwd, count: args.count }
+      return { tool: id, cwd: ctx.cwd, count: args.count, own_dir: ctx.ownDir }
     },
   })
 }

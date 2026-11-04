@@ -21,6 +21,8 @@ type FakeOptions = {
   options?: Record<string, unknown>
   /** What `session.get` resolves to (a session in `/work/project` when absent); `null` makes it reject. */
   location?: { directory?: string } | null
+  /** The `ownDir` the plugin is built with. */
+  ownDir?: string
   /** Makes `permission.assert` reject with this error. */
   deny?: Error
   events?: string[]
@@ -55,7 +57,7 @@ function fakeContext(fake: FakeOptions = {}) {
 async function setUp(fake: FakeOptions = {}, env: Record<string, string | undefined> = {}) {
   const events = fake.events ?? []
   const fakeCtx = fakeContext({ ...fake, events })
-  await createV2Setup(fixtureSpecs(events), { env })(fakeCtx.ctx)
+  await createV2Setup(fixtureSpecs(events), { env, ownDir: fake.ownDir })(fakeCtx.ctx)
   return fakeCtx
 }
 
@@ -69,7 +71,7 @@ describe("V2 setup", () => {
     expect(read.description).toBe(`Description of ${READ_ID}`)
     expect(z.toJSONSchema(read.input, { io: "input" }).additionalProperties).toBe(false)
     expect(Object.keys(read.input.shape)).toEqual(["repo", "count"])
-    expect(Object.keys(read.output.shape)).toEqual(["tool", "cwd", "count"])
+    expect(Object.keys(read.output.shape)).toEqual(["tool", "cwd", "count", "own_dir"])
   })
 
   test("takes toolsets, read_only and tools from the options", async () => {
@@ -151,16 +153,56 @@ describe("V2 tool calls", () => {
     expect(asserts.map((request) => request.resources)).toEqual([["octo/hello"]])
   })
 
-  test("the resource is * when the repository cannot be resolved", async () => {
+  test("a qualified issue in another repository asks for that repository, not the session directory's", async () => {
+    const repo = tempRepo("https://github.com/Octo/Hello.git")
+    cleanups.push(repo.cleanup)
+    const { tools, asserts } = await setUp({ location: { directory: repo.dir } })
+    await tools.get(ADD_ID)!.execute({ issue: "Other/Repo#4" }, { sessionID: SESSION_ID, signal })
+    expect(asserts.map((request) => [request.resources, request.save])).toEqual([[["other/repo"], ["other/repo"]]])
+  })
+
+  test("a call that writes to two repositories asks for both, and the message names them", async () => {
+    const repo = tempRepo("https://github.com/Octo/Hello.git")
+    cleanups.push(repo.cleanup)
+    const { tools, asserts } = await setUp({ location: { directory: repo.dir } })
+    await tools.get(ADD_ID)!.execute({ issue: "3", branch_repo: "Fork/Hello" }, { sessionID: SESSION_ID, signal })
+    expect(asserts.map((request) => [request.resources, request.save])).toEqual([
+      [
+        ["fork/hello", "octo/hello"],
+        ["fork/hello", "octo/hello"],
+      ],
+    ])
+    expect(asserts[0]!.metadata?.message).toBe(`Title of ${ADD_ID} on fork/hello, octo/hello`)
+  })
+
+  test("the resource is * when the repository cannot be resolved, and an always answer saves nothing", async () => {
     const repo = tempRepo()
     cleanups.push(repo.cleanup)
     const { tools, asserts } = await setUp({ location: { directory: repo.dir } })
     await tools.get(ADD_ID)!.execute({}, { sessionID: SESSION_ID, signal })
     await tools.get(ADD_ID)!.execute({ repo: "not a repo" }, { sessionID: SESSION_ID, signal })
     expect(asserts.map((request) => [request.resources, request.save])).toEqual([
-      [["*"], ["*"]],
-      [["*"], ["*"]],
+      [["*"], []],
+      [["*"], []],
     ])
+  })
+
+  test("a repository that cannot be told is asked for beside the others, and never saved", async () => {
+    const repo = tempRepo()
+    cleanups.push(repo.cleanup)
+    const { tools, asserts } = await setUp({ location: { directory: repo.dir } })
+    await tools.get(ADD_ID)!.execute({ issue: "a/b#1", branch_repo: "not a repo" }, { sessionID: SESSION_ID, signal })
+    expect(asserts.map((request) => [request.resources, request.save])).toEqual([[["a/b", "*"], ["a/b"]]])
+  })
+
+  test("the install directory is handed to the tool, and a bare number there asks for *", async () => {
+    const repo = tempRepo("https://github.com/Octo/Self.git")
+    cleanups.push(repo.cleanup)
+    const { tools, asserts } = await setUp({ ownDir: repo.dir, location: { directory: repo.dir } })
+    const read = await tools.get(READ_ID)!.execute({}, { sessionID: SESSION_ID, signal })
+    const add = await tools.get(ADD_ID)!.execute({ issue: "3" }, { sessionID: SESSION_ID, signal })
+    expect([read, add].map(({ output }) => (output as { own_dir?: string }).own_dir)).toEqual([repo.dir, repo.dir])
+    expect(asserts.map((request) => request.resources)).toEqual([["*"]])
   })
 
   test("a denial stops the call and surfaces the harness's error", async () => {

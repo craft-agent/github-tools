@@ -1,6 +1,13 @@
 import { inputJsonSchema, type ToolSpec } from "../core"
-import { permissionResource } from "../entry/permission"
-import { needsPermission, permissionMetadata, runTool, selectedTools, type PluginDeps } from "./shared"
+import { permissionResources } from "../entry/permission"
+import {
+  needsPermission,
+  permissionMetadata,
+  persistableResources,
+  runTool,
+  selectedTools,
+  type PluginDeps,
+} from "./shared"
 import type { OpenCodePlugin, PluginOptions, V1Hooks, V1Tool, V1ToolContext } from "./types"
 
 type PropertySchema = {
@@ -40,19 +47,19 @@ function workingDir(context: V1ToolContext): string {
   return context.worktree && context.worktree !== "/" ? context.worktree : context.directory
 }
 
-function v1Tool(spec: ToolSpec): V1Tool {
+function v1Tool(spec: ToolSpec, ownDir: string | undefined): V1Tool {
   return {
     description: `${spec.description}${describeArguments(spec)}`,
     args: spec.input.shape,
     async execute(args: unknown, context: V1ToolContext): Promise<string> {
-      const ctx = { cwd: workingDir(context), signal: context.abort }
+      const ctx = { cwd: workingDir(context), ownDir, signal: context.abort }
       if (needsPermission(spec)) {
-        const resource = await permissionResource(args, ctx)
+        const resources = await permissionResources(spec, args, ctx)
         await context.ask({
           permission: spec.id,
-          patterns: [resource],
-          always: [resource],
-          metadata: permissionMetadata(spec, args, resource),
+          patterns: resources,
+          always: persistableResources(resources),
+          metadata: permissionMetadata(spec, args, resources),
         })
       }
       const result = await runTool(spec, args, ctx)
@@ -70,7 +77,7 @@ function v1Tool(spec: ToolSpec): V1Tool {
 export function createV1Server(specs: ToolSpec[], deps: PluginDeps = {}): OpenCodePlugin["server"] {
   return async function server(_input: unknown, options?: PluginOptions): Promise<V1Hooks> {
     const tool: V1Hooks["tool"] = {}
-    for (const spec of selectedTools(specs, options, deps.env)) tool[spec.id] = v1Tool(spec)
+    for (const spec of selectedTools(specs, options, deps.env)) tool[spec.id] = v1Tool(spec, deps.ownDir)
     return { tool }
   }
 }

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { z } from "zod"
 import { defineTool } from "../core"
 import { tempRepo } from "../testing/git-repo"
+import { ALL_TOOLS } from "../tools"
 import { ADD_ID, ADMIN_ID, FAILING_ID, READ_ID, fixtureSpecs } from "./testing"
 import type { V1AskRequest, V1ToolContext } from "./types"
 import { createV1Server } from "./v1"
@@ -16,6 +17,7 @@ afterEach(() => {
 type Fake = {
   options?: Record<string, unknown>
   env?: Record<string, string | undefined>
+  ownDir?: string
   deny?: Error
 }
 
@@ -32,7 +34,10 @@ async function setUp(fake: Fake = {}) {
       if (fake.deny) throw fake.deny
     },
   }
-  const { tool } = await createV1Server(fixtureSpecs(events), { env: fake.env ?? {} })({}, fake.options)
+  const { tool } = await createV1Server(fixtureSpecs(events), { env: fake.env ?? {}, ownDir: fake.ownDir })(
+    {},
+    fake.options,
+  )
   return { tool, asks, events, context }
 }
 
@@ -185,16 +190,56 @@ describe("V1 tool calls", () => {
     expect(asks.map((request) => request.patterns)).toEqual([["octo/hello"]])
   })
 
-  test("the pattern is * when the repository cannot be resolved", async () => {
+  test("a qualified issue in another repository asks for that repository, not the working tree's", async () => {
+    const repo = tempRepo("git@github.com:Octo/Hello.git")
+    cleanups.push(repo.cleanup)
+    const { tool, asks, context } = await setUp()
+    await tool[ADD_ID]!.execute({ issue: "Other/Repo#4" }, { ...context, worktree: repo.dir })
+    expect(asks.map((request) => [request.patterns, request.always])).toEqual([[["other/repo"], ["other/repo"]]])
+  })
+
+  test("a call that writes to two repositories asks for both, and the message names them", async () => {
+    const repo = tempRepo("git@github.com:Octo/Hello.git")
+    cleanups.push(repo.cleanup)
+    const { tool, asks, context } = await setUp()
+    await tool[ADD_ID]!.execute({ issue: "3", branch_repo: "Fork/Hello" }, { ...context, worktree: repo.dir })
+    expect(asks.map((request) => [request.patterns, request.always])).toEqual([
+      [
+        ["fork/hello", "octo/hello"],
+        ["fork/hello", "octo/hello"],
+      ],
+    ])
+    expect(asks[0]!.metadata.message).toBe(`Title of ${ADD_ID} on fork/hello, octo/hello`)
+  })
+
+  test("a repository that cannot be told is asked for as * beside the others, and never saved", async () => {
+    const repo = tempRepo()
+    cleanups.push(repo.cleanup)
+    const { tool, asks, context } = await setUp()
+    await tool[ADD_ID]!.execute({ issue: "a/b#1", branch_repo: "not a repo" }, { ...context, worktree: repo.dir })
+    expect(asks.map((request) => [request.patterns, request.always])).toEqual([[["a/b", "*"], ["a/b"]]])
+  })
+
+  test("the pattern is * when the repository cannot be resolved, and an always answer saves nothing", async () => {
     const repo = tempRepo()
     cleanups.push(repo.cleanup)
     const { tool, asks, context } = await setUp()
     await tool[ADD_ID]!.execute({}, { ...context, worktree: repo.dir })
     await tool[ADD_ID]!.execute({ repo: "not a repo" }, { ...context, worktree: repo.dir })
     expect(asks.map((request) => [request.patterns, request.always])).toEqual([
-      [["*"], ["*"]],
-      [["*"], ["*"]],
+      [["*"], []],
+      [["*"], []],
     ])
+  })
+
+  test("the install directory is handed to the tool, and a bare number there asks for *", async () => {
+    const repo = tempRepo("git@github.com:Octo/Self.git")
+    cleanups.push(repo.cleanup)
+    const { tool, asks, context } = await setUp({ ownDir: repo.dir })
+    const inInstallDir = { ...context, worktree: repo.dir }
+    expect(JSON.parse(await tool[READ_ID]!.execute({}, inInstallDir)).own_dir).toBe(repo.dir)
+    expect(JSON.parse(await tool[ADD_ID]!.execute({ issue: "3" }, inInstallDir)).own_dir).toBe(repo.dir)
+    expect(asks.map((request) => request.patterns)).toEqual([["*"]])
   })
 
   test("a denial stops the call and surfaces the harness's error", async () => {
@@ -216,5 +261,39 @@ describe("V1 tool calls", () => {
     await expect(tool[READ_ID]!.execute({ extra: 1 }, context)).rejects.toThrow(
       "invalid_argument: Invalid arguments for github_issue_read: extra: unknown argument",
     )
+  })
+})
+
+describe("V1 permission for the real issue tools", () => {
+  const STOP = new Error("stopped at the question")
+
+  /** Runs a real spec up to the question it asks the harness, then stops there, so nothing reaches GitHub. */
+  async function asked(toolId: string, args: Record<string, unknown>): Promise<V1AskRequest> {
+    const asks: V1AskRequest[] = []
+    const context: V1ToolContext = {
+      directory: "/work/project",
+      worktree: "/work/project",
+      abort: new AbortController().signal,
+      async ask(request) {
+        asks.push(request)
+        throw STOP
+      },
+    }
+    const { tool } = await createV1Server(ALL_TOOLS, { env: {} })({}, {})
+    await expect(tool[toolId]!.execute(args, context)).rejects.toBe(STOP)
+    return asks[0]!
+  }
+
+  test("github_issue_relate asks for the issue's repository and each other one, a bare number being the issue's", async () => {
+    const request = await asked("github_issue_relate", { issue: "a/x#1", add_blocked_by: ["b/y#2", "3"] })
+    expect(request.permission).toBe("github_issue_relate")
+    expect(request.patterns).toEqual(["a/x", "b/y"])
+    expect(request.always).toEqual(["a/x", "b/y"])
+  })
+
+  test("github_issue_develop asks for the branch repository beside the issue's", async () => {
+    const request = await asked("github_issue_develop", { issue: "a/x#1", branch_repo: "c/z" })
+    expect(request.patterns).toEqual(["a/x", "c/z"])
+    expect(request.always).toEqual(["a/x", "c/z"])
   })
 })

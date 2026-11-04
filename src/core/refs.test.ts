@@ -1,5 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { chmodSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { tempRepo, type TempRepo } from "../testing/git-repo"
@@ -224,6 +233,80 @@ describe("resolveRepo", () => {
 
   test("an invalid explicit repo is refused", async () => {
     await invalidArgument(resolveRepo("nonsense", { cwd: process.cwd() }))
+  })
+})
+
+describe("ownDir", () => {
+  const INSTALLED = "is where these tools are installed, not a project"
+
+  /** An install directory that is a git checkout of its own, with origin `octo/self`. */
+  function installDir(): string {
+    return repoWithOrigin("https://github.com/octo/self.git").dir
+  }
+
+  test("a bare number in the install directory or below it fails, saying why", async () => {
+    const ownDir = installDir()
+    const below = join(ownDir, "dist", "deeper")
+    mkdirSync(below, { recursive: true })
+    for (const cwd of [ownDir, below]) {
+      const message = await invalidArgument(parseNumberRef("3", undefined, { cwd, ownDir }))
+      expect(message).toContain(`Cannot tell which repository to use: ${cwd} ${INSTALLED}`)
+      expect(message).toContain("pass `repo` as owner/name")
+      expect(message).toContain("owner/repo#N")
+      expect(await invalidArgument(resolveRepo(undefined, { cwd, ownDir }))).toContain(INSTALLED)
+      expect(await invalidArgument(repoFromOrigin(cwd, undefined, ownDir))).toContain(INSTALLED)
+    }
+  })
+
+  test("an explicit repo or a qualified reference still works there", async () => {
+    const ownDir = installDir()
+    const ctx = { cwd: ownDir, ownDir }
+    expect((await resolveRepo("x/y", ctx)).full).toBe("x/y")
+    expect((await parseNumberRef("3", "x/y", ctx)).repo.full).toBe("x/y")
+    expect((await parseNumberRef("a/b#3", undefined, ctx)).repo.full).toBe("a/b")
+  })
+
+  test("another working tree resolves by its origin as before", async () => {
+    const ownDir = installDir()
+    const other = repoWithOrigin("https://github.com/octo/other.git").dir
+    expect((await parseNumberRef("3", undefined, { cwd: other, ownDir })).repo.full).toBe("octo/other")
+  })
+
+  test("without ownDir the install directory resolves by its origin", async () => {
+    const ownDir = installDir()
+    expect((await parseNumberRef("3", undefined, { cwd: ownDir })).repo.full).toBe("octo/self")
+  })
+
+  test("a sibling whose name only starts like the install directory is not inside it", async () => {
+    const ownDir = installDir()
+    const sibling = `${ownDir}-sibling`
+    mkdirSync(sibling)
+    const message = await invalidArgument(parseNumberRef("3", undefined, { cwd: sibling, ownDir }))
+    expect(message).not.toContain(INSTALLED)
+    expect(message).toContain("`origin`")
+  })
+
+  test("a path that is not there is not the install directory", async () => {
+    const dir = installDir()
+    const missing = join(dir, "missing")
+    expect((await parseNumberRef("3", undefined, { cwd: dir, ownDir: missing })).repo.full).toBe("octo/self")
+    expect(await invalidArgument(parseNumberRef("3", undefined, { cwd: missing, ownDir: dir }))).not.toContain(
+      INSTALLED,
+    )
+  })
+
+  test("paths compare by real path, through a symlink on either side", async () => {
+    const ownDir = installDir()
+    const below = join(ownDir, "sub")
+    mkdirSync(below)
+    const links = scratchDir()
+    const toBelow = join(links, "to-below")
+    const toOwn = join(links, "to-own")
+    symlinkSync(below, toBelow)
+    symlinkSync(ownDir, toOwn)
+    expect(await invalidArgument(parseNumberRef("3", undefined, { cwd: toBelow, ownDir }))).toContain(INSTALLED)
+    expect(await invalidArgument(parseNumberRef("3", undefined, { cwd: below, ownDir: toOwn }))).toContain(INSTALLED)
+    expect(await invalidArgument(parseNumberRef("3", undefined, { cwd: toOwn, ownDir: toOwn }))).toContain(INSTALLED)
   })
 })
 

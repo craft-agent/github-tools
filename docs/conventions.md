@@ -50,6 +50,11 @@ discussion behind them is on
   means the working tree's repository (its `origin` on GitHub); `repo`
   (`owner/name`) names another. A call that needs a repository and finds
   neither fails, saying so.
+- **The tools' own install directory is never the working tree.** A harness may
+  start a tool inside the directory the package is installed in, a checkout of
+  this package, whose `origin` is not the caller's project. A bare number there
+  fails, saying so, instead of reading this package's issues; `repo` or a
+  qualified reference still works.
 
 ## Results
 
@@ -111,6 +116,11 @@ Every tool belongs to one class, and the class sets its MCP annotations.
 - **A native plugin asks the harness's own permission before every non-read
   call**, since the tools a native plugin adds pass through no harness
   approval of their own.
+- **It asks for every repository the call writes to.** Each write tool declares
+  which arguments name one (`repo`, an issue reference, a list of them); a bare
+  number means the call's own repository, and what cannot be told is `*`. An
+  "always" answer then covers only the repositories it named, never a write
+  into another one.
 - **`confirm: "elicitation"` adds the tool's own form** for administrative
   tools, where the client offers form-mode elicitation. It is for people who
   switch the client's approvals off: the tool states what will happen in plain
@@ -138,12 +148,15 @@ Every entry point takes the same settings:
 
 - A tool spec declares its ID, description, argument schema, output schema,
   toolset and write class; every entry point derives the same metadata from
-  it.
-- `execute(args, context)` gets the working directory, an abort signal and an
-  optional `confirm(request) => Promise<boolean>` hook. Nothing in it names a
-  harness. An entry point supplies `confirm` when the `elicitation` setting is
-  on; without it the harness's approval stands, and a tool that needs a
-  confirmation treats a missing hook as the harness having approved the call.
+  it. A write tool also declares its `targets`: the arguments that name a
+  repository the call writes to.
+- `execute(args, context)` gets the working directory, an abort signal, an
+  optional `ownDir` (the directory the tools are installed in, never the
+  working tree) and an optional `confirm(request) => Promise<boolean>` hook.
+  Nothing in it names a harness. An entry point supplies `confirm` when the
+  `elicitation` setting is on; without it the harness's approval stands, and a
+  tool that needs a confirmation treats a missing hook as the harness having
+  approved the call.
 - `src/core/` uses only the `node:*` modules and plain dependencies, never a
   runtime's own globals (`Bun.spawn`, `Bun.file`, …), so the same code runs on
   Node and on Bun.
