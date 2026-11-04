@@ -45,7 +45,8 @@ OpenCode V2 takes the package and its options in `opencode.json`:
       "package": "@craftsamo/agent-github@<version>",
       "options": { "toolsets": ["issues", "pull_requests", "projects"] }
     }
-  ]
+  ],
+  "permissions": [{ "action": "github_*", "resource": "*", "effect": "ask" }]
 }
 ```
 
@@ -53,12 +54,25 @@ OpenCode V1 takes the package as a string, or as a pair with its options:
 
 ```json
 {
-  "plugin": [["@craftsamo/agent-github@<version>", { "toolsets": ["issues", "pull_requests", "projects"] }]]
+  "plugin": [["@craftsamo/agent-github@<version>", { "toolsets": ["issues", "pull_requests", "projects"] }]],
+  "permission": { "github_*": "ask" }
 }
 ```
 
-V1 registers no skills. Unpack the package (`npm pack @craftsamo/agent-github@<version>`)
-and copy its `skills/*` folders into `~/.config/opencode/skills/`.
+OpenCode allows any action no rule names, so the plugin's request is granted
+silently unless a rule says `ask`. Read tools never ask, so the `github_*` glob
+is safe.
+
+V1 registers no skills. Unpack the package and copy its `skills/*` folders into
+`~/.config/opencode/skills/`:
+
+```sh
+npm pack @craftsamo/agent-github@<version>
+tar -xzf craftsamo-agent-github-<version>.tgz
+mkdir -p ~/.config/opencode/skills
+cp -r package/skills/* ~/.config/opencode/skills/
+rm -rf package craftsamo-agent-github-<version>.tgz
+```
 
 ### Claude Code
 
@@ -73,6 +87,10 @@ claude plugin install agent-github@craftsamo
 codex plugin marketplace add craftsamo/agent-github --ref v<version>
 codex plugin add agent-github@craftsamo
 ```
+
+Codex starts the MCP server in the plugin's install directory, so name issues
+as `owner/repo#N` or pass `repo` (a bare number fails there with a message saying
+so).
 
 ### Grok Build
 
@@ -92,10 +110,11 @@ agy plugin install https://github.com/craftsamo/agent-github/tree/v<version>
 
 ### Hermes Agent
 
-Hermes installs a commit, not a tag:
+Hermes installs a commit, not a tag, and the plugin installs disabled:
 
 ```sh
 hermes plugins install craftsamo/agent-github --ref <sha>
+hermes plugins enable agent-github
 ```
 
 ### Any other MCP host
@@ -115,7 +134,8 @@ Add the server to the host's MCP configuration. Flags go in `args`:
 
 ## Tools and skills
 
-Each toolset comes with a skill that tells an agent how to use its tools.
+Each toolset comes with a skill that tells an agent how to use its tools. A
+toolset with no tools yet registers none (0.2.0 ships the `issues` tools).
 
 ### Issues (`issues`)
 
@@ -186,9 +206,13 @@ Lists are comma-separated in a flag or a variable. Where each harness reads them
           exclude_tools: [github_pr_merge]
   ```
 
-- **The plugins for Claude Code, Codex, Grok Build and Antigravity** start the
-  server without flags, so set the variables in the environment the harness runs
-  in, or use the MCP configuration above, which takes flags.
+- **Claude Code and Antigravity** start the plugin's server without flags; Claude
+  Code passes the client's environment, so set the variables in the environment
+  the harness runs in.
+- **Codex and Grok Build** pass no environment to a plugin's MCP server, so the
+  `AGENT_GITHUB_*` variables have no effect there. To change settings in Codex,
+  add the server under `[mcp_servers]` in Codex's config with flags in `args` (as
+  in [Any other MCP host](#any-other-mcp-host)) instead of using the plugin.
 
 ## Layout
 
