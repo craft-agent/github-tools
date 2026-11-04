@@ -1,9 +1,7 @@
-import { parseNumberRef, type RefContext, type RepoName } from "../refs"
+import { isBareNumber, parseNumberRef, type RefContext, type RepoName } from "../refs"
 
 /** The issue a reference names, with the repository that holds it. */
 export type IssueRef = { repo: RepoName; number: number }
-
-const BARE_NUMBER = /^#?\d+$/
 
 /**
  * Resolves an issue a tool relates to its target (`parent`, `blocked_by`,
@@ -13,7 +11,7 @@ const BARE_NUMBER = /^#?\d+$/
  */
 export async function resolveRelatedIssue(ref: string, target: RepoName, ctx: RefContext): Promise<IssueRef> {
   const text = ref.trim()
-  return parseNumberRef(text, BARE_NUMBER.test(text) ? target.full : undefined, ctx, { accept: "issue" })
+  return parseNumberRef(text, isBareNumber(text) ? target.full : undefined, ctx, { accept: "issue" })
 }
 
 /** `owner/repo#12`: the form a result names an issue in. */

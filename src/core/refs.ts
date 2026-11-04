@@ -137,6 +137,11 @@ export async function resolveRepo(repo: string | undefined, ctx: RefContext): Pr
   return repo === undefined || repo.trim() === "" ? repoFromOrigin(ctx.cwd, ctx.signal) : parseRepo(repo)
 }
 
+/** Whether a reference is a number alone (`12` or `#12`), which names no repository of its own. */
+export function isBareNumber(ref: string): boolean {
+  return BARE_NUMBER_PATTERN.test(ref.trim())
+}
+
 function parseNumber(digits: string, ref: string): number {
   const number = Number.parseInt(digits, 10)
   if (!Number.isSafeInteger(number) || number < 1)

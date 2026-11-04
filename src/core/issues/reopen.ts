@@ -3,7 +3,7 @@ import { gh } from "../gh"
 import { readIssueFields } from "../github/issues"
 import { parseNumberRef } from "../refs"
 import { defineTool } from "../tool"
-import { ISSUE_DESCRIPTION, REPO_DESCRIPTION, given, writableContext } from "./write-support"
+import { ISSUE_DESCRIPTION, ISSUE_TARGETS, REPO_DESCRIPTION, given, writableContext } from "./write-support"
 
 const OPEN = "open"
 
@@ -30,6 +30,7 @@ export const issueReopen = defineTool({
   ].join(" "),
   toolset: "issues",
   class: "overwrite",
+  targets: ISSUE_TARGETS,
   input,
   output,
   async execute(args, ctx) {

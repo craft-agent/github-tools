@@ -4,7 +4,7 @@ import { readIssueFields } from "../github/issues"
 import { ghIssueRef, resolveRelatedIssue } from "../github/issue-refs"
 import { parseNumberRef } from "../refs"
 import { defineTool } from "../tool"
-import { ISSUE_DESCRIPTION, REPO_DESCRIPTION, given, invalid, writableContext } from "./write-support"
+import { ISSUE_DESCRIPTION, ISSUE_TARGETS, REPO_DESCRIPTION, given, invalid, writableContext } from "./write-support"
 
 const REASONS = ["completed", "not_planned", "duplicate"] as const
 
@@ -48,6 +48,7 @@ export const issueClose = defineTool({
   ].join(" "),
   toolset: "issues",
   class: "overwrite",
+  targets: ISSUE_TARGETS,
   input,
   output,
   async execute(args, ctx) {

@@ -99,6 +99,7 @@ export const issueCreate = defineTool({
   ].join(" "),
   toolset: "issues",
   class: "add",
+  targets: { repo: "repo", parent: "issue", blocked_by: "issues" },
   input,
   output,
   async execute(args, ctx) {

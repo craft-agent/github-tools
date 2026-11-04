@@ -13,6 +13,13 @@ export type WriteClass = "read" | "add" | "idempotent" | "overwrite" | "administ
 
 export type ConfirmRequest = { tool: string; message: string }
 
+/**
+ * What an argument that names a repository holds: `"repo"` an `owner/name`,
+ * `"issue"` one issue reference (`12`, `#12`, `owner/repo#12` or a URL),
+ * `"issues"` a list of them.
+ */
+export type TargetKind = "repo" | "issue" | "issues"
+
 export type ToolContext = {
   /** The working directory the call runs in; a bare issue number means this tree's repository. */
   cwd: string
@@ -28,6 +35,8 @@ export type ToolSpec<I extends z.ZodObject<any> = z.ZodObject<any>, O extends z.
   description: string
   toolset: Toolset
   class: WriteClass
+  /** The arguments that name a repository the call writes to, by name; each must be an argument of `input`. */
+  targets?: Readonly<Record<string, TargetKind>>
   input: I
   output: O
   execute(args: z.output<I>, ctx: ToolContext): Promise<z.input<O>>
@@ -42,8 +51,9 @@ const READ_TOOL_SUFFIX = "_read"
 
 /**
  * Returns the spec after checking what a type cannot: the ID's shape and
- * length, that a read tool is named `_read`, and that the output schema is an
- * object (a tool returns its data as a plain object).
+ * length, that a read tool is named `_read`, that the output schema is an
+ * object (a tool returns its data as a plain object), and that every target
+ * is an argument of the input.
  */
 export function defineTool<I extends z.ZodObject<any>, O extends z.ZodObject<any>>(
   spec: ToolSpec<I, O>,
@@ -59,6 +69,10 @@ export function defineTool<I extends z.ZodObject<any>, O extends z.ZodObject<any
   }
   if (!(spec.output instanceof z.ZodObject)) {
     throw new Error(`Tool "${spec.id}" must have an object output schema, since a result is an object.`)
+  }
+  const unknownTarget = Object.keys(spec.targets ?? {}).find((name) => !Object.hasOwn(spec.input.shape, name))
+  if (unknownTarget !== undefined) {
+    throw new Error(`Tool "${spec.id}" declares the target "${unknownTarget}", which is not one of its arguments.`)
   }
   return spec
 }

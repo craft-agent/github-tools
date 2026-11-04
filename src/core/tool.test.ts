@@ -94,6 +94,16 @@ describe("defineTool", () => {
     expect(() => defineTool(given as unknown as Parameters<typeof defineTool>[0])).toThrow(/object output schema/)
   })
 
+  test("accepts targets that are arguments of the input and rejects any other", () => {
+    const id = "github_issue_create"
+    expect(() => defineTool({ ...base, id, targets: { label: "repo" } })).not.toThrow()
+    expect(() => defineTool({ ...base, id, targets: { repo: "repo" } })).toThrow(
+      /target "repo".*not one of its arguments/,
+    )
+    const inherited = JSON.parse('{"toString":"repo"}')
+    expect(() => defineTool({ ...base, id, targets: inherited })).toThrow(/target "toString"/)
+  })
+
   test("throws a plain Error, not a ToolError", () => {
     try {
       defineTool({ ...base, id: "nope" })

@@ -13,6 +13,7 @@ import { parseNumberRef } from "../refs"
 import { defineTool } from "../tool"
 import {
   ISSUE_DESCRIPTION,
+  ISSUE_TARGETS,
   REPO_DESCRIPTION,
   editIssue,
   given,
@@ -155,6 +156,7 @@ export const issueEdit = defineTool({
   ].join(" "),
   toolset: "issues",
   class: "overwrite",
+  targets: ISSUE_TARGETS,
   input,
   output,
   async execute(args, ctx) {
