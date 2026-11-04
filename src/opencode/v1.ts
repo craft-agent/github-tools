@@ -1,6 +1,13 @@
 import { inputJsonSchema, type ToolSpec } from "../core"
 import { permissionResources } from "../entry/permission"
-import { needsPermission, permissionMetadata, runTool, selectedTools, type PluginDeps } from "./shared"
+import {
+  needsPermission,
+  permissionMetadata,
+  persistableResources,
+  runTool,
+  selectedTools,
+  type PluginDeps,
+} from "./shared"
 import type { OpenCodePlugin, PluginOptions, V1Hooks, V1Tool, V1ToolContext } from "./types"
 
 type PropertySchema = {
@@ -51,7 +58,7 @@ function v1Tool(spec: ToolSpec, ownDir: string | undefined): V1Tool {
         await context.ask({
           permission: spec.id,
           patterns: resources,
-          always: resources,
+          always: persistableResources(resources),
           metadata: permissionMetadata(spec, args, resources),
         })
       }

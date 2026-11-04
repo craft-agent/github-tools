@@ -20,6 +20,11 @@ export function permissionMessage(spec: Pick<ToolSpec, "title">, resources: stri
     : `${spec.title} on ${resources.join(", ")}`
 }
 
+/** The resources an "always" answer may persist: all but `*`, which would grant every repository. */
+export function persistableResources(resources: string[]): string[] {
+  return resources.filter((resource) => resource !== ANY_RESOURCE)
+}
+
 /** What the harness is told about a call it is asked to allow. */
 export function permissionMetadata(spec: Pick<ToolSpec, "title" | "class">, args: unknown, resources: string[]) {
   return { arguments: args, class: spec.class, message: permissionMessage(spec, resources) }

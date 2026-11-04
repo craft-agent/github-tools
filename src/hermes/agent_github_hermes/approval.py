@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 from collections.abc import Callable
 from typing import Any
 
@@ -50,11 +51,12 @@ def make_hook(runtime: Runtime, tools: list[ToolInfo]) -> Callable[..., dict[str
             return None
         resources = resolve_resources(runtime, tool.id, args)
         subject = tool.title if resources == [ANY_RESOURCE] else f"{tool.title} on {', '.join(resources)}"
-        return {
-            "action": "approve",
-            "message": f"{subject} ({tool.id})",
-            "rule_key": f"agent-github:{tool.id}:{','.join(resources)}",
-        }
+        rule_key = f"agent-github:{tool.id}:{','.join(resources)}"
+        if ANY_RESOURCE in resources:
+            # Hermes falls back to the bare tool name for a missing rule_key, which an "always" would turn into a
+            # grant for every repository; a key no later call repeats leaves nothing reusable.
+            rule_key = f"{rule_key}:once-{uuid.uuid4().hex}"
+        return {"action": "approve", "message": f"{subject} ({tool.id})", "rule_key": rule_key}
 
     return hook
 

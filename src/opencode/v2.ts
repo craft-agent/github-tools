@@ -1,7 +1,14 @@
 import type { ToolSpec } from "../core"
 import { permissionResources } from "../entry/permission"
 import { loadSkills } from "./skills"
-import { needsPermission, permissionMetadata, runTool, selectedTools, type PluginDeps } from "./shared"
+import {
+  needsPermission,
+  permissionMetadata,
+  persistableResources,
+  runTool,
+  selectedTools,
+  type PluginDeps,
+} from "./shared"
 import type { OpenCodePlugin, V2Context, V2Tool, V2ToolContext, V2ToolResult } from "./types"
 
 /** The directory of a session, or `undefined` when the harness cannot name it. */
@@ -31,7 +38,7 @@ function v2Tool(ctx: V2Context, spec: ToolSpec, ownDir: string | undefined): V2T
         await ctx.permission.assert({
           action: spec.id,
           resources,
-          save: resources,
+          save: persistableResources(resources),
           metadata: permissionMetadata(spec, input, resources),
           sessionID,
         })

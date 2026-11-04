@@ -175,16 +175,24 @@ describe("V2 tool calls", () => {
     expect(asserts[0]!.metadata?.message).toBe(`Title of ${ADD_ID} on fork/hello, octo/hello`)
   })
 
-  test("the resource is * when the repository cannot be resolved", async () => {
+  test("the resource is * when the repository cannot be resolved, and an always answer saves nothing", async () => {
     const repo = tempRepo()
     cleanups.push(repo.cleanup)
     const { tools, asserts } = await setUp({ location: { directory: repo.dir } })
     await tools.get(ADD_ID)!.execute({}, { sessionID: SESSION_ID, signal })
     await tools.get(ADD_ID)!.execute({ repo: "not a repo" }, { sessionID: SESSION_ID, signal })
     expect(asserts.map((request) => [request.resources, request.save])).toEqual([
-      [["*"], ["*"]],
-      [["*"], ["*"]],
+      [["*"], []],
+      [["*"], []],
     ])
+  })
+
+  test("a repository that cannot be told is asked for beside the others, and never saved", async () => {
+    const repo = tempRepo()
+    cleanups.push(repo.cleanup)
+    const { tools, asserts } = await setUp({ location: { directory: repo.dir } })
+    await tools.get(ADD_ID)!.execute({ issue: "a/b#1", branch_repo: "not a repo" }, { sessionID: SESSION_ID, signal })
+    expect(asserts.map((request) => [request.resources, request.save])).toEqual([[["a/b", "*"], ["a/b"]]])
   })
 
   test("the install directory is handed to the tool, and a bare number there asks for *", async () => {
