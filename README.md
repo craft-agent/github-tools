@@ -110,6 +110,27 @@ Add the server to the host's MCP configuration. Flags go in `args`:
 }
 ```
 
+## Tools and skills
+
+Each toolset comes with a skill that tells an agent how to use its tools.
+
+### Issues (`issues`)
+
+| Tool                   | What it does                                                                              | Class      |
+| ---------------------- | ----------------------------------------------------------------------------------------- | ---------- |
+| `github_issue_read`    | `view` one issue in full, or `list` a repository's issues or a parent's sub-issues        | read       |
+| `github_issue_create`  | create an issue with its kind, labels, assignees, milestone, parent and blocked-by issues | add        |
+| `github_issue_edit`    | change the title, body (or append to it), kind, labels, assignees or milestone            | overwrite  |
+| `github_issue_comment` | comment on an issue                                                                       | add        |
+| `github_issue_close`   | close with a reason (`completed`, `not_planned`, `duplicate`)                             | overwrite  |
+| `github_issue_reopen`  | reopen a closed issue                                                                     | overwrite  |
+| `github_issue_relate`  | set the parent, sub-issues, blocked-by and blocking issues, sending only what differs     | idempotent |
+| `github_issue_develop` | create a branch on GitHub linked to the issue, or return the one already linked           | idempotent |
+
+The skill is [`github-issues`](skills/github-issues/SKILL.md). An issue's kind
+is the organization's Issue Type of that name when it defines one, otherwise a
+`type:<kind>` label.
+
 ## Read tools without asking
 
 Every read tool is named `github_<domain>_read`. Writes are confirmed by the
@@ -165,6 +186,8 @@ Lists are comma-separated in a flag or a variable. Where each harness reads them
 - `src/cli/` — the command line the Hermes plugin calls, built to `dist/cli.js`
   and run by `agent-github-cli`.
 - `src/hermes/`, `plugin.yaml` and `__init__.py` — the Hermes plugin.
+- `skills/` — one skill per toolset, `skills/<name>/SKILL.md`, which every
+  harness that takes skills loads from the package or plugin root.
 - `plugin.json`, `mcp.json`, `.claude-plugin/`, `.agents/plugins/`,
   `.antigravity-plugin/` and `mcp_config.json` — the plugin manifests of the
   other harnesses. Claude Code's server is declared inside

@@ -272,6 +272,46 @@ describe("parseNumberRef", () => {
     expect(parsed.number).toBe(12)
   })
 
+  describe("accept", () => {
+    const ISSUE_URL = "https://github.com/octo/hello/issues/12"
+    const PULL_URL = "https://github.com/octo/hello/pull/12"
+    const ctx = { cwd: process.cwd() }
+
+    test("issue refuses a pull request URL and says so", async () => {
+      const message = await invalidArgument(parseNumberRef(PULL_URL, undefined, ctx, { accept: "issue" }))
+      expect(message).toContain(PULL_URL)
+      expect(message).toContain("is a pull request, not an issue")
+    })
+
+    test("pull refuses an issue URL and says so", async () => {
+      const message = await invalidArgument(parseNumberRef(ISSUE_URL, undefined, ctx, { accept: "pull" }))
+      expect(message).toContain("is an issue, not a pull request")
+    })
+
+    test("each kind accepts its own URL", async () => {
+      expect((await parseNumberRef(ISSUE_URL, undefined, ctx, { accept: "issue" })).number).toBe(12)
+      expect((await parseNumberRef(PULL_URL, undefined, ctx, { accept: "pull" })).number).toBe(12)
+    })
+
+    test("any, and no option, accept both URLs", async () => {
+      for (const options of [{ accept: "any" as const }, undefined]) {
+        expect((await parseNumberRef(ISSUE_URL, undefined, ctx, options)).number).toBe(12)
+        expect((await parseNumberRef(PULL_URL, undefined, ctx, options)).number).toBe(12)
+      }
+    })
+
+    test.each(["issue", "pull"] as const)("the forms that do not say which kind pass for %s", async (accept) => {
+      const repo = repoWithOrigin(origin)
+      expect((await parseNumberRef("12", undefined, { cwd: repo.dir }, { accept })).number).toBe(12)
+      expect((await parseNumberRef("octo/hello#12", undefined, ctx, { accept })).number).toBe(12)
+    })
+
+    test("the kind is checked before the repository conflict", async () => {
+      const message = await invalidArgument(parseNumberRef(PULL_URL, "other/thing", ctx, { accept: "issue" }))
+      expect(message).toContain("pull request")
+    })
+  })
+
   test("a reference and a repo argument that name different repositories conflict", async () => {
     const message = await invalidArgument(parseNumberRef("octo/hello#12", "other/thing", { cwd: process.cwd() }))
     expect(message).toContain("octo/hello")

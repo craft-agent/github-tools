@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { z } from "zod"
 import { REQUIRES_USER_INTERACTION, ToolError, annotations, defineTool, selectTools } from "../core"
 import type { EntrySettings } from "../entry/settings"
+import { ALL_TOOLS } from "../tools"
 import { createServer } from "./server"
 import {
   call,
@@ -83,6 +84,44 @@ describe("tool list", () => {
       expect(listed.inputSchema.type).toBe("object")
       expect(listed.inputSchema.additionalProperties).toBe(false)
     }
+  })
+})
+
+describe("the package's tools", () => {
+  test("github_issue_read is listed as a read tool, under the default toolsets, even with read_only", async () => {
+    for (const given of [{}, { read_only: true }]) {
+      const { client } = await connect(ALL_TOOLS, settings(given))
+      const listed = (await client.listTools()).tools.find((t) => t.name === "github_issue_read")!
+      expect(listed.annotations).toEqual({
+        title: listed.title!,
+        readOnlyHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+      })
+      expect(listed._meta).toBeUndefined()
+      expect(listed.inputSchema.additionalProperties).toBe(false)
+      expect(listed.inputSchema.required).toEqual(["method"])
+    }
+  })
+
+  test.each([
+    ["github_issue_create", { destructiveHint: false, idempotentHint: false }],
+    ["github_issue_edit", { destructiveHint: true, idempotentHint: true }],
+    ["github_issue_comment", { destructiveHint: false, idempotentHint: false }],
+    ["github_issue_close", { destructiveHint: true, idempotentHint: true }],
+    ["github_issue_reopen", { destructiveHint: true, idempotentHint: true }],
+    ["github_issue_relate", { destructiveHint: false, idempotentHint: true }],
+    ["github_issue_develop", { destructiveHint: false, idempotentHint: true }],
+  ])("%s is a write tool under the default toolsets, and read_only leaves it out", async (id, hints) => {
+    const { client } = await connect(ALL_TOOLS, settings())
+    const listed = (await client.listTools()).tools.find((t) => t.name === id)!
+    expect(listed.annotations).toEqual({ title: listed.title!, readOnlyHint: false, ...hints, openWorldHint: true })
+    expect(listed._meta).toBeUndefined()
+    expect(listed.inputSchema.additionalProperties).toBe(false)
+    expect(listed.outputSchema?.type).toBe("object")
+
+    const { client: readOnly } = await connect(ALL_TOOLS, settings({ read_only: true }))
+    expect((await readOnly.listTools()).tools.map((t) => t.name)).not.toContain(id)
   })
 })
 

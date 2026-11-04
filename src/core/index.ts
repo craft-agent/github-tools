@@ -19,7 +19,16 @@ export {
   type Page,
   type Vars,
 } from "./gh"
-export { parseNumberRef, parseRepo, repoFromOrigin, resolveRepo, type RefContext, type RepoName } from "./refs"
+export {
+  parseNumberRef,
+  parseRepo,
+  repoFromOrigin,
+  resolveRepo,
+  type NumberRefOptions,
+  type RefAccept,
+  type RefContext,
+  type RepoName,
+} from "./refs"
 export {
   DEFAULT_TOOLSETS,
   REQUIRES_USER_INTERACTION,

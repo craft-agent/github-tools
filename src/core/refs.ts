@@ -144,8 +144,23 @@ function parseNumber(digits: string, ref: string): number {
   return number
 }
 
+/** What a number reference may name: an issue, a pull request or either. */
+export type RefAccept = "issue" | "pull" | "any"
+
+export type NumberRefOptions = {
+  /** Which kind of object the caller means; defaults to `"any"`. Only a URL says which kind it names. */
+  accept?: RefAccept
+}
+
+const URL_KINDS = { issues: "issue", pull: "pull" } as const
+const KIND_NOUNS = { issue: "an issue", pull: "a pull request" } as const
+
 /** The repository and number a fully qualified reference names, or `undefined` for a bare number. */
-function parseQualifiedRef(text: string, ref: string): { repo: RepoName; number: number } | undefined {
+function parseQualifiedRef(
+  text: string,
+  ref: string,
+  accept: RefAccept,
+): { repo: RepoName; number: number } | undefined {
   const qualified = QUALIFIED_NUMBER_PATTERN.exec(text)
   if (qualified) {
     const repo = repoName(qualified[1]!, qualified[2]!)
@@ -154,9 +169,13 @@ function parseQualifiedRef(text: string, ref: string): { repo: RepoName; number:
   }
   const url = parseRepoUrl(text)
   if (url) {
-    const [kind, digits] = url.rest
-    if ((kind !== "issues" && kind !== "pull") || !digits || !/^\d+$/.test(digits)) {
+    const [segment, digits] = url.rest
+    const kind = segment === "issues" || segment === "pull" ? URL_KINDS[segment] : undefined
+    if (!kind || !digits || !/^\d+$/.test(digits)) {
       throw invalid(`"${ref}" is not an issue or pull request URL.`)
+    }
+    if (accept !== "any" && kind !== accept) {
+      throw invalid(`"${ref}" is ${KIND_NOUNS[kind]}, not ${KIND_NOUNS[accept]}.`)
     }
     return { repo: url.repo, number: parseNumber(digits, ref) }
   }
@@ -166,15 +185,18 @@ function parseQualifiedRef(text: string, ref: string): { repo: RepoName; number:
 /**
  * Accepts `12`, `#12`, `owner/repo#12` and `https://github.com/owner/repo/(issues|pull)/12`
  * (anything after the number in a URL is ignored). A reference that names its
- * own repository must agree with `repoArg` when both are given.
+ * own repository must agree with `repoArg` when both are given. With
+ * `accept: "issue"` or `"pull"`, a URL of the other kind is refused; the other
+ * forms do not say which kind they name, so they pass.
  */
 export async function parseNumberRef(
   ref: string,
   repoArg: string | undefined,
   ctx: RefContext,
+  options: NumberRefOptions = {},
 ): Promise<{ repo: RepoName; number: number }> {
   const text = ref.trim()
-  const qualified = parseQualifiedRef(text, ref)
+  const qualified = parseQualifiedRef(text, ref, options.accept ?? "any")
   if (qualified) {
     if (repoArg !== undefined && repoArg.trim() !== "") {
       const other = parseRepo(repoArg)

@@ -114,3 +114,16 @@ describe("loadSkills", () => {
     expect(await loadSkills(join(dir, "missing"))).toEqual([])
   })
 })
+
+describe("the package's skills", () => {
+  test("each loads under its folder's name, with a description and a body", async () => {
+    const shipped = await loadSkills(new URL("../../skills/", import.meta.url))
+    expect(shipped.map((skill) => skill.id)).toContain("github-issues")
+    for (const skill of shipped) {
+      expect(skill.path).toEndWith(join(skill.id, "SKILL.md"))
+      expect(skill.description?.length ?? 0).toBeGreaterThan(0)
+      expect(skill.description?.length ?? 0).toBeLessThanOrEqual(1024)
+      expect(skill.content.trim().length).toBeGreaterThan(0)
+    }
+  })
+})

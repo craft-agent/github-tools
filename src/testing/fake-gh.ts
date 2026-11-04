@@ -28,6 +28,8 @@ export type FakeGh = {
   dir: string
   /** The arguments of every call so far, oldest first. */
   calls(): string[][]
+  /** What each call in `calls()` received on stdin; empty for a call that was given none. */
+  stdins(): string[]
   /** Puts `PATH` back, removes the fake and forgets the version check. */
   restore(): void
 }
@@ -46,6 +48,7 @@ export function installFakeGh(rules: GhRule[], options: { version?: string } = {
   writeFileSync(join(dir, "package.json"), JSON.stringify({ type: "module" }))
   writeFileSync(join(dir, "rules.json"), JSON.stringify({ rules, version: options.version ?? DEFAULT_VERSION }))
   writeFileSync(join(dir, "calls.log"), "")
+  writeFileSync(join(dir, "stdin.log"), "")
 
   const originalPath = process.env.PATH
   process.env.PATH = originalPath === undefined ? dir : `${dir}${delimiter}${originalPath}`
@@ -58,6 +61,11 @@ export function installFakeGh(rules: GhRule[], options: { version?: string } = {
         .split("\n")
         .filter(Boolean)
         .map((line) => JSON.parse(line) as string[]),
+    stdins: () =>
+      readFileSync(join(dir, "stdin.log"), "utf8")
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as string),
     restore() {
       if (originalPath === undefined) delete process.env.PATH
       else process.env.PATH = originalPath
