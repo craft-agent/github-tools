@@ -13,7 +13,7 @@ Hermes Agent) from this repository. Releases are GitHub Releases tagged
 - `src/<entry>/` — one thin entry point per delivery, which turns the specs
   into that harness's tools: `src/opencode/` (native plugin), `src/mcp/`
   (the stdio MCP server the other plugins bundle), and the CLI the Hermes
-  plugin (Python, import name `agent_github_hermes`) calls.
+  plugin (Python, import name `github_tools_hermes`) calls.
 - `docs/conventions.md` — the rules every tool follows.
 - Tests sit beside the code they test (`*.test.ts`, `bun test`).
 

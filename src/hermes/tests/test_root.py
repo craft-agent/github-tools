@@ -30,7 +30,7 @@ class RootModuleTest(unittest.TestCase):
         self.assertEqual(impl.__name__, f"{name}.{IMPL}")
         self.assertEqual(Path(impl.__file__).resolve(), (ROOT / PACKAGE_PATH / "__init__.py").resolve())
         self.assertEqual(impl.plugin.__name__, f"{name}.{IMPL}.plugin")
-        self.assertNotIn("agent_github_hermes", sys.modules)
+        self.assertNotIn("github_tools_hermes", sys.modules)
 
     def test_two_install_paths_each_get_a_package_that_knows_its_own_directory(self) -> None:
         first_dir = copy_plugin(self.dir / "first")

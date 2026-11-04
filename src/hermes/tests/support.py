@@ -17,7 +17,7 @@ from typing import Any
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[3]
-PACKAGE_PATH = Path("src") / "hermes" / "agent_github_hermes"
+PACKAGE_PATH = Path("src") / "hermes" / "github_tools_hermes"
 FAKE_CLI = Path(__file__).resolve().parent / "fake_cli.py"
 
 CWD = "/work/tree"

@@ -101,7 +101,7 @@ describe("package files", () => {
     ...Object.keys(MCP_CONFIGS),
     ...MARKETPLACES,
     "__init__.py",
-    "src/hermes/agent_github_hermes",
+    "src/hermes/github_tools_hermes",
   ]
 
   test.each(["dist", ...manifests])("%s is packed", (path) => {
