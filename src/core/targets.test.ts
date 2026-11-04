@@ -1,5 +1,17 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { installFakeGh, type FakeGh, type GhRule } from "../testing/fake-gh"
 import { tempRepo, type TempRepo } from "../testing/git-repo"
+import { gqlErrors } from "../testing/gql"
+import { apiCalls } from "../testing/issue-fixtures"
+import {
+  itemBoardRule,
+  linkedBoardsRule,
+  ownerBoardsRule,
+  ownerTypeRule,
+  rawBoard,
+  viewerBoardsRule,
+  viewerRule,
+} from "../testing/project-fixtures"
 import { isAbortError } from "./errors"
 import { issueClose } from "./issues/close"
 import { issueComment } from "./issues/comment"
@@ -12,10 +24,18 @@ import { writeTargets } from "./targets"
 import type { ToolSpec } from "./tool"
 
 const repos: TempRepo[] = []
+let fake: FakeGh | undefined
 
 afterEach(() => {
   for (const repo of repos.splice(0)) repo.cleanup()
+  fake?.restore()
+  fake = undefined
 })
+
+function useFake(rules: GhRule[]): FakeGh {
+  fake = installFakeGh(rules)
+  return fake
+}
 
 /** A working tree whose `origin` is `octo/self`, or one without any. */
 function tree(origin?: string): string {
@@ -269,5 +289,270 @@ describe("the issue write tools' targets", () => {
   test("closing as a duplicate writes nothing to the original's repository", async () => {
     const args = { issue: "a/b#1", reason: "duplicate", duplicate_of: "c/d#2" }
     expect(await writeTargets(issueClose, args, { cwd: tree() })).toEqual(["a/b"])
+  })
+})
+
+describe("board and item targets", () => {
+  const boardOnly: ToolSpec["targets"] = { project: "board" }
+  const boardAndRepos: ToolSpec["targets"] = { project: "board", repo: "repo", link_repo: "repo" }
+  const itemOnly: ToolSpec["targets"] = { item: "item" }
+
+  describe("a named board needs no gh", () => {
+    test("owner/N and a URL name the board, lowercased, and no own repository", async () => {
+      const installed = useFake([])
+      const ctx = { cwd: tree(WITH_ORIGIN) }
+      expect(await writeTargets({ targets: boardOnly }, { project: "Octo/3" }, ctx)).toEqual(["octo/projects/3"])
+      const url = "https://github.com/users/Alice/projects/4/views/1"
+      expect(await writeTargets({ targets: boardOnly }, { project: url }, ctx)).toEqual(["alice/projects/4"])
+      expect(apiCalls(installed)).toHaveLength(0)
+    })
+
+    test("a bare number takes owner, else the repo argument's owner, else the working tree's", async () => {
+      const installed = useFake([])
+      const ctx = { cwd: tree(WITH_ORIGIN) }
+      expect(await writeTargets({ targets: boardOnly }, { project: "3", owner: "Acme" }, ctx)).toEqual([
+        "acme/projects/3",
+      ])
+      expect(await writeTargets({ targets: boardOnly }, { project: "3", repo: "Other/Thing" }, ctx)).toEqual([
+        "other/projects/3",
+      ])
+      expect(await writeTargets({ targets: boardOnly }, { project: "3" }, ctx)).toEqual(["octo/projects/3"])
+      expect(apiCalls(installed)).toHaveLength(0)
+    })
+
+    test("the reference's own owner wins over owner", async () => {
+      useFake([])
+      expect(await writeTargets({ targets: boardOnly }, { project: "a/3", owner: "b" }, { cwd: tree() })).toEqual([
+        "a/projects/3",
+      ])
+    })
+
+    test("neither the origin nor gh is touched when the reference says it all", async () => {
+      const installed = useFake([])
+      const ctx = { cwd: "/no/matter", signal: abortedSignal() }
+      expect(await writeTargets({ targets: boardOnly }, { project: "a/3" }, ctx)).toEqual(["a/projects/3"])
+      expect(await writeTargets({ targets: boardOnly }, { project: "3", owner: "a" }, ctx)).toEqual(["a/projects/3"])
+      expect(apiCalls(installed)).toHaveLength(0)
+    })
+
+    test("@me is the viewer's login, the one thing asked of gh", async () => {
+      const installed = useFake([viewerRule("Alice")])
+      const targets = await writeTargets({ targets: boardOnly }, { project: "2", owner: "@me" }, { cwd: tree() })
+      expect(targets).toEqual(["alice/projects/2"])
+      expect(apiCalls(installed)).toHaveLength(1)
+    })
+
+    test("a bare number without an origin, or in the install directory, is *", async () => {
+      useFake([])
+      expect(await writeTargets({ targets: boardOnly }, { project: "3" }, { cwd: tree() })).toEqual(["*"])
+      const ownDir = tree(WITH_ORIGIN)
+      expect(await writeTargets({ targets: boardOnly }, { project: "3" }, { cwd: ownDir, ownDir })).toEqual(["*"])
+      expect(await writeTargets({ targets: boardOnly }, { project: "o/3" }, { cwd: ownDir, ownDir })).toEqual([
+        "o/projects/3",
+      ])
+    })
+
+    test.each([
+      ["an empty project", { project: "" }],
+      ["a blank project", { project: "  ", owner: "octo" }],
+      ["a project that is not text", { project: 3, owner: "octo" }],
+      ["an owner that is not a login", { project: "3", owner: "bad owner" }],
+      ["an owner that is not text", { project: "3", owner: 1 }],
+    ])("%s is *", async (_name, args) => {
+      useFake([])
+      expect(await writeTargets({ targets: boardOnly }, args, { cwd: tree(WITH_ORIGIN) })).toEqual(["*"])
+    })
+  })
+
+  describe("a board the arguments do not name is looked up, by reads only", () => {
+    test("the board linked to the working tree's repository", async () => {
+      const installed = useFake([linkedBoardsRule("Octo", "Self", [rawBoard(4)])])
+      expect(await writeTargets({ targets: boardOnly }, {}, { cwd: tree(WITH_ORIGIN) })).toEqual(["octo/projects/4"])
+      expect(apiCalls(installed)).toHaveLength(1)
+    })
+
+    test("a project that is a title is looked up like none, with owner steering where", async () => {
+      useFake([
+        ownerTypeRule("acme", "Organization"),
+        ownerBoardsRule("organization", "acme", [rawBoard(6, { title: "Plan" })]),
+      ])
+      const args = { project: "plan", owner: "acme" }
+      expect(await writeTargets({ targets: boardOnly }, args, { cwd: tree() })).toEqual(["octo/projects/6"])
+    })
+
+    test("a title is looked up among the boards linked to the working tree's repository", async () => {
+      const installed = useFake([linkedBoardsRule("Octo", "Self", [rawBoard(4), rawBoard(5, { title: "Plan" })])])
+      expect(await writeTargets({ targets: boardOnly }, { project: " PLAN " }, { cwd: tree(WITH_ORIGIN) })).toEqual([
+        "octo/projects/5",
+      ])
+      expect(apiCalls(installed)).toHaveLength(1)
+    })
+
+    test("a title that finds no board is *", async () => {
+      useFake([linkedBoardsRule("Octo", "Self", []), ownerBoardsRule("organization", "Octo", []), viewerBoardsRule([])])
+      expect(await writeTargets({ targets: boardOnly }, { project: "Plan" }, { cwd: tree(WITH_ORIGIN) })).toEqual(["*"])
+    })
+
+    test("the organization's, then the viewer's board, as the lookup goes", async () => {
+      useFake([linkedBoardsRule("Octo", "Self", []), ownerBoardsRule("organization", "Octo", []), viewerBoardsRule([])])
+      expect(await writeTargets({ targets: boardOnly }, {}, { cwd: tree(WITH_ORIGIN) })).toEqual(["*"])
+    })
+
+    test.each<[string, GhRule[]]>([
+      [
+        "no board anywhere",
+        [linkedBoardsRule("Octo", "Self", []), ownerBoardsRule("organization", "Octo", []), viewerBoardsRule([])],
+      ],
+      ["several candidates", [linkedBoardsRule("Octo", "Self", [rawBoard(4), rawBoard(5)])]],
+      [
+        "a repository that cannot be read",
+        [{ match: "projectsV2", stdout: gqlErrors([{ type: "NOT_FOUND", message: "x" }]) }],
+      ],
+      ["a gh that fails", [{ match: "projectsV2", stderr: "boom", code: 1 }]],
+    ])("%s is *, and nothing throws", async (_name, rules) => {
+      useFake(rules)
+      expect(await writeTargets({ targets: boardOnly }, {}, { cwd: tree(WITH_ORIGIN) })).toEqual(["*"])
+    })
+
+    test("a working tree without an origin, and no owner, is *", async () => {
+      useFake([viewerBoardsRule([rawBoard(4)])])
+      expect(await writeTargets({ targets: boardOnly }, {}, { cwd: tree() })).toEqual(["*"])
+    })
+
+    test("a cancellation is not swallowed", async () => {
+      useFake([viewerRule()])
+      const cwd = tree(WITH_ORIGIN)
+      const error = await writeTargets(
+        { targets: boardOnly },
+        { project: "2", owner: "@me" },
+        { cwd, signal: abortedSignal() },
+      ).then(
+        () => undefined,
+        (e: unknown) => e,
+      )
+      expect(isAbortError(error)).toBe(true)
+    })
+  })
+
+  describe("a board names no own repository", () => {
+    test("only the board when no repo argument is declared", async () => {
+      useFake([])
+      const args = { project: "a/1", repo: "x/y" }
+      expect(await writeTargets({ targets: boardOnly }, args, { cwd: tree(WITH_ORIGIN) })).toEqual(["a/projects/1"])
+    })
+
+    test("a declared repo is the repository named, beside the board", async () => {
+      useFake([])
+      const args = { project: "a/1", repo: "Fork/Self" }
+      expect(await writeTargets({ targets: boardAndRepos }, args, { cwd: tree(WITH_ORIGIN) })).toEqual([
+        "a/projects/1",
+        "fork/self",
+      ])
+    })
+
+    test("a declared repo that is absent is the working tree's; other repo targets only when given", async () => {
+      useFake([])
+      const ctx = { cwd: tree(WITH_ORIGIN) }
+      expect(await writeTargets({ targets: boardAndRepos }, { project: "a/1" }, ctx)).toEqual([
+        "a/projects/1",
+        "octo/self",
+      ])
+      const linked = { project: "a/1", link_repo: "Other/Thing" }
+      expect(await writeTargets({ targets: boardAndRepos }, linked, ctx)).toEqual([
+        "a/projects/1",
+        "octo/self",
+        "other/thing",
+      ])
+    })
+
+    test("a declared repo that cannot be told is *, beside the board", async () => {
+      useFake([])
+      expect(await writeTargets({ targets: boardAndRepos }, { project: "a/1" }, { cwd: tree() })).toEqual([
+        "a/projects/1",
+        "*",
+      ])
+      expect(await writeTargets({ targets: boardAndRepos }, { project: "a/1", repo: "no" }, { cwd: tree() })).toEqual([
+        "a/projects/1",
+        "*",
+      ])
+      expect(await writeTargets({ targets: boardAndRepos }, { project: "a/1", repo: 3 }, { cwd: tree() })).toEqual([
+        "*",
+      ])
+      expect(
+        await writeTargets({ targets: boardAndRepos }, { project: "a/1", link_repo: "no" }, { cwd: tree(WITH_ORIGIN) }),
+      ).toEqual(["a/projects/1", "octo/self", "*"])
+    })
+
+    test("a declared repo reads the origin even when the board is named", async () => {
+      useFake([])
+      const error = await writeTargets(
+        { targets: boardAndRepos },
+        { project: "a/1" },
+        { cwd: "/no/matter", signal: abortedSignal() },
+      ).then(
+        () => undefined,
+        (e: unknown) => e,
+      )
+      expect(isAbortError(error)).toBe(true)
+    })
+
+    test("a board spec's issue targets still mean the repository named", async () => {
+      useFake([])
+      const targets: ToolSpec["targets"] = { project: "board", item: "issue", repo: "repo" }
+      const args = { project: "a/1", item: "c/d#2", repo: "x/y" }
+      expect(await writeTargets({ targets }, args, { cwd: tree() })).toEqual(["a/projects/1", "c/d", "x/y"])
+    })
+  })
+
+  describe("an item's board", () => {
+    test("is read from GitHub for a node ID", async () => {
+      const installed = useFake([
+        itemBoardRule("PVTI_abc", rawBoard(3, { owner: { __typename: "Organization", login: "Octo" } })),
+      ])
+      expect(await writeTargets({ targets: itemOnly }, { item: "PVTI_abc" }, { cwd: tree() })).toEqual([
+        "octo/projects/3",
+      ])
+      expect(apiCalls(installed)).toHaveLength(1)
+    })
+
+    test("an item that cannot be read is *", async () => {
+      useFake([itemBoardRule("PVTI_abc", null)])
+      expect(await writeTargets({ targets: itemOnly }, { item: "PVTI_abc" }, { cwd: tree() })).toEqual(["*"])
+    })
+
+    test("anything else is chosen by the board selectors", async () => {
+      const installed = useFake([])
+      const ctx = { cwd: tree(WITH_ORIGIN) }
+      const targets: ToolSpec["targets"] = { item: "item" }
+      expect(await writeTargets({ targets }, { item: "octo/hello#5", project: "9", owner: "acme" }, ctx)).toEqual([
+        "acme/projects/9",
+      ])
+      expect(await writeTargets({ targets }, { item: "octo/hello#5", project: "acme/2" }, ctx)).toEqual([
+        "acme/projects/2",
+      ])
+      expect(apiCalls(installed)).toHaveLength(0)
+    })
+
+    test("with no board selected it is the lookup", async () => {
+      useFake([linkedBoardsRule("Octo", "Self", [rawBoard(4)])])
+      expect(await writeTargets({ targets: itemOnly }, { item: "octo/hello#5" }, { cwd: tree(WITH_ORIGIN) })).toEqual([
+        "octo/projects/4",
+      ])
+    })
+
+    test("an item that is not text, absent or blank leaves the call with nothing named: *", async () => {
+      useFake([])
+      const ctx = { cwd: tree(WITH_ORIGIN) }
+      for (const args of [{ item: 5 }, {}, { item: " " }]) {
+        expect(await writeTargets({ targets: itemOnly }, args, ctx)).toEqual(["*"])
+      }
+    })
+
+    test("the item's board and a named board are listed once each", async () => {
+      useFake([itemBoardRule("PVTI_abc", rawBoard(3))])
+      const targets: ToolSpec["targets"] = { project: "board", item: "item" }
+      const args = { project: "octo/3", item: "PVTI_abc" }
+      expect(await writeTargets({ targets }, args, { cwd: tree() })).toEqual(["octo/projects/3"])
+    })
   })
 })
