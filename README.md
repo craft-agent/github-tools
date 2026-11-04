@@ -4,16 +4,16 @@ GitHub tools for coding agents: issues, project boards, pull requests,
 repositories, releases and Actions. One implementation, delivered to each
 agent harness in the form that suits it best.
 
-| Harness        | Delivery                                         | Pinned by                                     |
-| -------------- | ------------------------------------------------ | --------------------------------------------- |
-| OpenCode V2    | native plugin (npm package, with skills)         | the version in the package                    |
-| OpenCode V1    | native plugin (npm package, no skills)           | the version in the package                    |
-| Claude Code    | plugin: MCP server and skills                    | the release tag, as the ref                   |
-| Codex          | plugin: MCP server and skills                    | the release tag, as the ref                   |
-| Grok Build     | plugin: MCP server and skills                    | the release tag, as `@ref`                    |
-| Antigravity    | plugin: MCP server and skills (not yet verified) | the release tag's tree URL (not yet verified) |
-| Hermes Agent   | native plugin (Python, calls the command line)   | the release commit, as the SHA                |
-| other MCP host | MCP server from npm                              | the version in the package                    |
+| Harness        | Delivery                                       | Pinned by                      |
+| -------------- | ---------------------------------------------- | ------------------------------ |
+| OpenCode V2    | native plugin (npm package, with skills)       | the version in the package     |
+| OpenCode V1    | native plugin (npm package, no skills)         | the version in the package     |
+| Claude Code    | plugin: MCP server and skills                  | the release tag, as the ref    |
+| Codex          | plugin: MCP server and skills                  | the release tag, as the ref    |
+| Grok Build     | plugin: MCP server and skills                  | the release tag, as `@ref`     |
+| Antigravity    | plugin: MCP server and skills                  | the release tag's tree URL     |
+| Hermes Agent   | native plugin (Python, calls the command line) | the release commit, as the SHA |
+| other MCP host | MCP server from npm                            | the version in the package     |
 
 0.3.0 moved the package from `craftsamo/agent-github` to `craft-agent/github-tools` and renamed it: npm `@craftsamo/github-tools` (was `@craftsamo/agent-github`, now removed from npm), plugin and MCP server `github-tools`, programs `github-tools` and `github-tools-cli`, settings `GITHUB_TOOLS_*`. Allow rules, plugin installs and MCP configurations written for 0.2.0 change; the tool IDs do not.
 
@@ -104,8 +104,8 @@ a bare issue number names an issue of that repository.
 ### Antigravity
 
 Install from the tree of the release tag, never from the default branch, which
-has no built `dist/`. The pinning and the install command are not yet verified
-on a real install.
+has no built `dist/`; Antigravity clones the tag into
+`~/.gemini/config/plugins/github-tools`.
 
 ```sh
 agy plugin install https://github.com/craft-agent/github-tools/tree/v<version>
@@ -166,14 +166,14 @@ one, otherwise a `type:<kind>` label.
 Every read tool is named `github_<domain>_read`. Reads can run unasked; writes
 are confirmed by the harness.
 
-| Harness     | Reads without asking                                                                                                      |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------- |
-| OpenCode    | always; the plugin asks only before a write                                                                               |
-| Claude Code | the rule `mcp__plugin_github-tools_github-tools__*_read` in `permissions.allow` of `~/.claude/settings.json` or a project |
-| Codex       | always; Codex runs tools that declare `readOnlyHint` unasked, as the read tools do                                        |
-| Grok Build  | `grok --allow 'MCPTool(github-tools__*_read)'`                                                                            |
-| Antigravity | an Allow rule `mcp(github-tools/<tool>)` for each read tool; not yet verified                                             |
-| Hermes      | always; the plugin asks only before a write                                                                               |
+| Harness     | Reads without asking                                                                                                                                    |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OpenCode    | always; the plugin asks only before a write                                                                                                             |
+| Claude Code | the rule `mcp__plugin_github-tools_github-tools__*_read` in `permissions.allow` of `~/.claude/settings.json` or a project                               |
+| Codex       | always; Codex runs tools that declare `readOnlyHint` unasked, as the read tools do                                                                      |
+| Grok Build  | `grok --allow 'MCPTool(github-tools__*_read)'`                                                                                                          |
+| Antigravity | the rule `mcp(github-tools_github-tools/github_issue_read)` in `permissions.allow` of `~/.gemini/antigravity-cli/settings.json`, one for each read tool |
+| Hermes      | always; the plugin asks only before a write                                                                                                             |
 
 Where a write is asked about, and where it is not:
 
@@ -181,6 +181,10 @@ Where a write is asked about, and where it is not:
   a rule asks for it: add the `github_*` rule shown under [OpenCode](#opencode).
 - **Codex** under `codex exec`, and **Grok Build** under `grok -p`, refuse a
   write they cannot ask about, unless it is allowed beforehand.
+- **Antigravity** asks before any MCP tool no rule allows, reads included, and
+  names the plugin's server `github-tools_github-tools` (plugin, then server).
+  `agy -p` refuses a tool it cannot ask about; `--dangerously-skip-permissions`
+  runs every tool unasked.
 - **Hermes** `hermes chat -q` refuses a write it cannot ask about; `hermes -z`
   and `--yolo` skip approval, so writes then run unasked.
 
@@ -217,9 +221,9 @@ environment variable in `env:` is allowed). Where each harness reads them:
           exclude_tools: [github_pr_merge]
   ```
 
-- **Claude Code and Antigravity** start the plugin's server without flags; Claude
-  Code passes the client's environment, so set the variables in the environment
-  the harness runs in.
+- **Claude Code and Antigravity** start the plugin's server without flags and
+  pass it the client's environment, so set the variables in the environment the
+  harness runs in.
 - **Codex and Grok Build** pass no environment to a plugin's MCP server, so the
   `GITHUB_TOOLS_*` variables have no effect there. To change settings in Codex,
   add the server under `[mcp_servers]` in Codex's config with flags in `args` (as
