@@ -1,6 +1,6 @@
 {
   "name": "agent-github",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "GitHub tools for coding agents: issues, project boards, pull requests, repositories, releases and Actions.",
   "author": {
     "name": "craftsamo",
