@@ -1,0 +1,95 @@
+import { z } from "zod"
+import { paginate } from "../gh"
+import type { RefContext } from "../refs"
+import { PAGE_INFO, PAGE_SIZE } from "./projects"
+
+/** Project board reads of a board's structure: its fields, with their options and iterations, and its views. */
+
+const VIEW_LAYOUT_SUFFIX = /_LAYOUT$/
+
+const FIELDS_QUERY = `query($id:ID!,$after:String){node(id:$id){... on ProjectV2{fields(first:${PAGE_SIZE},after:$after){${PAGE_INFO} nodes{__typename ... on ProjectV2FieldCommon{id name dataType} ... on ProjectV2SingleSelectField{options{id name color description}} ... on ProjectV2IterationField{configuration{iterations{id title startDate duration}}}}}}}}`
+const VIEWS_QUERY = `query($id:ID!,$after:String){node(id:$id){... on ProjectV2{views(first:${PAGE_SIZE},after:$after){${PAGE_INFO} nodes{number name layout filter}}}}}`
+
+export const boardFieldSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z
+    .string()
+    .describe("GitHub's data type in lower case: text, number, date, single_select, iteration, title, assignees, …"),
+  options: z
+    .array(z.object({ id: z.string(), name: z.string(), color: z.string(), description: z.string() }))
+    .optional()
+    .describe("single_select: the options, in order."),
+  iterations: z
+    .array(z.object({ id: z.string(), title: z.string(), start_date: z.string(), duration: z.number().int() }))
+    .optional()
+    .describe("iteration: the iterations; duration is in days."),
+})
+
+export const boardViewSchema = z.object({
+  number: z.number().int(),
+  name: z.string(),
+  layout: z.string().describe("table, board or roadmap."),
+  filter: z.string().nullable(),
+})
+
+export type BoardField = z.output<typeof boardFieldSchema>
+export type BoardView = z.output<typeof boardViewSchema>
+
+type RawField = {
+  id?: string
+  name?: string
+  dataType?: string
+  options?: { id: string; name: string; color?: string; description?: string | null }[] | null
+  configuration?: {
+    iterations?: { id: string; title: string; startDate: string; duration: number }[] | null
+  } | null
+}
+
+type RawView = { number: number; name: string; layout?: string; filter?: string | null }
+
+function toField(raw: RawField & { id: string }): BoardField {
+  const field: BoardField = { id: raw.id, name: raw.name ?? "", type: (raw.dataType ?? "").toLowerCase() }
+  if (raw.options) {
+    field.options = raw.options.map((option) => ({
+      id: option.id,
+      name: option.name,
+      color: option.color ?? "",
+      description: option.description ?? "",
+    }))
+  }
+  if (raw.configuration?.iterations) {
+    field.iterations = raw.configuration.iterations.map((iteration) => ({
+      id: iteration.id,
+      title: iteration.title,
+      start_date: iteration.startDate,
+      duration: iteration.duration,
+    }))
+  }
+  return field
+}
+
+/** Every field of a board by its node ID, in GitHub's order, with the options of a single select and the iterations of an iteration field. */
+export async function readBoardFields(projectId: string, ctx: RefContext): Promise<BoardField[]> {
+  const { items } = await paginate<RawField | null>(FIELDS_QUERY, { id: projectId }, (data) => data?.node?.fields, {
+    cwd: ctx.cwd,
+    signal: ctx.signal,
+  })
+  return items.filter((raw): raw is RawField & { id: string } => Boolean(raw?.id)).map(toField)
+}
+
+/** Every view of a board by its node ID, in GitHub's order. */
+export async function readBoardViews(projectId: string, ctx: RefContext): Promise<BoardView[]> {
+  const { items } = await paginate<RawView | null>(VIEWS_QUERY, { id: projectId }, (data) => data?.node?.views, {
+    cwd: ctx.cwd,
+    signal: ctx.signal,
+  })
+  return items
+    .filter((raw): raw is RawView => raw != null)
+    .map((raw) => ({
+      number: raw.number,
+      name: raw.name,
+      layout: (raw.layout ?? "").replace(VIEW_LAYOUT_SUFFIX, "").toLowerCase(),
+      filter: raw.filter ?? null,
+    }))
+}
