@@ -1,16 +1,16 @@
 {
-  "name": "@craftsamo/agent-github",
+  "name": "@craftsamo/github-tools",
   "version": "0.2.0",
   "description": "GitHub tools for coding agents: issues, project boards, pull requests, repositories, releases and Actions.",
   "author": "craftsamo",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/craftsamo/agent-github.git"
+    "url": "git+https://github.com/craft-agent/github-tools.git"
   },
-  "homepage": "https://github.com/craftsamo/agent-github#readme",
-  "bugs": "https://github.com/craftsamo/agent-github/issues",
-  "mcpName": "io.github.craftsamo/agent-github",
+  "homepage": "https://github.com/craft-agent/github-tools#readme",
+  "bugs": "https://github.com/craft-agent/github-tools/issues",
+  "mcpName": "io.github.craft-agent/github-tools",
   "type": "module",
   "main": "dist/opencode.js",
   "exports": {
@@ -18,8 +18,8 @@
     "./opencode": "./dist/opencode.js"
   },
   "bin": {
-    "agent-github": "dist/mcp.js",
-    "agent-github-cli": "dist/cli.js"
+    "craft-agent-github": "dist/mcp.js",
+    "craft-agent-github-cli": "dist/cli.js"
   },
   "files": [
     "dist",

@@ -8,8 +8,8 @@ import { DESCRIPTION, serverJson } from "./server-json.mjs"
 import { VERSION_FILES } from "./version-files.mjs"
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url))
-const PLUGIN_NAME = "agent-github"
-const SERVER_NAME = "agent-github"
+const PLUGIN_NAME = "github-tools"
+const SERVER_NAME = "github-tools"
 const MCP_ENTRY = "dist/mcp.js"
 const REGISTRY_DESCRIPTION_LIMIT = 100
 
@@ -78,8 +78,8 @@ describe("MCP configurations", () => {
     }
   })
 
-  test("the package's own name runs the MCP server, and agent-github-cli the command line", () => {
-    expect(pkg.bin).toEqual({ [PLUGIN_NAME]: MCP_ENTRY, "agent-github-cli": "dist/cli.js" })
+  test("craft-agent-github runs the MCP server, and craft-agent-github-cli the command line", () => {
+    expect(pkg.bin).toEqual({ "craft-agent-github": MCP_ENTRY, "craft-agent-github-cli": "dist/cli.js" })
   })
 })
 
@@ -117,11 +117,11 @@ describe("server.json", () => {
     expect(server.packages).toEqual([
       { registryType: "npm", identifier: pkg.name, version: pkg.version, transport: { type: "stdio" } },
     ])
-    expect(server.repository).toEqual({ url: "https://github.com/craftsamo/agent-github", source: "github" })
+    expect(server.repository).toEqual({ url: "https://github.com/craft-agent/github-tools", source: "github" })
   })
 
   test("names the registry namespace the repository's owner holds", () => {
-    expect(pkg.mcpName).toBe("io.github.craftsamo/agent-github")
+    expect(pkg.mcpName).toBe("io.github.craft-agent/github-tools")
   })
 
   test("describes the server within the registry's limit", () => {
@@ -129,7 +129,7 @@ describe("server.json", () => {
   })
 
   test("the script writes the same document", () => {
-    const dir = mkdtempSync(join(tmpdir(), "agent-github-server-json-"))
+    const dir = mkdtempSync(join(tmpdir(), "github-tools-server-json-"))
     try {
       const output = join(dir, "server.json")
       const run = spawnSync(process.execPath, [join(ROOT, "scripts/server-json.mjs"), output], { encoding: "utf8" })

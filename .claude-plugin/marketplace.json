@@ -1,14 +1,14 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "craftsamo",
-  "description": "Plugins by craftsamo.",
+  "name": "craft-agent",
+  "description": "Plugins by Craft Agent.",
   "owner": {
-    "name": "craftsamo",
-    "url": "https://github.com/craftsamo"
+    "name": "Craft Agent",
+    "url": "https://github.com/craft-agent"
   },
   "plugins": [
     {
-      "name": "agent-github",
+      "name": "github-tools",
       "source": "./",
       "description": "GitHub tools for coding agents: issues, project boards, pull requests, repositories, releases and Actions.",
       "category": "development"

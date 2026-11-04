@@ -4,7 +4,7 @@ import { createV1Server } from "./v1"
 import { createV2Setup } from "./v2"
 import type { OpenCodePlugin } from "./types"
 
-const PLUGIN_ID = "agent-github"
+const PLUGIN_ID = "github-tools"
 
 /** The skills sit in the package root, one level above the built `dist/opencode.js`. */
 const SKILLS_DIR = new URL("../skills/", import.meta.url)
