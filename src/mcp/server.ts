@@ -22,7 +22,7 @@ import type { EntrySettings } from "../entry/settings"
 import { elicitationConfirm } from "./confirm"
 import { createWorkingDirResolver } from "./roots"
 
-const SERVER_NAME = "agent-github"
+const SERVER_NAME = "github-tools"
 const DEFAULT_VERSION = "0.0.0"
 
 export type ServerOptions = {

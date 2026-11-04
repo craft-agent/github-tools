@@ -1,13 +1,13 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
-  "name": "agent-github",
+  "name": "github-tools",
   "version": "0.2.0",
   "description": "GitHub tools for coding agents: issues, project boards, pull requests, repositories, releases and Actions.",
   "author": {
     "name": "craftsamo",
     "url": "https://github.com/craftsamo"
   },
-  "homepage": "https://github.com/craftsamo/agent-github#readme",
-  "repository": "https://github.com/craftsamo/agent-github",
+  "homepage": "https://github.com/craft-agent/github-tools#readme",
+  "repository": "https://github.com/craft-agent/github-tools",
   "license": "MIT"
 }

@@ -17,12 +17,12 @@ from typing import Any
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[3]
-PACKAGE_PATH = Path("src") / "hermes" / "agent_github_hermes"
+PACKAGE_PATH = Path("src") / "hermes" / "github_tools_hermes"
 FAKE_CLI = Path(__file__).resolve().parent / "fake_cli.py"
 
 CWD = "/work/tree"
 IMPL = "_impl"
-ROOT_NAME = "hermes_plugins_agent_github"
+ROOT_NAME = "hermes_plugins_github_tools"
 
 
 def load_root(root: Path, name: str) -> types.ModuleType:
@@ -117,7 +117,7 @@ class FakeCliCase(unittest.TestCase):
     replies: dict[str, dict[str, Any]]
 
     def setUp(self) -> None:
-        self.dir = Path(tempfile.mkdtemp(prefix="agent-github-hermes-"))
+        self.dir = Path(tempfile.mkdtemp(prefix="github-tools-hermes-"))
         self.addCleanup(shutil.rmtree, self.dir, True)
         self.log = self.dir / "calls.jsonl"
         self.fixture = self.dir / "fixture.json"

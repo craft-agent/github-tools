@@ -86,9 +86,9 @@ describe("V2 setup", () => {
   })
 
   test("falls back to the environment, and an option wins over it", async () => {
-    expect([...(await setUp({}, { AGENT_GITHUB_READ_ONLY: "true" })).tools.keys()]).toEqual([READ_ID])
+    expect([...(await setUp({}, { GITHUB_TOOLS_READ_ONLY: "true" })).tools.keys()]).toEqual([READ_ID])
     expect([
-      ...(await setUp({ options: { read_only: false } }, { AGENT_GITHUB_READ_ONLY: "true" })).tools.keys(),
+      ...(await setUp({ options: { read_only: false } }, { GITHUB_TOOLS_READ_ONLY: "true" })).tools.keys(),
     ]).toEqual([READ_ID, ADD_ID, FAILING_ID])
   })
 
@@ -252,7 +252,7 @@ describe("V2 tool calls", () => {
 
 describe("V2 skills", () => {
   async function withSkillsDir(run: (dir: string) => Promise<void>) {
-    const dir = await mkdtemp(join(tmpdir(), "agent-github-skills-"))
+    const dir = await mkdtemp(join(tmpdir(), "github-tools-skills-"))
     try {
       await run(dir)
     } finally {
@@ -280,7 +280,7 @@ describe("V2 skills", () => {
 
   test("registers no skill when the directory is missing", async () => {
     const fake = fakeContext()
-    await createV2Setup([], { skillsDir: join(tmpdir(), "agent-github-no-such-dir") })(fake.ctx)
+    await createV2Setup([], { skillsDir: join(tmpdir(), "github-tools-no-such-dir") })(fake.ctx)
     expect(fake.skills).toEqual([])
   })
 })

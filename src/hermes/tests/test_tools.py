@@ -31,13 +31,13 @@ class RegisterTest(FakeCliCase):
         self.assertEqual(
             {tool_id: (tool["toolset"], tool["emoji"]) for tool_id, tool in ctx.tools.items()},
             {
-                "github_issue_read": ("agent-github-issues", "🎫"),
-                "github_issue_comment": ("agent-github-issues", "🎫"),
-                "github_pr_merge": ("agent-github-pull-requests", "🔀"),
-                "github_project_item_add": ("agent-github-projects", "📋"),
-                "github_repo_edit": ("agent-github-repos", "📦"),
-                "github_release_publish": ("agent-github-releases", "🏷️"),
-                "github_run_rerun": ("agent-github-actions", "⚙️"),
+                "github_issue_read": ("github-tools-issues", "🎫"),
+                "github_issue_comment": ("github-tools-issues", "🎫"),
+                "github_pr_merge": ("github-tools-pull-requests", "🔀"),
+                "github_project_item_add": ("github-tools-projects", "📋"),
+                "github_repo_edit": ("github-tools-repos", "📦"),
+                "github_release_publish": ("github-tools-releases", "🏷️"),
+                "github_run_rerun": ("github-tools-actions", "⚙️"),
             },
         )
 
@@ -79,10 +79,10 @@ class HandlerTest(FakeCliCase):
         self.assertEqual(json.loads(self.handler()({})), {"error": "not_found: No such issue."})
 
     def test_maps_an_exit_without_a_document_to_its_stderr(self) -> None:
-        self.reply("run github_issue_comment", stderr="agent-github-cli: boom\n", code=2)
-        self.assertEqual(json.loads(self.handler()({})), {"error": "agent-github-cli failed: agent-github-cli: boom"})
+        self.reply("run github_issue_comment", stderr="github-tools-cli: boom\n", code=2)
+        self.assertEqual(json.loads(self.handler()({})), {"error": "github-tools-cli failed: github-tools-cli: boom"})
         self.reply("run github_issue_comment", code=3)
-        self.assertEqual(json.loads(self.handler()({})), {"error": "agent-github-cli failed: exit status 3"})
+        self.assertEqual(json.loads(self.handler()({})), {"error": "github-tools-cli failed: exit status 3"})
 
     def test_maps_a_success_that_is_not_a_result_document_to_an_error(self) -> None:
         self.reply("run github_issue_comment", stdout="garbage")

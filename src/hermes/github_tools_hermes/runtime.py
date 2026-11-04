@@ -17,7 +17,7 @@ _POSIX = os.name == "posix"
 TERMINATE_GRACE_SECONDS = 2
 
 #: The repository root, where ``plugin.yaml`` sits: this file is
-#: ``<root>/src/hermes/agent_github_hermes/runtime.py``.
+#: ``<root>/src/hermes/github_tools_hermes/runtime.py``.
 PLUGIN_DIR = Path(__file__).resolve().parents[3]
 
 #: The built command line, relative to ``PLUGIN_DIR``.
@@ -74,12 +74,12 @@ class Runtime:
                 start_new_session=_POSIX,
             )
         except OSError as error:
-            raise CliError(f"agent-github-cli could not be started: {error}") from error
+            raise CliError(f"github-tools-cli could not be started: {error}") from error
         try:
             stdout, stderr = process.communicate(input=stdin, timeout=timeout)
         except subprocess.TimeoutExpired as error:
             _stop(process)
-            raise CliError(f"agent-github-cli did not finish within {timeout:g} seconds") from error
+            raise CliError(f"github-tools-cli did not finish within {timeout:g} seconds") from error
         except BaseException:
             _stop(process)
             raise

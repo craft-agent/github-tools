@@ -14,7 +14,7 @@ from support import IMPL, PACKAGE_PATH, ROOT, copy_plugin, evict, load_root
 
 class RootModuleTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.dir = Path(tempfile.mkdtemp(prefix="agent-github-root-")).resolve()
+        self.dir = Path(tempfile.mkdtemp(prefix="github-tools-root-")).resolve()
         self.addCleanup(shutil.rmtree, self.dir, True)
 
     def load(self, root: Path, name: str) -> types.ModuleType:
@@ -30,12 +30,12 @@ class RootModuleTest(unittest.TestCase):
         self.assertEqual(impl.__name__, f"{name}.{IMPL}")
         self.assertEqual(Path(impl.__file__).resolve(), (ROOT / PACKAGE_PATH / "__init__.py").resolve())
         self.assertEqual(impl.plugin.__name__, f"{name}.{IMPL}.plugin")
-        self.assertNotIn("agent_github_hermes", sys.modules)
+        self.assertNotIn("github_tools_hermes", sys.modules)
 
     def test_two_install_paths_each_get_a_package_that_knows_its_own_directory(self) -> None:
         first_dir = copy_plugin(self.dir / "first")
         second_dir = copy_plugin(self.dir / "second")
-        first_name, second_name = "hermes_plugins_agent_github_first", "hermes_plugins_agent_github_second__home_0a1b"
+        first_name, second_name = "hermes_plugins_github_tools_first", "hermes_plugins_github_tools_second__home_0a1b"
         first = self.load(first_dir, first_name)
         second = self.load(second_dir, second_name)
 

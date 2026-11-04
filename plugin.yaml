@@ -1,4 +1,4 @@
-name: agent-github
+name: github-tools
 version: 0.2.0
 description: "GitHub tools for coding agents: issues, project boards, pull requests, repositories, releases and Actions."
 manifest_version: 1

@@ -16,11 +16,11 @@ type OptionName = "toolsets" | "read_only" | "tools" | "exclude_tools" | "confir
 type Option = { flag: string; env: string; boolean?: true }
 
 const OPTIONS: Record<OptionName, Option> = {
-  toolsets: { flag: "--toolsets", env: "AGENT_GITHUB_TOOLSETS" },
-  read_only: { flag: "--read-only", env: "AGENT_GITHUB_READ_ONLY", boolean: true },
-  tools: { flag: "--tools", env: "AGENT_GITHUB_TOOLS" },
-  exclude_tools: { flag: "--exclude-tools", env: "AGENT_GITHUB_EXCLUDE_TOOLS" },
-  confirm: { flag: "--confirm", env: "AGENT_GITHUB_CONFIRM" },
+  toolsets: { flag: "--toolsets", env: "GITHUB_TOOLS_TOOLSETS" },
+  read_only: { flag: "--read-only", env: "GITHUB_TOOLS_READ_ONLY", boolean: true },
+  tools: { flag: "--tools", env: "GITHUB_TOOLS_TOOLS" },
+  exclude_tools: { flag: "--exclude-tools", env: "GITHUB_TOOLS_EXCLUDE_TOOLS" },
+  confirm: { flag: "--confirm", env: "GITHUB_TOOLS_CONFIRM" },
 }
 
 function readFlags(argv: string[]): Partial<Record<OptionName, string>> {
@@ -124,7 +124,7 @@ export function parseSettings(argv: string[], env: Record<string, string | undef
 /**
  * Reads the tool settings from a command line that has no `confirm` setting,
  * for entry points whose caller does the confirming: `--confirm` is
- * `invalid_argument`, and `AGENT_GITHUB_CONFIRM` is ignored. Everything else
+ * `invalid_argument`, and `GITHUB_TOOLS_CONFIRM` is ignored. Everything else
  * is read as `parseSettings` reads it.
  */
 export function parseToolSettings(argv: string[], env: Record<string, string | undefined>): ToolSettings {

@@ -60,11 +60,11 @@ describe("parseSettings", () => {
   test("falls back to the environment", () => {
     expect(
       parseSettings([], {
-        AGENT_GITHUB_TOOLSETS: "actions,releases",
-        AGENT_GITHUB_READ_ONLY: "true",
-        AGENT_GITHUB_TOOLS: "x",
-        AGENT_GITHUB_EXCLUDE_TOOLS: "y,z",
-        AGENT_GITHUB_CONFIRM: "elicitation",
+        GITHUB_TOOLS_TOOLSETS: "actions,releases",
+        GITHUB_TOOLS_READ_ONLY: "true",
+        GITHUB_TOOLS_TOOLS: "x",
+        GITHUB_TOOLS_EXCLUDE_TOOLS: "y,z",
+        GITHUB_TOOLS_CONFIRM: "elicitation",
       }),
     ).toEqual({
       toolsets: ["actions", "releases"],
@@ -81,27 +81,27 @@ describe("parseSettings", () => {
     ["TRUE", true],
     ["0", false],
     ["False", false],
-  ])("AGENT_GITHUB_READ_ONLY=%s is %p", (value, expected) => {
-    expect(parseSettings([], { AGENT_GITHUB_READ_ONLY: value }).read_only).toBe(expected)
+  ])("GITHUB_TOOLS_READ_ONLY=%s is %p", (value, expected) => {
+    expect(parseSettings([], { GITHUB_TOOLS_READ_ONLY: value }).read_only).toBe(expected)
   })
 
-  test.each(["yes", "on", "2", "enabled"])("AGENT_GITHUB_READ_ONLY=%s is rejected, naming the variable", (value) => {
-    const message = failure(() => parseSettings([], { AGENT_GITHUB_READ_ONLY: value })).message
-    expect(message).toContain("AGENT_GITHUB_READ_ONLY")
+  test.each(["yes", "on", "2", "enabled"])("GITHUB_TOOLS_READ_ONLY=%s is rejected, naming the variable", (value) => {
+    const message = failure(() => parseSettings([], { GITHUB_TOOLS_READ_ONLY: value })).message
+    expect(message).toContain("GITHUB_TOOLS_READ_ONLY")
     expect(message).toContain(`"${value}"`)
   })
 
   test("a flag-given --read-only is not blocked by a bad environment variable it overrides", () => {
-    expect(parseSettings(["--read-only"], { AGENT_GITHUB_READ_ONLY: "yes" }).read_only).toBe(true)
+    expect(parseSettings(["--read-only"], { GITHUB_TOOLS_READ_ONLY: "yes" }).read_only).toBe(true)
   })
 
   test("a flag wins over its environment variable", () => {
     const env = {
-      AGENT_GITHUB_TOOLSETS: "actions",
-      AGENT_GITHUB_TOOLS: "x",
-      AGENT_GITHUB_EXCLUDE_TOOLS: "y",
-      AGENT_GITHUB_CONFIRM: "elicitation",
-      AGENT_GITHUB_READ_ONLY: "0",
+      GITHUB_TOOLS_TOOLSETS: "actions",
+      GITHUB_TOOLS_TOOLS: "x",
+      GITHUB_TOOLS_EXCLUDE_TOOLS: "y",
+      GITHUB_TOOLS_CONFIRM: "elicitation",
+      GITHUB_TOOLS_READ_ONLY: "0",
     }
     expect(
       parseSettings(
@@ -112,7 +112,9 @@ describe("parseSettings", () => {
   })
 
   test("an empty environment variable counts as unset", () => {
-    expect(parseSettings([], { AGENT_GITHUB_TOOLSETS: "", AGENT_GITHUB_CONFIRM: " " })).toEqual({ confirm: "harness" })
+    expect(parseSettings([], { GITHUB_TOOLS_TOOLSETS: "", GITHUB_TOOLS_CONFIRM: " " })).toEqual({
+      confirm: "harness",
+    })
   })
 
   test("drops empty list items", () => {
@@ -124,7 +126,7 @@ describe("parseSettings", () => {
 
   test('"all" turns on every toolset', () => {
     expect(parseSettings(["--toolsets", "all"], {}).toolsets).toBe("all")
-    expect(parseSettings([], { AGENT_GITHUB_TOOLSETS: "all" }).toolsets).toBe("all")
+    expect(parseSettings([], { GITHUB_TOOLS_TOOLSETS: "all" }).toolsets).toBe("all")
   })
 
   test("the last of a repeated flag wins", () => {
@@ -145,15 +147,15 @@ describe("parseSettings", () => {
 
   test("a bad confirm mode is rejected, naming it", () => {
     expect(failure(() => parseSettings(["--confirm", "ask"], {})).message).toContain('"ask"')
-    expect(failure(() => parseSettings([], { AGENT_GITHUB_CONFIRM: "ask" })).message).toContain("AGENT_GITHUB_CONFIRM")
+    expect(failure(() => parseSettings([], { GITHUB_TOOLS_CONFIRM: "ask" })).message).toContain("GITHUB_TOOLS_CONFIRM")
   })
 
   test("an unknown toolset is rejected, naming it and where it came from", () => {
     const fromFlag = failure(() => parseSettings(["--toolsets", "issues,bogus"], {})).message
     expect(fromFlag).toContain('"bogus"')
     expect(fromFlag).toContain("--toolsets")
-    expect(failure(() => parseSettings([], { AGENT_GITHUB_TOOLSETS: "bogus" })).message).toContain(
-      "AGENT_GITHUB_TOOLSETS",
+    expect(failure(() => parseSettings([], { GITHUB_TOOLS_TOOLSETS: "bogus" })).message).toContain(
+      "GITHUB_TOOLS_TOOLSETS",
     )
   })
 })
@@ -162,7 +164,7 @@ describe("parseToolSettings", () => {
   test("reads the tool settings and gives no confirm setting", () => {
     expect(parseToolSettings([], {})).toEqual({})
     expect(
-      parseToolSettings(["--toolsets=repos", "--read-only", "--tools", "a"], { AGENT_GITHUB_EXCLUDE_TOOLS: "b" }),
+      parseToolSettings(["--toolsets=repos", "--read-only", "--tools", "a"], { GITHUB_TOOLS_EXCLUDE_TOOLS: "b" }),
     ).toEqual({
       toolsets: ["repos"],
       read_only: true,
@@ -176,8 +178,8 @@ describe("parseToolSettings", () => {
     expect(failure(() => parseToolSettings(["--confirm=elicitation"], {})).message).toContain("--confirm")
   })
 
-  test("ignores AGENT_GITHUB_CONFIRM, even a bad one", () => {
-    expect(parseToolSettings([], { AGENT_GITHUB_CONFIRM: "ask" })).toEqual({})
+  test("ignores GITHUB_TOOLS_CONFIRM, even a bad one", () => {
+    expect(parseToolSettings([], { GITHUB_TOOLS_CONFIRM: "ask" })).toEqual({})
   })
 })
 
@@ -205,10 +207,14 @@ describe("settingsFromOptions", () => {
   })
 
   test("falls back to the environment, and an option wins over it", () => {
-    const env = { AGENT_GITHUB_TOOLSETS: "actions", AGENT_GITHUB_READ_ONLY: "true", AGENT_GITHUB_TOOLS: "a,b" }
+    const env = {
+      GITHUB_TOOLS_TOOLSETS: "actions",
+      GITHUB_TOOLS_READ_ONLY: "true",
+      GITHUB_TOOLS_TOOLS: "a,b",
+    }
     expect(settingsFromOptions({}, env)).toEqual({ toolsets: ["actions"], read_only: true, tools: ["a", "b"] })
     expect(
-      settingsFromOptions({ toolsets: ["repos"], read_only: false }, { ...env, AGENT_GITHUB_READ_ONLY: "yes" }),
+      settingsFromOptions({ toolsets: ["repos"], read_only: false }, { ...env, GITHUB_TOOLS_READ_ONLY: "yes" }),
     ).toEqual({ toolsets: ["repos"], read_only: false, tools: ["a", "b"] })
   })
 
@@ -228,9 +234,9 @@ describe("settingsFromOptions", () => {
   })
 
   test("a bad environment variable is rejected only when no option overrides it", () => {
-    expect(failure(() => settingsFromOptions({}, { AGENT_GITHUB_READ_ONLY: "yes" })).message).toContain(
-      "AGENT_GITHUB_READ_ONLY",
+    expect(failure(() => settingsFromOptions({}, { GITHUB_TOOLS_READ_ONLY: "yes" })).message).toContain(
+      "GITHUB_TOOLS_READ_ONLY",
     )
-    expect(settingsFromOptions({ read_only: true }, { AGENT_GITHUB_READ_ONLY: "yes" }).read_only).toBe(true)
+    expect(settingsFromOptions({ read_only: true }, { GITHUB_TOOLS_READ_ONLY: "yes" }).read_only).toBe(true)
   })
 })

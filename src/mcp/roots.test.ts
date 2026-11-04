@@ -96,9 +96,9 @@ describe("working directory", () => {
   })
 
   test("the install directory reaches the tool's context", async () => {
-    const { calls, cwd } = await setup({}, { ownDir: "/opt/agent-github" })
+    const { calls, cwd } = await setup({}, { ownDir: "/opt/github-tools" })
     await cwd()
-    expect(calls.at(-1)!.ctx.ownDir).toBe("/opt/agent-github")
+    expect(calls.at(-1)!.ctx.ownDir).toBe("/opt/github-tools")
   })
 
   test("only bad roots fall back to the fallback directory", async () => {
