@@ -201,6 +201,22 @@ describe("writeTargets", () => {
     })
   })
 
+  describe("in the directory the tools are installed in", () => {
+    test("a bare number and a missing repo are *, what is qualified still resolves", async () => {
+      const ownDir = tree(WITH_ORIGIN)
+      const ctx = { cwd: ownDir, ownDir }
+      expect(await writeTargets({ targets: relateTargets }, { issue: "3" }, ctx)).toEqual(["*"])
+      expect(await writeTargets({ targets: relateTargets }, {}, ctx)).toEqual(["*"])
+      expect(await writeTargets({ targets: relateTargets }, { issue: "a/b#3", parent: "4" }, ctx)).toEqual(["a/b"])
+      expect(await writeTargets({ targets: issueTargets }, { issue: "3", repo: "x/y" }, ctx)).toEqual(["x/y"])
+    })
+
+    test("another working tree is read as before", async () => {
+      const ctx = { cwd: tree(WITH_ORIGIN), ownDir: tree("https://github.com/octo/own.git") }
+      expect(await writeTargets({ targets: issueTargets }, { issue: "3" }, ctx)).toEqual(["octo/self"])
+    })
+  })
+
   describe("a spec without targets", () => {
     test("is its repo argument", async () => {
       expect(await writeTargets({}, { repo: "Octo/Hello" }, { cwd: tree() })).toEqual(["octo/hello"])

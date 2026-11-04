@@ -23,6 +23,8 @@ export type TargetKind = "repo" | "issue" | "issues"
 export type ToolContext = {
   /** The working directory the call runs in; a bare issue number means this tree's repository. */
   cwd: string
+  /** A directory that is never the caller's working tree (where these tools are installed); a bare number there fails. */
+  ownDir?: string
   signal?: AbortSignal
   /** Asks the person to approve; absent when the harness's own approval already covers the call. */
   confirm?(request: ConfirmRequest): Promise<boolean>
