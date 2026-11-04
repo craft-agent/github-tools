@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "github-tools",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "GitHub tools for coding agents: issues, project boards, pull requests, repositories, releases and Actions.",
   "author": {
     "name": "craftsamo",
