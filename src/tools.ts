@@ -7,6 +7,7 @@ import { issueEdit } from "./core/issues/edit"
 import { issueRead } from "./core/issues/read"
 import { issueRelate } from "./core/issues/relate"
 import { issueReopen } from "./core/issues/reopen"
+import { projectRead } from "./core/projects/read"
 
 /** Every tool spec of the package; entry points register their tools from this list. */
 export const ALL_TOOLS: ToolSpec[] = [
@@ -18,4 +19,5 @@ export const ALL_TOOLS: ToolSpec[] = [
   issueReopen,
   issueRelate,
   issueDevelop,
+  projectRead,
 ]
