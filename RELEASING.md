@@ -54,6 +54,9 @@ A tool ID change also changes `provides_tools` in `plugin.yaml`; run
   workflow `release-publish.yml`. npm does not check the entry when it is saved,
   and expires it unless a publish succeeds within two days. The package must
   exist before its settings do, so the first version is published once by hand.
+  Right after a manual publish, `npm view` may still answer E404 for a minute;
+  the release workflow treats npm's refusal to overwrite the version as already
+  published, so the job may then be re-run, or it passes on its own.
 - **MCP Registry.** Nothing beyond the workflow's OIDC token: the GitHub login
   proves the `io.github.craftsamo/*` namespace, and `mcpName` in `package.json`
   proves that the npm package belongs to the entry.

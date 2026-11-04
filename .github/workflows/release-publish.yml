@@ -113,6 +113,9 @@ jobs:
       # A rerun after a later job failed finds the version already published
       # and goes on to the registry job. Only a version that does not exist
       # counts as unpublished; any other failure to read it stops the job.
+      # Right after a manual publish, npm view may still answer E404 for a
+      # minute, so npm publish refusing to overwrite the version also counts
+      # as already published.
       - name: Publish the package
         run: |
           name="$(node -p 'require("./package.json").name')"
@@ -123,7 +126,15 @@ jobs:
             exit 0
           fi
           grep -q E404 "$errors" || { cat "$errors" >&2; exit 1; }
-          npm publish --access public --ignore-scripts
+          publish_errors="$RUNNER_TEMP/publish-errors"
+          if ! npm publish --access public --ignore-scripts 2> "$publish_errors"; then
+            if grep -q "You cannot publish over the previously published versions" "$publish_errors"; then
+              echo "$name@$version is already published; skipping the publish."
+              exit 0
+            fi
+            cat "$publish_errors" >&2
+            exit 1
+          fi
 
   mcp-registry:
     name: Publish to the MCP Registry
