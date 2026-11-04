@@ -62,7 +62,7 @@ def read_frontmatter(text: str) -> dict[str, str]:
 
 
 def short_name(name: str) -> str:
-    """A skill's name without its leading ``github-``: ``github-issues`` is shown as ``agent-github:issues``."""
+    """A skill's name without its leading ``github-``: ``github-issues`` is shown as ``github-tools:issues``."""
     return name.removeprefix(NAME_PREFIX) or name
 
 
@@ -89,6 +89,6 @@ def register_skills(ctx: PluginContext, skills_dir: Path) -> None:
         try:
             ctx.register_skill(name, path, description=found.get("description", ""))
         except (ValueError, OSError) as error:
-            logger.warning("agent-github: skill %s was not registered: %s", folder.name, error)
+            logger.warning("github-tools: skill %s was not registered: %s", folder.name, error)
             continue
         registered.add(name)

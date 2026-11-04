@@ -27,7 +27,7 @@ def register(ctx: PluginContext) -> None:
         flags = settings_flags(ctx)
         tools = list_tools(runtime, flags)
     except (Unavailable, SettingsError) as error:
-        logger.warning("agent-github is not available and registers nothing: %s", error)
+        logger.warning("github-tools is not available and registers nothing: %s", error)
         return
 
     register_tools(ctx, runtime, tools, flags)
