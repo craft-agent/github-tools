@@ -14,7 +14,7 @@ const DEFAULT_HOST = "github.com"
 const SSH_ALIAS_HOST = "ssh.github.com"
 const GIT_CONFIG_ENV = ["GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_NOSYSTEM"] as const
 /** Enterprise Managed User logins contain `_`. */
-const OWNER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/
+export const OWNER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/
 const NAME_PATTERN = /^[A-Za-z0-9._-]+$/
 const REPO_PATTERN = /^([^/\s#]+)\/([^/\s#]+)$/
 const QUALIFIED_NUMBER_PATTERN = /^([^/\s#]+)\/([^/\s#]+)#(\d+)$/
@@ -26,7 +26,7 @@ function invalid(message: string): ToolError {
   return new ToolError("invalid_argument", message)
 }
 
-function isGitHubHost(host: string): boolean {
+export function isGitHubHost(host: string): boolean {
   const known = host.toLowerCase()
   return known === DEFAULT_HOST || (process.env.GH_HOST !== undefined && known === process.env.GH_HOST.toLowerCase())
 }

@@ -268,12 +268,18 @@ export class GraphQLToolError extends ToolError {
   }
 }
 
+const INSUFFICIENT_SCOPES = "INSUFFICIENT_SCOPES"
+
 const GRAPHQL_ERROR_CODES = new Map<string, ErrorCode>([
   ["NOT_FOUND", "not_found"],
   ["FORBIDDEN", "forbidden"],
-  ["INSUFFICIENT_SCOPES", "forbidden"],
+  [INSUFFICIENT_SCOPES, "forbidden"],
   ["RATE_LIMITED", "rate_limited"],
 ])
+
+/** What to do about a token that lacks a scope; project boards need the `project` scope (`read:project` to read). */
+const SCOPE_HINT =
+  "Grant the missing scope with `gh auth refresh -s <scope>`; project boards need `gh auth refresh -s project`."
 
 function varFlags(vars: Vars): string[] {
   const flags: string[] = []
@@ -304,7 +310,8 @@ function graphqlFailure(errors: GraphQLErrorEntry[], data: unknown): GraphQLTool
   )
   const type = errors[0]?.type
   const code = (type === undefined ? undefined : GRAPHQL_ERROR_CODES.get(type)) ?? classifyGhFailure(text, "", 0).code
-  return new GraphQLToolError(code, `${FAILURE_HINTS[code] ?? "GitHub GraphQL error:"} ${text}`, errors, data)
+  const hint = type === INSUFFICIENT_SCOPES ? ` ${SCOPE_HINT}` : ""
+  return new GraphQLToolError(code, `${FAILURE_HINTS[code] ?? "GitHub GraphQL error:"} ${text}${hint}`, errors, data)
 }
 
 /** Runs one query or mutation and returns its `data`; errors in the reply throw a `GraphQLToolError`. */
