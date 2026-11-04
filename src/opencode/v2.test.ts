@@ -21,6 +21,8 @@ type FakeOptions = {
   options?: Record<string, unknown>
   /** What `session.get` resolves to (a session in `/work/project` when absent); `null` makes it reject. */
   location?: { directory?: string } | null
+  /** The `ownDir` the plugin is built with. */
+  ownDir?: string
   /** Makes `permission.assert` reject with this error. */
   deny?: Error
   events?: string[]
@@ -55,7 +57,7 @@ function fakeContext(fake: FakeOptions = {}) {
 async function setUp(fake: FakeOptions = {}, env: Record<string, string | undefined> = {}) {
   const events = fake.events ?? []
   const fakeCtx = fakeContext({ ...fake, events })
-  await createV2Setup(fixtureSpecs(events), { env })(fakeCtx.ctx)
+  await createV2Setup(fixtureSpecs(events), { env, ownDir: fake.ownDir })(fakeCtx.ctx)
   return fakeCtx
 }
 
@@ -69,7 +71,7 @@ describe("V2 setup", () => {
     expect(read.description).toBe(`Description of ${READ_ID}`)
     expect(z.toJSONSchema(read.input, { io: "input" }).additionalProperties).toBe(false)
     expect(Object.keys(read.input.shape)).toEqual(["repo", "count"])
-    expect(Object.keys(read.output.shape)).toEqual(["tool", "cwd", "count"])
+    expect(Object.keys(read.output.shape)).toEqual(["tool", "cwd", "count", "own_dir"])
   })
 
   test("takes toolsets, read_only and tools from the options", async () => {
@@ -183,6 +185,16 @@ describe("V2 tool calls", () => {
       [["*"], ["*"]],
       [["*"], ["*"]],
     ])
+  })
+
+  test("the install directory is handed to the tool, and a bare number there asks for *", async () => {
+    const repo = tempRepo("https://github.com/Octo/Self.git")
+    cleanups.push(repo.cleanup)
+    const { tools, asserts } = await setUp({ ownDir: repo.dir, location: { directory: repo.dir } })
+    const read = await tools.get(READ_ID)!.execute({}, { sessionID: SESSION_ID, signal })
+    const add = await tools.get(ADD_ID)!.execute({ issue: "3" }, { sessionID: SESSION_ID, signal })
+    expect([read, add].map(({ output }) => (output as { own_dir?: string }).own_dir)).toEqual([repo.dir, repo.dir])
+    expect(asserts.map((request) => request.resources)).toEqual([["*"]])
   })
 
   test("a denial stops the call and surfaces the harness's error", async () => {

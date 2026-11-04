@@ -8,7 +8,12 @@ const input = z.object({
   repo: z.string().describe("The repository, as owner/name.").optional(),
   count: z.number().int().optional(),
 })
-const output = z.object({ tool: z.string(), cwd: z.string(), count: z.number().optional() })
+const output = z.object({
+  tool: z.string(),
+  cwd: z.string(),
+  count: z.number().optional(),
+  own_dir: z.string().optional(),
+})
 const writeInput = input.extend({ issue: z.string().optional(), parent: z.string().optional() })
 
 const READ_ID = "github_issue_read"
@@ -29,7 +34,7 @@ function fixture(id: string, toolset: ToolSpec["toolset"], writeClass: ToolSpec[
     input: id === ADD_ID ? writeInput : input,
     output,
     async execute(args, ctx) {
-      return { tool: id, cwd: ctx.cwd, count: args.count }
+      return { tool: id, cwd: ctx.cwd, count: args.count, own_dir: ctx.ownDir }
     },
   })
 }
@@ -147,6 +152,11 @@ describe("run", () => {
     })
   })
 
+  test("hands the install directory to the tool", async () => {
+    const run = await cli(["run", ADD_ID, "--cwd", "/work/tree"], "", { ownDir: "/opt/agent-github" })
+    expect(json(run).result).toEqual({ tool: ADD_ID, cwd: "/work/tree", own_dir: "/opt/agent-github" })
+  })
+
   test("takes --cwd after the settings flags and in its --cwd=dir form", async () => {
     const run = await cli(["run", ADMIN_ID, "--toolsets", "all", "--cwd=/x"])
     expect(json(run)).toEqual({ result: { tool: ADMIN_ID, cwd: "/x" } })
@@ -243,6 +253,15 @@ describe("target", () => {
       resources: ["*"],
     })
     expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir], '{"repo":3}'))).toEqual({ resources: ["*"] })
+  })
+
+  test("is * for a bare number in the install directory, and still names a qualified issue there", async () => {
+    const repo = tempRepo("git@github.com:Octo/Self.git")
+    cleanups.push(repo.cleanup)
+    const argv = ["target", ADD_ID, "--cwd", repo.dir]
+    expect(json(await cli(argv, '{"issue":"3"}', { ownDir: repo.dir }))).toEqual({ resources: ["*"] })
+    expect(json(await cli(argv, '{"issue":"o/r#3"}', { ownDir: repo.dir }))).toEqual({ resources: ["o/r"] })
+    expect(json(await cli(argv, '{"issue":"3"}'))).toEqual({ resources: ["octo/self"] })
   })
 
   test("an unknown tool is invalid_argument", async () => {

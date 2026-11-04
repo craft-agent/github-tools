@@ -2,7 +2,7 @@ import type { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { RootsListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js"
 import { statSync } from "node:fs"
 import { fileURLToPath } from "node:url"
-import { exec, isAbortError, passthroughEnv } from "../core"
+import { exec, isAbortError, isWithin, passthroughEnv } from "../core"
 
 const FILE_URI_PROTOCOL = "file:"
 
@@ -29,25 +29,28 @@ function localDirectory(uri: string): string | undefined {
   }
 }
 
-/** The first root of the client that is a local directory inside a git work tree. */
-async function firstGitRoot(server: Server, signal?: AbortSignal): Promise<string | undefined> {
+/** The first root of the client that is a local directory inside a git work tree, and not inside `ownDir`. */
+async function firstGitRoot(server: Server, ownDir?: string, signal?: AbortSignal): Promise<string | undefined> {
   const { roots } = await server.listRoots(undefined, { signal })
   for (const root of roots) {
     const dir = localDirectory(root.uri)
-    if (dir !== undefined && (await isInsideWorkTree(dir, signal))) return dir
+    if (dir === undefined || (ownDir !== undefined && (await isWithin(dir, ownDir)))) continue
+    if (await isInsideWorkTree(dir, signal)) return dir
   }
   return undefined
 }
 
 /**
  * Resolves the directory a call runs in: the first of the client's roots that
- * is inside a git work tree (the root itself, not the work tree's top), else
- * `fallback()`. A client that advertises no roots always gets `fallback()`.
- * The answer is kept until the client reports that its roots changed.
+ * is inside a git work tree (the root itself, not the work tree's top) and not
+ * inside `ownDir`, else `fallback()`. A client that advertises no roots always
+ * gets `fallback()`. The answer is kept until the client reports that its
+ * roots changed.
  */
 export function createWorkingDirResolver(
   server: Server,
   fallback: () => string,
+  ownDir?: string,
 ): (signal?: AbortSignal) => Promise<string> {
   let cached: string | undefined
   let generation = 0
@@ -62,7 +65,7 @@ export function createWorkingDirResolver(
     const started = generation
     let dir: string
     try {
-      dir = (await firstGitRoot(server, signal)) ?? fallback()
+      dir = (await firstGitRoot(server, ownDir, signal)) ?? fallback()
     } catch (error) {
       if (signal?.aborted || isAbortError(error)) throw error
       return fallback()

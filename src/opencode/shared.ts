@@ -9,6 +9,8 @@ export type PluginDeps = {
   env?: Record<string, string | undefined>
   /** The directory holding `<name>/SKILL.md` files, for the harness version that registers skills. */
   skillsDir?: URL | string
+  /** Where the plugin is installed: never a call's working tree, so a bare number there fails. */
+  ownDir?: string
 }
 
 /** The one plain line a person reads when the harness asks to run a tool; it names every repository the call writes to. */

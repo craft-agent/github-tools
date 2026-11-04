@@ -16,6 +16,7 @@ afterEach(() => {
 type Fake = {
   options?: Record<string, unknown>
   env?: Record<string, string | undefined>
+  ownDir?: string
   deny?: Error
 }
 
@@ -32,7 +33,10 @@ async function setUp(fake: Fake = {}) {
       if (fake.deny) throw fake.deny
     },
   }
-  const { tool } = await createV1Server(fixtureSpecs(events), { env: fake.env ?? {} })({}, fake.options)
+  const { tool } = await createV1Server(fixtureSpecs(events), { env: fake.env ?? {}, ownDir: fake.ownDir })(
+    {},
+    fake.options,
+  )
   return { tool, asks, events, context }
 }
 
@@ -225,6 +229,16 @@ describe("V1 tool calls", () => {
       [["*"], ["*"]],
       [["*"], ["*"]],
     ])
+  })
+
+  test("the install directory is handed to the tool, and a bare number there asks for *", async () => {
+    const repo = tempRepo("git@github.com:Octo/Self.git")
+    cleanups.push(repo.cleanup)
+    const { tool, asks, context } = await setUp({ ownDir: repo.dir })
+    const inInstallDir = { ...context, worktree: repo.dir }
+    expect(JSON.parse(await tool[READ_ID]!.execute({}, inInstallDir)).own_dir).toBe(repo.dir)
+    expect(JSON.parse(await tool[ADD_ID]!.execute({ issue: "3" }, inInstallDir)).own_dir).toBe(repo.dir)
+    expect(asks.map((request) => request.patterns)).toEqual([["*"]])
   })
 
   test("a denial stops the call and surfaces the harness's error", async () => {

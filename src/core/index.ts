@@ -20,6 +20,7 @@ export {
   type Vars,
 } from "./gh"
 export {
+  isWithin,
   parseNumberRef,
   parseRepo,
   repoFromOrigin,

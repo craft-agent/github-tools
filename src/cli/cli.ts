@@ -33,6 +33,8 @@ export type CliIo = {
   stdout(text: string): void
   /** Receives usage lines and the detail of unexpected errors. */
   stderr(text: string): void
+  /** Where the tools are installed: never a call's working tree, so a bare number there fails. */
+  ownDir?: string
   /** Stops a running tool when it aborts. */
   signal?: AbortSignal
 }
@@ -124,7 +126,11 @@ async function runTool(command: Extract<Command, { name: "run" }>, io: CliIo): P
   const spec = command.selected.find((candidate) => candidate.id === command.toolId)
   if (!spec) return writeError(io, "invalid_argument", `Unknown tool "${command.toolId}".`)
   try {
-    const result = await invoke(spec, await readArguments(io), { cwd: command.cwd, signal: io.signal })
+    const result = await invoke(spec, await readArguments(io), {
+      cwd: command.cwd,
+      ownDir: io.ownDir,
+      signal: io.signal,
+    })
     writeJson(io, { result })
     return EXIT_OK
   } catch (error) {
@@ -141,6 +147,7 @@ async function targetOf(command: Extract<Command, { name: "target" }>, io: CliIo
   try {
     const resources = await permissionResources(spec, await readArguments(io), {
       cwd: command.cwd,
+      ownDir: io.ownDir,
       signal: io.signal,
     })
     writeJson(io, { resources })

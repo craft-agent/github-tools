@@ -13,7 +13,7 @@ async function sessionDirectory(ctx: V2Context, sessionID: string): Promise<stri
   }
 }
 
-function v2Tool(ctx: V2Context, spec: ToolSpec): V2Tool {
+function v2Tool(ctx: V2Context, spec: ToolSpec, ownDir: string | undefined): V2Tool {
   return {
     name: spec.id,
     description: spec.description,
@@ -27,7 +27,7 @@ function v2Tool(ctx: V2Context, spec: ToolSpec): V2Tool {
             `invalid_argument: The session's directory could not be read, so ${spec.id} cannot tell which repository it changes; pass \`repo\` as owner/name or retry.`,
           )
         }
-        const resources = await permissionResources(spec, input, { cwd: directory, signal })
+        const resources = await permissionResources(spec, input, { cwd: directory, ownDir, signal })
         await ctx.permission.assert({
           action: spec.id,
           resources,
@@ -36,7 +36,7 @@ function v2Tool(ctx: V2Context, spec: ToolSpec): V2Tool {
           sessionID,
         })
       }
-      const result = await runTool(spec, input, { cwd: directory ?? process.cwd(), signal })
+      const result = await runTool(spec, input, { cwd: directory ?? process.cwd(), ownDir, signal })
       return { content: JSON.stringify(result), output: result }
     },
   }
@@ -50,7 +50,7 @@ function v2Tool(ctx: V2Context, spec: ToolSpec): V2Tool {
  */
 export function createV2Setup(specs: ToolSpec[], deps: PluginDeps = {}): OpenCodePlugin["setup"] {
   return async function setup(ctx: V2Context): Promise<void> {
-    const tools = selectedTools(specs, ctx.options, deps.env).map((spec) => v2Tool(ctx, spec))
+    const tools = selectedTools(specs, ctx.options, deps.env).map((spec) => v2Tool(ctx, spec, deps.ownDir))
     const skills = deps.skillsDir === undefined ? [] : await loadSkills(deps.skillsDir)
 
     if (tools.length > 0) {

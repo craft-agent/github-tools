@@ -28,6 +28,8 @@ const DEFAULT_VERSION = "0.0.0"
 export type ServerOptions = {
   /** The directory a call runs in when the client names no usable root; defaults to `process.cwd`. */
   cwd?: () => string
+  /** Where the tools are installed: never a call's working tree, so a client root inside it is skipped. */
+  ownDir?: string
   /** The version the server reports; defaults to `0.0.0`. */
   version?: string
   /** Receives the full text of an unexpected error, which the client never sees; defaults to stderr. */
@@ -63,7 +65,7 @@ export function createServer(specs: ToolSpec[], settings: EntrySettings, options
     { name: SERVER_NAME, version: options.version ?? DEFAULT_VERSION },
     { capabilities: { tools: {} } },
   )
-  const workingDir = createWorkingDirResolver(server, options.cwd ?? (() => process.cwd()))
+  const workingDir = createWorkingDirResolver(server, options.cwd ?? (() => process.cwd()), options.ownDir)
   const selected = new Map(selectTools(specs, settings).map((spec) => [spec.id, spec]))
   const tools = [...selected.values()].map(describeTool)
 
@@ -76,6 +78,7 @@ export function createServer(specs: ToolSpec[], settings: EntrySettings, options
       const confirm = settings.confirm === "elicitation" ? elicitationConfirm(server, extra.signal) : undefined
       const ctx: ToolContext = {
         cwd: await workingDir(extra.signal),
+        ownDir: options.ownDir,
         signal: extra.signal,
         ...(confirm && { confirm }),
       }
