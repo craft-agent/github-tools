@@ -3,6 +3,10 @@ import type { ViewRequest } from "../github/board-view-setup"
 
 /** The standard template a board is brought to: Status, Start and Target, and the Roadmap, Kanban and Backlog views. */
 
+/** The Status options a new board item starts in: `Todo`, or `Waiting` when an open issue blocks it. */
+export const STATUS_TODO = "Todo"
+export const STATUS_WAITING = "Waiting"
+
 const START_FIELD = "Start"
 const TARGET_FIELD = "Target"
 const NOT_DONE = "-status:Done -status:Cancelled"
@@ -19,10 +23,10 @@ export const STANDARD_FIELDS: readonly FieldRequest[] = [
     name: STATUS_FIELD,
     type: "single_select",
     options: [
-      { name: "Todo", color: "BLUE", description: "Ready to start; nothing is in the way." },
+      { name: STATUS_TODO, color: "BLUE", description: "Ready to start; nothing is in the way." },
       { name: "In Progress", color: "YELLOW", description: "Being worked on now." },
       {
-        name: "Waiting",
+        name: STATUS_WAITING,
         color: "GRAY",
         description: "Cannot move until something else clears: an open blocking issue, a review or a reply.",
       },
