@@ -133,7 +133,9 @@ Every tool belongs to one class, and the class sets its MCP annotations.
   the same lookup the tool uses, which reads but never writes. Putting an
   issue or pull request on a board names the board only, since the issue does
   not change; a call that also writes to a repository (linking one, turning a
-  draft into an issue) names both.
+  draft into an issue) names both. Creating a board names `owner/projects/new`,
+  so an "always" answer lets new boards be made for that owner and no
+  existing board be written to.
 - **`confirm: "elicitation"` adds the tool's own form** for administrative
   tools, where the client offers form-mode elicitation. It is for people who
   switch the client's approvals off: the tool states what will happen in plain
