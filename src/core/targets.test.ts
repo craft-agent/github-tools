@@ -29,6 +29,12 @@ import { projectItemCreate } from "./projects/item-create"
 import { projectItemEdit } from "./projects/item-edit"
 import { projectLink, projectUnlink } from "./projects/link"
 import { projectViewEnsure } from "./projects/view-ensure"
+import { prClose } from "./pull-requests/close"
+import { prComment } from "./pull-requests/comment"
+import { prCreate } from "./pull-requests/create"
+import { prEdit } from "./pull-requests/edit"
+import { prReady } from "./pull-requests/ready"
+import { prReopen } from "./pull-requests/reopen"
 import { writeTargets } from "./targets"
 import type { ToolSpec } from "./tool"
 
@@ -298,6 +304,116 @@ describe("the issue write tools' targets", () => {
   test("closing as a duplicate writes nothing to the original's repository", async () => {
     const args = { issue: "a/b#1", reason: "duplicate", duplicate_of: "c/d#2" }
     expect(await writeTargets(issueClose, args, { cwd: tree() })).toEqual(["a/b"])
+  })
+})
+
+describe("pull request targets", () => {
+  const pullTargets: ToolSpec["targets"] = { pr: "pull", repo: "repo" }
+
+  test("a qualified pull request or a pull URL names its own repository", async () => {
+    const cwd = tree(WITH_ORIGIN)
+    expect(await writeTargets({ targets: pullTargets }, { pr: "Other/Repo#3" }, { cwd })).toEqual(["other/repo"])
+    const url = "https://github.com/Other/Repo/pull/3"
+    expect(await writeTargets({ targets: pullTargets }, { pr: url }, { cwd })).toEqual(["other/repo"])
+  })
+
+  test("a bare number means repo, else the working tree's origin", async () => {
+    const cwd = tree(WITH_ORIGIN)
+    expect(await writeTargets({ targets: pullTargets }, { pr: "4", repo: "x/y" }, { cwd })).toEqual(["x/y"])
+    expect(await writeTargets({ targets: pullTargets }, { pr: "#4" }, { cwd })).toEqual(["octo/self"])
+  })
+
+  test("an issue URL in a pull request argument is *", async () => {
+    const args = { pr: "https://github.com/c/d/issues/1", repo: "a/b" }
+    expect(await writeTargets({ targets: pullTargets }, args, { cwd: tree() })).toEqual(["a/b", "*"])
+    expect(await writeTargets({ targets: pullTargets }, { pr: args.pr }, { cwd: tree() })).toEqual(["*"])
+  })
+
+  test("a pull request URL in an issue argument is *", async () => {
+    const cwd = tree()
+    expect(await writeTargets({ targets: issueTargets }, { issue: "https://github.com/c/d/pull/1" }, { cwd })).toEqual([
+      "*",
+    ])
+  })
+
+  test("a pull request that is not text is *", async () => {
+    expect(await writeTargets({ targets: pullTargets }, { pr: 4, repo: "a/b" }, { cwd: tree() })).toEqual(["a/b", "*"])
+  })
+
+  test("a qualified pull request that disagrees with repo is listed beside it", async () => {
+    const targets = await writeTargets({ targets: pullTargets }, { pr: "a/b#1", repo: "c/d" }, { cwd: tree() })
+    expect(targets).toEqual(["a/b", "c/d"])
+  })
+
+  test("the tools that write to one pull request", async () => {
+    const cwd = tree(WITH_ORIGIN)
+    for (const spec of [prEdit, prComment, prReady, prClose, prReopen]) {
+      expect(await writeTargets(spec, { pr: "other/repo#3" }, { cwd })).toEqual(["other/repo"])
+    }
+  })
+})
+
+describe("an optional board target", () => {
+  const createTargets: ToolSpec["targets"] = { repo: "repo", project: "optional_board" }
+
+  test("absent adds nothing and runs no lookup: just the repository", async () => {
+    const installed = useFake([])
+    expect(await writeTargets({ targets: createTargets }, { repo: "Octo/Hello" }, { cwd: tree() })).toEqual([
+      "octo/hello",
+    ])
+    expect(await writeTargets({ targets: createTargets }, {}, { cwd: tree(WITH_ORIGIN) })).toEqual(["octo/self"])
+    expect(apiCalls(installed)).toHaveLength(0)
+  })
+
+  test("given as owner/N it is the board, beside the repository", async () => {
+    const installed = useFake([])
+    const args = { repo: "octo/hello", project: "Acme/5" }
+    expect(await writeTargets({ targets: createTargets }, args, { cwd: tree() })).toEqual([
+      "acme/projects/5",
+      "octo/hello",
+    ])
+    expect(apiCalls(installed)).toHaveLength(0)
+  })
+
+  test("a bare number takes the owner of the repository", async () => {
+    useFake([])
+    const args = { repo: "octo/hello", project: "5" }
+    expect(await writeTargets({ targets: createTargets }, args, { cwd: tree() })).toEqual([
+      "octo/hello",
+      "octo/projects/5",
+    ])
+  })
+
+  test("given as a title it runs the lookup", async () => {
+    const installed = useFake([linkedBoardsRule("Octo", "Self", [rawBoard(4, { title: "Plan" })])])
+    const args = { project: "plan" }
+    expect(await writeTargets({ targets: createTargets }, args, { cwd: tree(WITH_ORIGIN) })).toEqual([
+      "octo/projects/4",
+      "octo/self",
+    ])
+    expect(apiCalls(installed)).toHaveLength(1)
+  })
+
+  test("a title that finds no board is *, beside the repository", async () => {
+    useFake([linkedBoardsRule("Octo", "Self", []), ownerBoardsRule("organization", "Octo", []), viewerBoardsRule([])])
+    expect(await writeTargets({ targets: createTargets }, { project: "Plan" }, { cwd: tree(WITH_ORIGIN) })).toEqual([
+      "octo/self",
+      "*",
+    ])
+  })
+
+  test("a value that is not text is *", async () => {
+    useFake([])
+    expect(await writeTargets({ targets: createTargets }, { repo: "a/b", project: 5 }, { cwd: tree() })).toEqual([
+      "a/b",
+      "*",
+    ])
+  })
+
+  test("pull request create names the repository and the board", async () => {
+    useFake([])
+    const args = { head: "x", title: "t", project: "craftsamo/1", repo: "a/b" }
+    expect(await writeTargets(prCreate, args, { cwd: tree() })).toEqual(["a/b", "craftsamo/projects/1"])
   })
 })
 
