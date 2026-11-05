@@ -1,8 +1,15 @@
 import { z } from "zod"
 import { ToolError, isToolError } from "../errors"
-import { graphql, paginate } from "../gh"
+import { graphql, paginate, type Vars } from "../gh"
 import type { RefContext, RepoName } from "../refs"
-import { checksSummarySchema, summarizeChecks, type CheckContexts } from "./checks"
+import {
+  checkBucket,
+  checksSummarySchema,
+  summarizeChecks,
+  type CheckContexts,
+  type CheckNode,
+  type ChecksSummary,
+} from "./checks"
 import { stateWord } from "./issues"
 
 const PREVIEW_LABELS = 30
@@ -94,8 +101,40 @@ export const pullRequestDetailSchema = z.object({
   closed_at: z.string().nullable(),
 })
 
+/** The pull request a checks or diff read is about; `checks` fills every field, `diff` only `number` and `head_sha`. */
+export const pullRequestIdentitySchema = z.object({
+  number: z.number().int(),
+  head_sha: z.string(),
+  url: z.string().optional(),
+  state: z.string().describe(STATE_DESCRIPTION).optional(),
+  draft: z.boolean().optional(),
+  head: z.string().describe("The head branch name.").optional(),
+})
+
+export const checkRunSchema = z.object({
+  name: z.string(),
+  workflow: z.string().nullable().describe("The workflow of a GitHub Actions check; null for any other check."),
+  bucket: z.enum(["pass", "fail", "pending", "skipping"]),
+  required: z.boolean(),
+  state: z.string().describe("A check run's lower-cased conclusion, else its status; a status's lower-cased state."),
+  url: z.string().nullable(),
+})
+
 export type PullRequestDetail = z.output<typeof pullRequestDetailSchema>
 export type PullRequestRow = z.output<typeof pullRequestRowSchema>
+export type CheckRunRow = z.output<typeof checkRunSchema>
+export type PullRequestRef = { repo: RepoName; number: number }
+
+/** A failed check that is a GitHub Actions job, whose log can be read by its job id. */
+export type FailedJob = { name: string; job: number; url: string | null }
+
+/** A pull request's checks on its last commit, in one read. */
+export type PullRequestChecks = {
+  pr: Required<z.output<typeof pullRequestIdentitySchema>>
+  checks: ChecksSummary
+  check_runs: CheckRunRow[]
+  failed_jobs: FailedJob[]
+}
 
 type Connection<T> = { nodes?: (T | null)[] | null } | null | undefined
 type Author = { login: string }
@@ -163,6 +202,29 @@ type RawPullRequest = Omit<RawRow, "milestone"> & {
   }
 }
 
+type RawCheckNode = CheckNode & {
+  name?: string | null
+  context?: string | null
+  detailsUrl?: string | null
+  targetUrl?: string | null
+  databaseId?: number | null
+  checkSuite?: {
+    workflowRun?: { databaseId?: number | null; workflow?: { name?: string | null } | null } | null
+  } | null
+}
+type RawChecksPullRequest = Pick<
+  RawPullRequest,
+  "number" | "url" | "state" | "isDraft" | "headRefName" | "headRefOid"
+> & {
+  lastCommit?: Connection<{
+    commit?: {
+      statusCheckRollup?: {
+        contexts?: { pageInfo?: { hasNextPage?: boolean }; nodes?: (RawCheckNode | null)[] | null } | null
+      } | null
+    } | null
+  }>
+}
+
 const ROW_FIELDS = `number title url state isDraft author{login} baseRefName headRefName reviewDecision labels(first:${ROW_LABELS}){nodes{name}} assignees(first:${ROW_ASSIGNEES}){nodes{login}} milestone{title} updatedAt`
 const DETAIL_QUERY = `query($owner:String!,$name:String!,$n:Int!,$comments:Int!,$withComments:Boolean!){repository(owner:$owner,name:$name){pullRequest(number:$n){
   id number title url state isDraft body author{login} createdAt updatedAt mergedAt closedAt
@@ -178,6 +240,14 @@ const DETAIL_QUERY = `query($owner:String!,$name:String!,$n:Int!,$comments:Int!,
   lastCommit: commits(last:1){nodes{commit{statusCheckRollup{state contexts(first:${MAX_CONTEXTS}){totalCount pageInfo{hasNextPage} nodes{__typename ... on CheckRun{name status conclusion isRequired(pullRequestNumber:$n) detailsUrl} ... on StatusContext{context state isRequired(pullRequestNumber:$n) targetUrl}}}}}}}
   comments(last:$comments){totalCount nodes @include(if:$withComments){author{login} createdAt body url}}
 }}}`
+
+/** For a GitHub Actions check run, `databaseId` is the job id and `workflowRun` is set; for any other check run `workflowRun` is null. */
+const CHECKS_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){pullRequest(number:$n){
+  number url state isDraft headRefName headRefOid
+  lastCommit: commits(last:1){nodes{commit{statusCheckRollup{contexts(first:${MAX_CONTEXTS}){pageInfo{hasNextPage} nodes{__typename ... on CheckRun{name status conclusion isRequired(pullRequestNumber:$n) detailsUrl databaseId checkSuite{workflowRun{databaseId workflow{name}}}} ... on StatusContext{context state isRequired(pullRequestNumber:$n) targetUrl description}}}}}}}
+}}}`
+
+const HEAD_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){pullRequest(number:$n){headRefOid changedFiles state}}}`
 
 /** Plain ISSUE search keeps every qualifier, including the repository, scoped across OR expressions. */
 const SEARCH_QUERY = `query($q:String!,$first:Int!,$after:String){search(type:ISSUE,query:$q,first:$first,after:$after){pageInfo{hasNextPage endCursor} nodes{... on PullRequest{${ROW_FIELDS}}}}}`
@@ -212,31 +282,32 @@ function pullRequestNotFound(repo: RepoName, number: number, cause?: unknown): T
   )
 }
 
-/** One pull request in full, from one read; the comment count is reported even when no comments are requested. */
-export async function readPullRequest(
-  ref: { repo: RepoName; number: number },
-  options: { comments: number },
-  ctx: RefContext,
-): Promise<PullRequestDetail> {
-  let data: { repository?: { pullRequest?: RawPullRequest | null } | null } | null
+/** The pull request a query selects with `$owner`, `$name` and `$n`; one that is missing or hidden is `not_found`. */
+async function readPullRequestNode<T>(query: string, ref: PullRequestRef, vars: Vars, ctx: RefContext): Promise<T> {
+  let data: { repository?: { pullRequest?: T | null } | null } | null
   try {
-    data = await graphql(
-      DETAIL_QUERY,
-      {
-        owner: ref.repo.owner,
-        name: ref.repo.name,
-        n: ref.number,
-        comments: Math.max(options.comments, 1),
-        withComments: options.comments > 0,
-      },
-      ctx,
-    )
+    data = await graphql(query, { owner: ref.repo.owner, name: ref.repo.name, n: ref.number, ...vars }, ctx)
   } catch (error) {
     if (isToolError(error) && error.code === "not_found") throw pullRequestNotFound(ref.repo, ref.number, error)
     throw error
   }
   const pull = data?.repository?.pullRequest
   if (!pull) throw pullRequestNotFound(ref.repo, ref.number)
+  return pull
+}
+
+/** One pull request in full, from one read; the comment count is reported even when no comments are requested. */
+export async function readPullRequest(
+  ref: PullRequestRef,
+  options: { comments: number },
+  ctx: RefContext,
+): Promise<PullRequestDetail> {
+  const pull = await readPullRequestNode<RawPullRequest>(
+    DETAIL_QUERY,
+    ref,
+    { comments: Math.max(options.comments, 1), withComments: options.comments > 0 },
+    ctx,
+  )
   const threads = nodesOf(pull.reviewThreads)
   return {
     id: pull.id,
@@ -322,6 +393,60 @@ export async function readPullRequest(
     merged_at: pull.mergedAt ?? null,
     closed_at: pull.closedAt ?? null,
   }
+}
+
+function checkRun(node: RawCheckNode): CheckRunRow {
+  const isRun = node.__typename === "CheckRun"
+  return {
+    name: (isRun ? node.name : node.context) ?? "",
+    workflow: node.checkSuite?.workflowRun?.workflow?.name ?? null,
+    bucket: checkBucket(node),
+    required: Boolean(node.isRequired),
+    state: ((isRun ? (node.conclusion ?? node.status) : node.state) ?? "unknown").toLowerCase(),
+    url: (isRun ? node.detailsUrl : node.targetUrl) ?? null,
+  }
+}
+
+/** A failed check that is an Actions job: a check run with a workflow run and a job id. */
+function failedJob(node: RawCheckNode, row: CheckRunRow): FailedJob | undefined {
+  const job = node.checkSuite?.workflowRun ? node.databaseId : undefined
+  if (node.__typename !== "CheckRun" || row.bucket !== "fail" || job == null) return undefined
+  return { name: row.name, job, url: row.url }
+}
+
+/** The checks on a pull request's last commit, from one read. */
+export async function readPullRequestChecks(ref: PullRequestRef, ctx: RefContext): Promise<PullRequestChecks> {
+  const pull = await readPullRequestNode<RawChecksPullRequest>(CHECKS_QUERY, ref, {}, ctx)
+  const contexts = nodesOf(pull.lastCommit)[0]?.commit?.statusCheckRollup?.contexts
+  const nodes = nodesOf(contexts)
+  const rows = nodes.map(checkRun)
+  return {
+    pr: {
+      number: pull.number,
+      url: pull.url,
+      state: stateWord(pull.state),
+      draft: pull.isDraft,
+      head: pull.headRefName,
+      head_sha: pull.headRefOid,
+    },
+    checks: summarizeChecks(contexts),
+    check_runs: rows,
+    failed_jobs: nodes.flatMap((node, i) => failedJob(node, rows[i]!) ?? []),
+  }
+}
+
+/** The head commit, the number of changed files and the state of a pull request, from a small read. */
+export async function readPullRequestHead(
+  ref: PullRequestRef,
+  ctx: RefContext,
+): Promise<{ head_sha: string; changed_files: number; state: string }> {
+  const pull = await readPullRequestNode<Pick<RawPullRequest, "headRefOid" | "changedFiles" | "state">>(
+    HEAD_QUERY,
+    ref,
+    {},
+    ctx,
+  )
+  return { head_sha: pull.headRefOid, changed_files: pull.changedFiles, state: stateWord(pull.state) }
 }
 
 /** Matching pull requests, at most `limit`; the caller builds and checks the query. */
