@@ -221,6 +221,78 @@ export const detailRule = (pullRequest: unknown = rawPullRequest()): GhRule => (
   match: DETAIL,
   stdout: gqlReply({ repository: { pullRequest } }),
 })
+/** Tokens only the checks query, the head query, a job log read, a run listing and a files page hold, for fake `gh` rules. */
+export const CHECKS = "checkSuite\\{workflowRun"
+export const HEAD = "headRefOid changedFiles"
+export const RUN_VIEW = "^run view"
+export const RUN_LIST = "^run list"
+export const FILES = "pulls/\\d+/files"
+
+/** A GitHub Actions check run as GitHub's GraphQL replies with it; `job` is its job id. */
+export const rawCheckRun = (name: string, job: number, extra: Record<string, unknown> = {}) => ({
+  __typename: "CheckRun",
+  name,
+  status: "COMPLETED",
+  conclusion: "SUCCESS",
+  isRequired: false,
+  detailsUrl: `https://github.com/octo/hello/actions/runs/1/job/${job}`,
+  databaseId: job,
+  checkSuite: { workflowRun: { databaseId: 1, workflow: { name: "CI" } } },
+  ...extra,
+})
+
+export const rawStatusContext = (context: string, extra: Record<string, unknown> = {}) => ({
+  __typename: "StatusContext",
+  context,
+  state: "SUCCESS",
+  isRequired: false,
+  targetUrl: null,
+  description: null,
+  ...extra,
+})
+
+/** A pull request as the checks query replies with it. */
+export const rawChecksPullRequest = (nodes: unknown[], extra: Record<string, unknown> = {}, hasNextPage = false) => ({
+  number: 7,
+  url: "https://github.com/octo/hello/pull/7",
+  state: "OPEN",
+  isDraft: false,
+  headRefName: "fix",
+  headRefOid: "abc123",
+  lastCommit: { nodes: [{ commit: { statusCheckRollup: { contexts: { pageInfo: { hasNextPage }, nodes } } } }] },
+  ...extra,
+})
+
+export const checksRule = (pullRequest: unknown, times?: number): GhRule => ({
+  match: CHECKS,
+  stdout: gqlReply({ repository: { pullRequest } }),
+  times,
+})
+
+/** A job log line as `gh run view --log-failed` prints it: job, step and a timestamped text, separated by tabs. */
+export const logLine = (text: string, job = "build", step = "Run tests") =>
+  `${job}\t${step}\t2026-11-01T00:00:00.1234567Z ${text}`
+
+export const headRule = (changedFiles: number): GhRule => ({
+  match: HEAD,
+  stdout: gqlReply({ repository: { pullRequest: { headRefOid: "abc123", changedFiles, state: "OPEN" } } }),
+})
+
+/** A file as GitHub's REST API lists it. */
+export const rawFile = (filename: string, extra: Record<string, unknown> = {}) => ({
+  filename,
+  status: "modified",
+  additions: 1,
+  deletions: 0,
+  patch: `@@ -1 +1 @@\n+${filename}`,
+  ...extra,
+})
+
+export const filesRule = (page: number, files: unknown[]): GhRule => ({
+  match: `${FILES}\\?per_page=100&page=${page}$`,
+  stdout: JSON.stringify(files),
+})
+
 export const searchPage = (nodes: unknown[], next: string | null = null) =>
   gqlReply({ search: { pageInfo: { hasNextPage: next !== null, endCursor: next }, nodes } })
 export const searchRule = (nodes: unknown[] = []): GhRule => ({ match: SEARCH, stdout: searchPage(nodes) })
