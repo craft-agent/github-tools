@@ -14,11 +14,15 @@ export type WriteClass = "read" | "add" | "idempotent" | "overwrite" | "administ
 export type ConfirmRequest = { tool: string; message: string }
 
 /**
- * What an argument that names a repository holds: `"repo"` an `owner/name`,
- * `"issue"` one issue reference (`12`, `#12`, `owner/repo#12` or a URL),
- * `"issues"` a list of them.
+ * What an argument that names what a call writes to holds: `"repo"` an
+ * `owner/name`, `"issue"` one issue reference (`12`, `#12`, `owner/repo#12` or
+ * a URL), `"issues"` a list of them, `"board"` the board that `project` (a
+ * reference or a title), `owner` and `repo` choose together (declared on
+ * `project`), `"item"` a project item's node ID (`PVTI_…`), whose board is
+ * written to, `"owner"` a user or organization login (or `@me`) that a board is
+ * about to be created for.
  */
-export type TargetKind = "repo" | "issue" | "issues"
+export type TargetKind = "repo" | "issue" | "issues" | "board" | "item" | "owner"
 
 export type ToolContext = {
   /** The working directory the call runs in; a bare issue number means this tree's repository. */
@@ -37,7 +41,7 @@ export type ToolSpec<I extends z.ZodObject<any> = z.ZodObject<any>, O extends z.
   description: string
   toolset: Toolset
   class: WriteClass
-  /** The arguments that name a repository the call writes to, by name; each must be an argument of `input`. */
+  /** The arguments that name a repository or board the call writes to, by name; each must be an argument of `input`. */
   targets?: Readonly<Record<string, TargetKind>>
   input: I
   output: O

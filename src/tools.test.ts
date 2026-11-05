@@ -25,12 +25,30 @@ const EXPECTED_TARGETS: Record<string, Record<string, TargetKind>> = {
     remove_blocking: "issues",
   },
   github_issue_develop: { issue: "issue", repo: "repo", branch_repo: "repo" },
+  github_project_create: { owner: "owner", link_repo: "repo" },
+  github_project_link: { project: "board", repo: "repo" },
+  github_project_unlink: { project: "board", repo: "repo" },
+  github_project_field_ensure: { project: "board" },
+  github_project_view_ensure: { project: "board" },
+  github_project_item_add: { project: "board" },
+  github_project_item_create: { project: "board" },
+  github_project_item_edit: { item: "item" },
+  github_project_item_archive: { item: "item" },
+  github_project_item_unarchive: { item: "item" },
+  github_project_item_convert: { item: "item", repo: "repo" },
 }
 
 /** Arguments that look like they name a repository but do not make the call write to one, and why. */
 const NOT_TARGETS: Record<string, Record<string, string>> = {
   github_issue_close: { duplicate_of: "closing as a duplicate writes nothing to the original's repository" },
   github_issue_relate: { remove_parent: "a flag; the parent is read from the issue" },
+  github_project_field_ensure: { repo: "where the board lookup starts; nothing is written to it" },
+  github_project_view_ensure: { repo: "where the board lookup starts; nothing is written to it" },
+  github_project_item_add: { repo: "where the board lookup starts; the issue is only put on the board" },
+  github_project_item_create: { repo: "where the board lookup starts; nothing is written to it" },
+  github_project_item_edit: { repo: "where the board lookup starts; nothing is written to it" },
+  github_project_item_archive: { repo: "where the board lookup starts; nothing is written to it" },
+  github_project_item_unarchive: { repo: "where the board lookup starts; nothing is written to it" },
 }
 
 /** What makes an argument look like it names a repository or an issue. */

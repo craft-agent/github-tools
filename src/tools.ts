@@ -7,6 +7,16 @@ import { issueEdit } from "./core/issues/edit"
 import { issueRead } from "./core/issues/read"
 import { issueRelate } from "./core/issues/relate"
 import { issueReopen } from "./core/issues/reopen"
+import { projectCreate } from "./core/projects/create"
+import { projectFieldEnsure } from "./core/projects/field-ensure"
+import { projectItemAdd } from "./core/projects/item-add"
+import { projectItemArchive, projectItemUnarchive } from "./core/projects/item-archive"
+import { projectItemConvert } from "./core/projects/item-convert"
+import { projectItemCreate } from "./core/projects/item-create"
+import { projectItemEdit } from "./core/projects/item-edit"
+import { projectLink, projectUnlink } from "./core/projects/link"
+import { projectRead } from "./core/projects/read"
+import { projectViewEnsure } from "./core/projects/view-ensure"
 
 /** Every tool spec of the package; entry points register their tools from this list. */
 export const ALL_TOOLS: ToolSpec[] = [
@@ -18,4 +28,16 @@ export const ALL_TOOLS: ToolSpec[] = [
   issueReopen,
   issueRelate,
   issueDevelop,
+  projectRead,
+  projectCreate,
+  projectLink,
+  projectUnlink,
+  projectFieldEnsure,
+  projectViewEnsure,
+  projectItemAdd,
+  projectItemCreate,
+  projectItemEdit,
+  projectItemArchive,
+  projectItemUnarchive,
+  projectItemConvert,
 ]

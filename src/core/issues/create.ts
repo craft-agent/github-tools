@@ -2,11 +2,11 @@ import { z } from "zod"
 import { ToolError, isAbortError } from "../errors"
 import { gh } from "../gh"
 import { ghIssueRef, issueLabel, resolveRelatedIssue, type IssueRef } from "../github/issue-refs"
-import { kindFlags, kindPlacementSchema, resolveKind, withKindFallback, type KindPlacement } from "../github/kind"
+import { kindPlacementSchema, resolveKind } from "../github/kind"
 import { milestoneSchema, resolveMilestone, type MilestoneRef } from "../github/milestones"
 import { resolveRepo, type RepoName } from "../refs"
 import { StepErrors, defineTool, type ToolContext } from "../tool"
-import { editIssue, given, invalid, lastUrl, nameList, writableContext } from "./write-support"
+import { editIssue, given, invalid, lastUrl, nameList, setKind, writableContext } from "./write-support"
 
 const ISSUE_URL = /\/issues\/(\d+)$/
 
@@ -52,19 +52,6 @@ function createdIssue(stdout: string): { number: number; url: string } {
     )
   }
   return { number: Number.parseInt(number, 10), url }
-}
-
-async function setKind(
-  kind: string,
-  placement: KindPlacement,
-  target: RepoName,
-  number: number,
-  ctx: ToolContext,
-): Promise<KindPlacement> {
-  const applied = await withKindFallback(kind, placement, async (where) =>
-    editIssue(target, number, await kindFlags(where, target, ctx), ctx),
-  )
-  return applied.placement
 }
 
 /** One call per blocker, so each that GitHub accepts is kept; the failures are reported together. */

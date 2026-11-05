@@ -46,10 +46,16 @@ discussion behind them is on
   harnesses run. An argument that replaces a whole list, where one is needed,
   is named for the list (`labels`) and its description says it replaces.
 - **References.** An issue or pull request is `12`, `#12`, `owner/repo#12` or
-  its URL; a board is its number, `owner/number` or its URL. A bare number
-  means the working tree's repository (its `origin` on GitHub); `repo`
+  its URL; a board is its number, `owner/number`, its URL or its title. A bare
+  number means the working tree's repository (its `origin` on GitHub); `repo`
   (`owner/name`) names another. A call that needs a repository and finds
   neither fails, saying so.
+- **A board not named is looked up, never guessed.** By title (the `project`
+  argument when it is no reference, default `Roadmap`), in order: the owner
+  given, else the boards linked to the repository, the organization that owns
+  it, and the viewer. Several candidates on one route stop the call with the
+  candidates listed, and a repository that cannot be read fails instead of
+  falling through to another route.
 - **The tools' own install directory is never the working tree.** A harness may
   start a tool inside the directory the package is installed in, a checkout of
   this package, whose `origin` is not the caller's project. A bare number there
@@ -116,11 +122,20 @@ Every tool belongs to one class, and the class sets its MCP annotations.
 - **A native plugin asks the harness's own permission before every non-read
   call**, since the tools a native plugin adds pass through no harness
   approval of their own.
-- **It asks for every repository the call writes to.** Each write tool declares
-  which arguments name one (`repo`, an issue reference, a list of them); a bare
-  number means the call's own repository, and what cannot be told is `*`. An
-  "always" answer then covers only the repositories it named, never a write
-  into another one.
+- **It asks for every repository and board the call writes to.** Each write
+  tool declares which arguments name one (`repo`, an issue reference, a list of
+  them, a board); a bare number means the call's own repository, and what
+  cannot be told is `*`. An "always" answer then covers only what it named,
+  never a write into another repository or board.
+- **A board is named `owner/projects/N`.** A board belongs to a user or an
+  organization, not to a repository, so its writes name the board rather than
+  the working tree's repository. A board the call does not name is found with
+  the same lookup the tool uses, which reads but never writes. Putting an
+  issue or pull request on a board names the board only, since the issue does
+  not change; a call that also writes to a repository (linking one, turning a
+  draft into an issue) names both. Creating a board names `owner/projects/new`,
+  so an "always" answer lets new boards be made for that owner and no
+  existing board be written to.
 - **`confirm: "elicitation"` adds the tool's own form** for administrative
   tools, where the client offers form-mode elicitation. It is for people who
   switch the client's approvals off: the tool states what will happen in plain

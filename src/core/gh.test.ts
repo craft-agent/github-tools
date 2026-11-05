@@ -346,6 +346,15 @@ describe("graphql", () => {
     expect(await codeOf(graphql("query{x}", {}, OPTIONS))).toBe(code)
   })
 
+  test("an INSUFFICIENT_SCOPES error says how to grant the scope", async () => {
+    useFake([
+      { match: "^api graphql", stdout: gqlErrors([{ type: "INSUFFICIENT_SCOPES", message: "needs read:project" }]) },
+    ])
+    const error = (await graphql("query{x}", {}, OPTIONS).catch((e: unknown) => e)) as GraphQLToolError
+    expect(error.message).toContain("needs read:project")
+    expect(error.message).toContain("gh auth refresh -s project")
+  })
+
   test("an error without a known type is classified by its message", async () => {
     useFake([{ match: "^api graphql", stdout: gqlErrors([{ type: "OTHER", message: "API rate limit exceeded" }]) }])
     expect(await codeOf(graphql("query{x}", {}, OPTIONS))).toBe("rate_limited")
