@@ -20,6 +20,10 @@ import { issueDevelop } from "./issues/develop"
 import { issueEdit } from "./issues/edit"
 import { issueRelate } from "./issues/relate"
 import { issueReopen } from "./issues/reopen"
+import { projectCreate } from "./projects/create"
+import { projectFieldEnsure } from "./projects/field-ensure"
+import { projectLink, projectUnlink } from "./projects/link"
+import { projectViewEnsure } from "./projects/view-ensure"
 import { writeTargets } from "./targets"
 import type { ToolSpec } from "./tool"
 
@@ -553,6 +557,58 @@ describe("board and item targets", () => {
       const targets: ToolSpec["targets"] = { project: "board", item: "item" }
       const args = { project: "octo/3", item: "PVTI_abc" }
       expect(await writeTargets({ targets }, args, { cwd: tree() })).toEqual(["octo/projects/3"])
+    })
+  })
+
+  describe("an owner a board is created for", () => {
+    const ownerOnly: ToolSpec["targets"] = { owner: "owner" }
+
+    test("is owner/projects/new, lowercased, without gh", async () => {
+      const installed = useFake([])
+      expect(await writeTargets({ targets: ownerOnly }, { owner: "Octo" }, { cwd: tree(WITH_ORIGIN) })).toEqual([
+        "octo/projects/new",
+      ])
+      expect(apiCalls(installed)).toHaveLength(0)
+    })
+
+    test("@me is the viewer's login, read from GitHub", async () => {
+      useFake([viewerRule("Alice")])
+      expect(await writeTargets({ targets: ownerOnly }, { owner: "@me" }, { cwd: tree() })).toEqual([
+        "alice/projects/new",
+      ])
+    })
+
+    test("absent, blank, invalid, not text or an unreadable viewer is *", async () => {
+      useFake([])
+      for (const args of [{}, { owner: " " }, { owner: "no way" }, { owner: 4 }, { owner: "@me" }]) {
+        expect(await writeTargets({ targets: ownerOnly }, args, { cwd: tree() })).toEqual(["*"])
+      }
+    })
+
+    test("names no own repository, and a repo target beside it is the one named", async () => {
+      useFake([])
+      const targets: ToolSpec["targets"] = { owner: "owner", link_repo: "repo" }
+      const ctx = { cwd: tree(WITH_ORIGIN) }
+      expect(await writeTargets({ targets }, { owner: "acme" }, ctx)).toEqual(["acme/projects/new"])
+      expect(await writeTargets({ targets }, { owner: "acme", link_repo: "Acme/Widgets" }, ctx)).toEqual([
+        "acme/projects/new",
+        "acme/widgets",
+      ])
+      expect(await writeTargets({ targets }, { link_repo: "Acme/Widgets" }, ctx)).toEqual(["acme/widgets", "*"])
+    })
+  })
+
+  describe("the board setup tools", () => {
+    test.each([
+      [projectCreate, { owner: "acme", link_repo: "acme/w" }, ["acme/projects/new", "acme/w"]],
+      [projectLink, { project: "acme/2", repo: "acme/w" }, ["acme/projects/2", "acme/w"]],
+      [projectLink, { project: "acme/2" }, ["acme/projects/2", "octo/self"]],
+      [projectUnlink, { project: "acme/2", repo: "Acme/W" }, ["acme/projects/2", "acme/w"]],
+      [projectFieldEnsure, { project: "acme/2", repo: "x/y" }, ["acme/projects/2"]],
+      [projectViewEnsure, { project: "acme/2", repo: "x/y" }, ["acme/projects/2"]],
+    ])("%#", async (spec, args, expected) => {
+      useFake([])
+      expect(await writeTargets(spec, args, { cwd: tree(WITH_ORIGIN) })).toEqual(expected)
     })
   })
 })
