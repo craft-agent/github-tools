@@ -17,7 +17,13 @@ import { projectItemEdit } from "./core/projects/item-edit"
 import { projectLink, projectUnlink } from "./core/projects/link"
 import { projectRead } from "./core/projects/read"
 import { projectViewEnsure } from "./core/projects/view-ensure"
+import { prClose } from "./core/pull-requests/close"
+import { prComment } from "./core/pull-requests/comment"
+import { prCreate } from "./core/pull-requests/create"
+import { prEdit } from "./core/pull-requests/edit"
 import { prRead } from "./core/pull-requests/read"
+import { prReady } from "./core/pull-requests/ready"
+import { prReopen } from "./core/pull-requests/reopen"
 
 /** Every tool spec of the package; entry points register their tools from this list. */
 export const ALL_TOOLS: ToolSpec[] = [
@@ -30,6 +36,12 @@ export const ALL_TOOLS: ToolSpec[] = [
   issueRelate,
   issueDevelop,
   prRead,
+  prCreate,
+  prEdit,
+  prComment,
+  prReady,
+  prClose,
+  prReopen,
   projectRead,
   projectCreate,
   projectLink,

@@ -2,6 +2,9 @@ import { describe, expect, test } from "bun:test"
 import type { TargetKind } from "./core"
 import { ALL_TOOLS } from "./tools"
 
+/** What every tool that writes to one pull request declares; spelled out here so the pin does not follow the constant. */
+const PR_TARGETS: Record<string, TargetKind> = { pr: "pull", repo: "repo" }
+
 /**
  * The arguments each write tool declares as naming a repository it writes to.
  * A new write tool, or a new argument that carries a repository, is added here
@@ -25,6 +28,12 @@ const EXPECTED_TARGETS: Record<string, Record<string, TargetKind>> = {
     remove_blocking: "issues",
   },
   github_issue_develop: { issue: "issue", repo: "repo", branch_repo: "repo" },
+  github_pr_create: { repo: "repo", project: "optional_board" },
+  github_pr_edit: PR_TARGETS,
+  github_pr_comment: PR_TARGETS,
+  github_pr_ready: PR_TARGETS,
+  github_pr_close: PR_TARGETS,
+  github_pr_reopen: PR_TARGETS,
   github_project_create: { owner: "owner", link_repo: "repo" },
   github_project_link: { project: "board", repo: "repo" },
   github_project_unlink: { project: "board", repo: "repo" },
