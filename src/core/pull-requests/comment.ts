@@ -1,0 +1,50 @@
+import { z } from "zod"
+import { gh } from "../gh"
+import { REPO_DESCRIPTION, given, invalid, lastUrl, writableContext } from "../issues/write-support"
+import { parseNumberRef } from "../refs"
+import { defineTool } from "../tool"
+import { PR_DESCRIPTION, PR_TARGETS } from "./write-support"
+
+const input = z.object({
+  pr: z.string().describe(PR_DESCRIPTION),
+  repo: z.string().optional().describe(REPO_DESCRIPTION),
+  body: z.string().describe("The comment, in Markdown."),
+})
+
+const output = z.object({
+  repo: z.string(),
+  pr: z.number().int(),
+  url: z.string().describe("The new comment's URL."),
+  foreign: z.boolean(),
+})
+
+export const prComment = defineTool({
+  id: "github_pr_comment",
+  title: "Comment on a GitHub pull request",
+  description: [
+    "Post a comment on a pull request; the people following it are notified and the comment stays on the pull request.",
+    "Needs write permission on the repository.",
+    "A pull request is 12, #12, owner/repo#12 or its URL; a bare number means the working tree's repository, or repo.",
+  ].join(" "),
+  toolset: "pull_requests",
+  class: "add",
+  targets: PR_TARGETS,
+  input,
+  output,
+  async execute(args, ctx) {
+    if (!given(args.body)) throw invalid("body cannot be blank.")
+    const ref = await parseNumberRef(args.pr, args.repo, ctx, { accept: "pull" })
+    const context = await writableContext(ref.repo, ctx)
+    const stdout = await gh(["pr", "comment", String(ref.number), "--repo", context.repo.full, "--body-file", "-"], {
+      cwd: ctx.cwd,
+      signal: ctx.signal,
+      stdin: args.body,
+    })
+    return {
+      repo: context.repo.full,
+      pr: ref.number,
+      url: lastUrl(stdout) ?? "",
+      foreign: context.foreign,
+    }
+  },
+})
