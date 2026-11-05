@@ -15,6 +15,7 @@ import {
   STATE,
   prCommands,
   prCreatedRule,
+  prEditedRule,
   linkedIssues,
   prWrites,
   rawClosingIssue,
@@ -40,6 +41,7 @@ const base = (...rules: GhRule[]): GhRule[] => [
   branchRule("octo/hello", "feature", true),
   NO_OPEN,
   prCreatedRule(7),
+  prEditedRule(7),
   stateRule(),
 ]
 
@@ -88,31 +90,16 @@ describe("one gh pr create", () => {
       foreign: false,
       errors: {},
     })
-    expect(prCommands(installed).filter((call) => call.args[1] === "create")).toEqual([
-      {
-        args: [
-          ...CREATE,
-          "--title",
-          "Add the thing",
-          "--body-file",
-          "-",
-          "--draft",
-          "--label",
-          "a",
-          "--label",
-          "b",
-          "--assignee",
-          "@me",
-          "--reviewer",
-          "dave",
-          "--reviewer",
-          "octo/core",
-          "--milestone",
-          "v1",
-        ],
-        stdin: "Does the thing.\n\nCloses #12",
-      },
-    ])
+    // Only what makes the pull request goes to create; the labels, people and milestone follow in one edit.
+    const [create, edit] = prCommands(installed).filter((call) => call.args[1] !== "list")
+    expect(create).toEqual({
+      args: [...CREATE, "--title", "Add the thing", "--body-file", "-", "--draft"],
+      stdin: "Does the thing.\n\nCloses #12",
+    })
+    expect(edit!.args.join(" ")).toBe(
+      "pr edit 7 --repo octo/hello --add-label a --add-label b --add-assignee @me --add-reviewer dave --add-reviewer octo/core --milestone v1",
+    )
+    expect(prCommands(installed)).toHaveLength(3)
   })
 
   test("a bare call: the default branch is the base, the body is empty and the pull request is not a draft", async () => {

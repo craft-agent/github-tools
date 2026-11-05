@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { ToolError } from "../errors"
+import { ToolError, isAbortError, isToolError, type ErrorCode } from "../errors"
 import { gh, ghJson } from "../gh"
 import { planFieldValues } from "../github/board-field-values"
 import { readBoardFields } from "../github/board-fields"
@@ -19,14 +19,16 @@ import {
   stepErrorsSchema,
 } from "../projects/item-support"
 import { BOARD_LOOKUP_NOTE, PROJECT_SCOPE_NOTE, boardSummary, boardSummarySchema } from "../projects/support"
-import { resolveRepo } from "../refs"
-import { StepErrors, defineTool } from "../tool"
+import { resolveRepo, type RepoName } from "../refs"
+import { StepErrors, defineTool, type ToolContext } from "../tool"
 import { CLOSES_DESCRIPTION, withClosing } from "./closes"
-import { closingNotes, resolveClosing, settledClosingState, type ClosingChange } from "./write-support"
+import { closingNotes, editPullRequest, resolveClosing, settledClosingState, type ClosingChange } from "./write-support"
 
 const PULL_URL = /\/pull\/(\d+)$/
 const SHA_PATTERN = /^[0-9a-f]{40}$/i
 const SHORT_SHA_LENGTH = 12
+/** The failures of `gh pr create` that can come after GitHub made the pull request; the others are refusals that made nothing. */
+const MAY_HAVE_CREATED: readonly ErrorCode[] = ["github_error", "stale", "not_found", "rate_limited"]
 const NOT_A_BRANCH = "head must be a branch of the repository; pull requests from forks are not supported yet."
 
 const input = z.object({
@@ -100,13 +102,73 @@ function createdPullRequest(stdout: string): { number: number; url: string } {
   return { number: Number.parseInt(number, 10), url }
 }
 
+/** The open pull request from `head` into `base`, if there is one. */
+async function findOpenPullRequest(
+  repo: RepoName,
+  head: string,
+  base: string,
+  ctx: ToolContext,
+): Promise<{ number: number; url: string } | undefined> {
+  const open = await ghJson<{ number: number; url: string }[]>(
+    [
+      "pr",
+      "list",
+      "--repo",
+      repo.full,
+      "--head",
+      head,
+      "--base",
+      base,
+      "--state",
+      "open",
+      "--json",
+      "number,url",
+      "--limit",
+      "1",
+    ],
+    ctx,
+  )
+  return open?.[0]
+}
+
+/**
+ * Runs `gh pr create`. When it fails in a way that can follow the pull request
+ * being made (GitHub failing, a timeout, a failed follow-up request), looks for
+ * the pull request: if it is there, it is returned with the failure `gh`
+ * reported; if it is not, or the look fails, the original error is thrown.
+ */
+async function createPullRequest(
+  repo: RepoName,
+  pull: { head: string; base: string; flags: string[]; body: string },
+  ctx: ToolContext,
+): Promise<{ created: { number: number; url: string }; failure?: ToolError }> {
+  try {
+    const stdout = await gh(["pr", "create", "--repo", repo.full, ...pull.flags], {
+      cwd: ctx.cwd,
+      signal: ctx.signal,
+      stdin: pull.body,
+    })
+    return { created: createdPullRequest(stdout) }
+  } catch (error) {
+    if (isAbortError(error) || !isToolError(error) || !MAY_HAVE_CREATED.includes(error.code)) throw error
+    let found: { number: number; url: string } | undefined
+    try {
+      found = await findOpenPullRequest(repo, pull.head, pull.base, ctx)
+    } catch (lookupError) {
+      if (isAbortError(lookupError)) throw lookupError
+    }
+    if (!found) throw error
+    return { created: found, failure: error }
+  }
+}
+
 export const prCreate = defineTool({
   id: "github_pr_create",
   title: "Create a GitHub pull request",
   description: [
     "Open a pull request from a pushed branch of a repository the viewer may write to into another branch of it (default: the default branch), and settle its place in the same call: draft, labels, assignees and reviewers (they are notified), milestone, the issues it closes (a `Closes #12` line at the end of the body) and a project board with field values (the Status starts as Todo). Pull requests from forks are not supported yet.",
     "Everything that can fail is checked before the pull request is made: the branches exist, head_sha (when given) is still the head, no pull request is open from head into base already, the milestone exists and the board accepts the values.",
-    "Once the pull request exists, a failed read-back, board or field step does not fail the call: it is listed in errors and the pull request is still returned.",
+    "A pull request that was made is always returned, even when GitHub reported a failure while making it or a later step fails (labels, assignees, reviewers and milestone are applied right after it is made; then the read-back, board and field steps): what failed after it is listed in errors, keyed by step (create, metadata, read, head_sha, project, fields.<Name>).",
     "GitHub links closing issues only for a pull request into the default branch, and a moment after it exists: the call waits up to a few seconds for the link, and notes say when this pull request is not into the default branch or an issue was not linked yet.",
     "A pull request is 12, #12, owner/repo#12 or its URL; a bare number in closes means the pull request's repository.",
     BOARD_LOOKUP_NOTE,
@@ -164,26 +226,7 @@ export const prCreate = defineTool({
       )
     }
 
-    const open = await ghJson<{ number: number; url: string }[]>(
-      [
-        "pr",
-        "list",
-        "--repo",
-        target.full,
-        "--head",
-        head,
-        "--base",
-        base,
-        "--state",
-        "open",
-        "--json",
-        "number,url",
-        "--limit",
-        "1",
-      ],
-      ctx,
-    )
-    const existing = open?.[0]
+    const existing = await findOpenPullRequest(target, head, base, ctx)
     if (existing) {
       throw invalid(
         `${target.full}#${existing.number} is already open from ${head} into ${base}: ${existing.url}. Change it with github_pr_edit.`,
@@ -205,22 +248,28 @@ export const prCreate = defineTool({
     // A pull request never starts as Waiting: that is for an issue with an open blocker.
     if (status) writes.push(...defaultStatusWrite(boardFields, status, false))
 
+    // Only what makes the pull request goes to `gh pr create`: it adds labels, people and the milestone in a second
+    // request that can fail after the pull request exists, so those are applied as a step of their own.
     const flags = ["--base", base, "--head", head, "--title", title, "--body-file", "-"]
     if (args.draft) flags.push("--draft")
-    for (const label of labels) flags.push("--label", label)
-    for (const assignee of assignees) flags.push("--assignee", assignee)
-    for (const reviewer of reviewers) flags.push("--reviewer", reviewer)
-    if (milestone) flags.push("--milestone", milestone.title)
+    const metadataFlags: string[] = []
+    for (const label of labels) metadataFlags.push("--add-label", label)
+    for (const assignee of assignees) metadataFlags.push("--add-assignee", assignee)
+    for (const reviewer of reviewers) metadataFlags.push("--add-reviewer", reviewer)
+    if (milestone) metadataFlags.push("--milestone", milestone.title)
     const body = closes.length > 0 ? withClosing(args.body ?? "", closes, [], target) : (args.body ?? "")
-    const stdout = await gh(["pr", "create", "--repo", target.full, ...flags], {
-      cwd: ctx.cwd,
-      signal: ctx.signal,
-      stdin: body,
-    })
-    const created = createdPullRequest(stdout)
+    const { created, failure } = await createPullRequest(target, { head, base, flags, body }, ctx)
 
     // The pull request exists from here on, so a failing step is reported beside it instead of failing the call.
     const steps = new StepErrors()
+    if (failure) {
+      await steps.record("create", async () => {
+        throw failure
+      })
+    }
+    if (metadataFlags.length > 0) {
+      await steps.record("metadata", () => editPullRequest(target, created.number, metadataFlags, ctx))
+    }
     const pull = { repo: target, number: created.number }
     const read: PullRequestState | undefined = await steps.record("read", () => readPullRequestState(pull, ctx))
     if (read && expectedSha && read.head_sha.toLowerCase() !== expectedSha.toLowerCase()) {
