@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { paginate } from "../gh"
+import { graphql, paginate } from "../gh"
 import type { RefContext } from "../refs"
 import { stateWord } from "./issues"
 import { readKind } from "./kind"
@@ -33,12 +33,13 @@ fieldValues(first:${FIELD_VALUES}){nodes{
  ... on ProjectV2ItemFieldPullRequestValue{pullRequests(first:${FIELD_PULL_REQUESTS}){nodes{number}} ${FIELD_NAME}}
 }}
 content{__typename
- ... on DraftIssue{title body}
+ ... on DraftIssue{id title body}
  ... on Issue{number title url issueState: state repository{nameWithOwner} issueType{name} labels(first:${CONTENT_LABELS}){nodes{name}} assignees(first:${CONTENT_ASSIGNEES}){nodes{login}} parent{number repository{nameWithOwner}} subIssuesSummary{total completed}}
  ... on PullRequest{number title url pullRequestState: state repository{nameWithOwner} labels(first:${CONTENT_LABELS}){nodes{name}} assignees(first:${CONTENT_ASSIGNEES}){nodes{login}}}
 }`
 
 const ITEMS_QUERY = `query($id:ID!,$after:String){node(id:$id){... on ProjectV2{items(first:${PAGE_SIZE},after:$after){pageInfo{hasNextPage endCursor} nodes{${ITEM_FIELDS}}}}}}`
+const ITEM_QUERY = `query($id:ID!){node(id:$id){... on ProjectV2Item{${ITEM_FIELDS}}}}`
 
 export const iterationValueSchema = z.object({
   title: z.string(),
@@ -107,6 +108,7 @@ type RawFieldValue = {
 
 type RawContent = {
   __typename?: string
+  id?: string
   title?: string | null
   body?: string | null
   number?: number
@@ -215,4 +217,15 @@ export async function readBoardItems(
     { cwd: ctx.cwd, signal: ctx.signal, limit: MAX_BOARD_ITEMS },
   )
   return { items: items.filter((raw): raw is RawItem => raw != null).map(toItem), truncated }
+}
+
+/** One item read on its own; `draftId` is the node ID of a draft's text (`DI_…`), which editing the draft takes. */
+export type BoardItemRead = { item: BoardItem; draftId: string | null }
+
+/** One item by its node ID, in the shape `readBoardItems` gives; `null` when it does not exist or cannot be seen. */
+export async function readBoardItem(itemId: string, ctx: RefContext): Promise<BoardItemRead | null> {
+  const data = await graphql<{ node?: RawItem | null } | null>(ITEM_QUERY, { id: itemId }, ctx)
+  const raw = data?.node
+  if (!raw?.id) return null
+  return { item: toItem(raw), draftId: raw.content?.__typename === "DraftIssue" ? (raw.content.id ?? null) : null }
 }

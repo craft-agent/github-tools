@@ -370,6 +370,16 @@ export async function readIssue(
 }
 
 /**
+ * The issues that block one issue, as far as the first `MAX_DEPENDENCIES`. A
+ * failure is thrown, unlike in `readIssue`: the caller decides what an unknown
+ * list means.
+ */
+export async function readBlockedBy(ref: { repo: RepoName; number: number }, ctx: RefContext): Promise<IssueBrief[]> {
+  const reply = await readIssueData<{ blockedBy?: Connection<RawBrief> }>(DEPENDENCIES_QUERY, ref, {}, ctx)
+  return nodesOf(reply.blockedBy).map(brief)
+}
+
+/**
  * Issues matching a GitHub search query, at most `limit`, with `truncated` set
  * when more matched. The query is sent as it is; the caller builds and checks it.
  */
