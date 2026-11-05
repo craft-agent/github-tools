@@ -34,6 +34,7 @@ const EXPECTED_TARGETS: Record<string, Record<string, TargetKind>> = {
   github_pr_ready: PR_TARGETS,
   github_pr_close: PR_TARGETS,
   github_pr_reopen: PR_TARGETS,
+  github_pr_review: PR_TARGETS,
   github_project_create: { owner: "owner", link_repo: "repo" },
   github_project_link: { project: "board", repo: "repo" },
   github_project_unlink: { project: "board", repo: "repo" },

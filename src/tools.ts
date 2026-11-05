@@ -24,6 +24,7 @@ import { prEdit } from "./core/pull-requests/edit"
 import { prRead } from "./core/pull-requests/read"
 import { prReady } from "./core/pull-requests/ready"
 import { prReopen } from "./core/pull-requests/reopen"
+import { prReview } from "./core/pull-requests/review"
 
 /** Every tool spec of the package; entry points register their tools from this list. */
 export const ALL_TOOLS: ToolSpec[] = [
@@ -42,6 +43,7 @@ export const ALL_TOOLS: ToolSpec[] = [
   prReady,
   prClose,
   prReopen,
+  prReview,
   projectRead,
   projectCreate,
   projectLink,

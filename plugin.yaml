@@ -19,6 +19,7 @@ provides_tools:
   - github_pr_read
   - github_pr_ready
   - github_pr_reopen
+  - github_pr_review
   - github_project_create
   - github_project_field_ensure
   - github_project_item_add
