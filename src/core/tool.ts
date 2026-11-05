@@ -19,9 +19,10 @@ export type ConfirmRequest = { tool: string; message: string }
  * a URL), `"issues"` a list of them, `"board"` the board that `project` (a
  * reference or a title), `owner` and `repo` choose together (declared on
  * `project`), `"item"` a project item's node ID (`PVTI_…`), whose board is
- * written to.
+ * written to, `"owner"` a user or organization login (or `@me`) that a board is
+ * about to be created for.
  */
-export type TargetKind = "repo" | "issue" | "issues" | "board" | "item"
+export type TargetKind = "repo" | "issue" | "issues" | "board" | "item" | "owner"
 
 export type ToolContext = {
   /** The working directory the call runs in; a bare issue number means this tree's repository. */
