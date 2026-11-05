@@ -22,7 +22,8 @@ const URL_OWNER_SEGMENTS = ["orgs", "users"]
 const BOARD_ROUTES = ["named", "owner", "linked", "organization", "viewer"] as const
 const OWNER_TYPES = ["organization", "user"] as const
 
-const PROJECT_FIELDS =
+/** What a read or a write of a board selects of it. */
+export const PROJECT_FIELDS =
   "id number title url closed viewerCanUpdate owner{__typename ... on User{login} ... on Organization{login}}"
 const BOARDS = `projectsV2(first:${PAGE_SIZE},after:$after){${PAGE_INFO} nodes{${PROJECT_FIELDS}}}`
 
@@ -69,7 +70,7 @@ export type Boards = { boards: Board[]; truncated: boolean }
 
 type RawOwner = { __typename?: string; login?: string } | null | undefined
 
-type RawBoard = {
+export type RawBoard = {
   id: string
   number: number
   title: string
@@ -84,11 +85,12 @@ function invalid(message: string): ToolError {
 }
 
 /** An argument's text with its surrounding space removed; blank counts as not given. */
-function given(value: string | undefined): string | undefined {
+export function given(value: string | undefined): string | undefined {
   return value?.trim() || undefined
 }
 
-function sameTitle(a: string, b: string): boolean {
+/** Whether two names (of boards, fields, options or views) are the same without regard to case or surrounding space. */
+export function sameTitle(a: string, b: string): boolean {
   return a.trim().toLowerCase() === b.trim().toLowerCase()
 }
 
@@ -96,7 +98,8 @@ function ownerType(typename: string | undefined): BoardOwnerType {
   return typename === "Organization" ? "organization" : "user"
 }
 
-function toBoard(raw: RawBoard): Board {
+/** The board as a tool reports it, from the reply of a read or a write. */
+export function toBoard(raw: RawBoard): Board {
   return {
     id: raw.id,
     number: raw.number,
@@ -112,6 +115,11 @@ function toBoard(raw: RawBoard): Board {
 /** The board as a permission rule names it: `owner/projects/N`, the owner in lower case. */
 export function boardResource(board: Pick<Board, "owner" | "number">): string {
   return `${board.owner.toLowerCase()}/projects/${board.number}`
+}
+
+/** What a permission rule names a board about to be made for `owner`: `owner/projects/new`. */
+export function newBoardResource(owner: string): string {
+  return `${owner.toLowerCase()}/projects/new`
 }
 
 function describeBoard(board: Board): string {
