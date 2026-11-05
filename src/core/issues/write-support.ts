@@ -1,5 +1,6 @@
 import { ToolError } from "../errors"
 import { gh } from "../gh"
+import { kindFlags, withKindFallback, type KindPlacement } from "../github/kind"
 import { assertWritable, repositoryContext, type RepositoryContext } from "../github/repository"
 import type { RepoName } from "../refs"
 import type { TargetKind, ToolContext } from "../tool"
@@ -16,6 +17,7 @@ export const ISSUE_TARGETS = { issue: "issue", repo: "repo" } as const satisfies
 /** `gh` reads `--label` and `--assignee` values as CSV: a comma splits one name into two, and a quote or a line break is syntax. */
 const LIST_SYNTAX = /[,"\r\n]/
 const URL_LINE = /^https?:\/\/\S+$/
+const BODY_SEPARATOR = "\n\n"
 
 export function invalid(message: string): ToolError {
   return new ToolError("invalid_argument", message)
@@ -70,4 +72,24 @@ export function editIssue(
     signal: ctx.signal,
     stdin,
   })
+}
+
+/** Puts an issue's kind where `placement` says, falling back to the label when GitHub refuses the Issue Type; returns where it landed. */
+export async function setKind(
+  kind: string,
+  placement: KindPlacement,
+  target: RepoName,
+  number: number,
+  ctx: ToolContext,
+): Promise<KindPlacement> {
+  const applied = await withKindFallback(kind, placement, async (where) =>
+    editIssue(target, number, await kindFlags(where, target, ctx), ctx),
+  )
+  return applied.placement
+}
+
+/** `current` and `added` apart by a blank line; an empty body takes the text alone. */
+export function appended(current: string, added: string): string {
+  const body = current.trimEnd()
+  return body ? `${body}${BODY_SEPARATOR}${added}` : added
 }
