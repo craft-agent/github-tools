@@ -12,6 +12,7 @@ provides_tools:
   - github_issue_read
   - github_issue_relate
   - github_issue_reopen
+  - github_pr_read
   - github_project_create
   - github_project_field_ensure
   - github_project_item_add
