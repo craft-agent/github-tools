@@ -22,6 +22,11 @@ import { issueRelate } from "./issues/relate"
 import { issueReopen } from "./issues/reopen"
 import { projectCreate } from "./projects/create"
 import { projectFieldEnsure } from "./projects/field-ensure"
+import { projectItemAdd } from "./projects/item-add"
+import { projectItemArchive, projectItemUnarchive } from "./projects/item-archive"
+import { projectItemConvert } from "./projects/item-convert"
+import { projectItemCreate } from "./projects/item-create"
+import { projectItemEdit } from "./projects/item-edit"
 import { projectLink, projectUnlink } from "./projects/link"
 import { projectViewEnsure } from "./projects/view-ensure"
 import { writeTargets } from "./targets"
@@ -610,5 +615,29 @@ describe("board and item targets", () => {
       useFake([])
       expect(await writeTargets(spec, args, { cwd: tree(WITH_ORIGIN) })).toEqual(expected)
     })
+  })
+
+  describe("the board item tools", () => {
+    test.each([
+      [projectItemAdd, { project: "acme/2", item: "12", repo: "x/y" }, ["acme/projects/2"]],
+      [projectItemCreate, { project: "acme/2", title: "Idea", repo: "x/y" }, ["acme/projects/2"]],
+      [projectItemEdit, { item: "octo/hello#5", project: "acme/2", repo: "x/y" }, ["acme/projects/2"]],
+      [projectItemArchive, { item: "12", project: "acme/2" }, ["acme/projects/2"]],
+      [projectItemUnarchive, { item: "12", project: "9", owner: "Acme" }, ["acme/projects/9"]],
+      [projectItemConvert, { item: "12", project: "acme/2", repo: "Acme/W" }, ["acme/projects/2", "acme/w"]],
+      [projectItemConvert, { item: "12", project: "acme/2" }, ["acme/projects/2", "octo/self"]],
+    ])("%#", async (spec, args, expected) => {
+      useFake([])
+      expect(await writeTargets(spec, args, { cwd: tree(WITH_ORIGIN) })).toEqual(expected)
+    })
+
+    test.each([projectItemEdit, projectItemArchive, projectItemUnarchive, projectItemConvert])(
+      "the board of an item ID is the one it sits on: %#",
+      async (spec) => {
+        useFake([itemBoardRule("PVTI_abc", rawBoard(3, { owner: { __typename: "Organization", login: "Acme" } }))])
+        const targets = await writeTargets(spec, { item: "PVTI_abc", repo: "Acme/W" }, { cwd: tree(WITH_ORIGIN) })
+        expect(targets).toEqual(spec === projectItemConvert ? ["acme/projects/3", "acme/w"] : ["acme/projects/3"])
+      },
+    )
   })
 })
