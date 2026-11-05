@@ -134,7 +134,10 @@ export type CheckRunRow = z.output<typeof checkRunSchema>
 export type PullRequestRef = { repo: RepoName; number: number }
 
 /** What a pull request write needs to know of the pull request before or after it changes it. */
-export type PullRequestState = Pick<PullRequestDetail, "id" | "number" | "url" | "draft" | "body" | "base" | "head"> &
+export type PullRequestState = Pick<
+  PullRequestDetail,
+  "id" | "number" | "url" | "draft" | "body" | "base" | "head" | "author"
+> &
   Pick<PullRequestDetail, "head_sha" | "closing_issues"> & { state: string }
 
 /** A failed check that is a GitHub Actions job, whose log can be read by its job id. */
@@ -260,7 +263,7 @@ const CHECKS_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(own
 }}}`
 
 const STATE_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){pullRequest(number:$n){
-  id number url state isDraft body baseRefName headRefName headRefOid
+  id number url state isDraft body author{login} baseRefName headRefName headRefOid
   closingIssuesReferences(first:${MAX_LINKED}){nodes{number title url state repository{nameWithOwner}}}
 }}}`
 
@@ -426,6 +429,7 @@ export async function readPullRequestState(ref: PullRequestRef, ctx: RefContext)
       | "url"
       | "state"
       | "isDraft"
+      | "author"
       | "body"
       | "baseRefName"
       | "headRefName"
@@ -439,6 +443,7 @@ export async function readPullRequestState(ref: PullRequestRef, ctx: RefContext)
     url: pull.url,
     state: stateWord(pull.state),
     draft: pull.isDraft,
+    author: pull.author?.login ?? null,
     body: pull.body ?? "",
     base: pull.baseRefName,
     head: pull.headRefName,
