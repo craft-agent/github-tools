@@ -15,6 +15,7 @@ import {
   ISSUE_DESCRIPTION,
   ISSUE_TARGETS,
   REPO_DESCRIPTION,
+  appended,
   editIssue,
   given,
   invalid,
@@ -22,8 +23,6 @@ import {
   nameList,
   writableContext,
 } from "./write-support"
-
-const BODY_SEPARATOR = "\n\n"
 
 const input = z.object({
   issue: z.string().describe(ISSUE_DESCRIPTION),
@@ -138,12 +137,6 @@ function changedArguments(change: Change): string[] {
     remove_milestone: change.removeMilestone,
   }
   return Object.entries(applied).flatMap(([name, isApplied]) => (isApplied ? [name] : []))
-}
-
-/** `current` and `added` apart by a blank line; an empty body takes the text alone. */
-function appended(current: string, added: string): string {
-  const body = current.trimEnd()
-  return body ? `${body}${BODY_SEPARATOR}${added}` : added
 }
 
 export const issueEdit = defineTool({
