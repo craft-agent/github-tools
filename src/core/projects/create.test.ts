@@ -454,6 +454,25 @@ describe("link_repo", () => {
     expect(writeLog(installed)).toEqual(["linkProjectV2ToRepository"])
   })
 
+  test("a repository of another owner is invalid_argument, before anything is read or written", async () => {
+    const installed = use(bare())
+    const error = await failure(run({ ...OWNER, link_repo: "Acme/widgets" }))
+    expect(error.code).toBe("invalid_argument")
+    expect(error.message).toBe(
+      "A board can only be linked to a repository of its own owner: the board to be created belongs to octo, Acme/widgets to Acme.",
+    )
+    expect(sent(installed)).toEqual([])
+  })
+
+  test("@me stands for the viewer's login in that check", async () => {
+    const installed = use([viewerRule("alice"), ...bare()])
+    const error = await failure(run({ owner: "@me", link_repo: "octo/hello" }))
+    expect(error.code).toBe("invalid_argument")
+    expect(error.message).toContain("belongs to alice, octo/hello to octo")
+    expect(writeLog(installed)).toEqual([])
+    expect(sent(installed)).toHaveLength(1)
+  })
+
   test("needs write permission, checked before the board is made", async () => {
     const installed = use([repositoryRule({ permission: "READ" }), ...bare()])
     expect((await failure(run({ ...OWNER, link_repo: "octo/hello" }))).code).toBe("forbidden")
