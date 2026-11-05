@@ -141,7 +141,8 @@ Add the server to the host's MCP configuration. Flags go in `args`:
 ## Tools and skills
 
 Each toolset comes with a skill that tells an agent how to use its tools. A
-toolset with no tools yet registers none (so far only `issues` has tools).
+toolset with no tools yet registers none (so far `issues` and `projects` have
+tools).
 
 ### Issues (`issues`)
 
@@ -160,6 +161,33 @@ The skill is [`github-issues`](skills/github-issues/SKILL.md), shown as
 `github-tools:github-issues` in Claude Code and `github-tools:issues` in Hermes.
 An issue's kind is the organization's Issue Type of that name when it defines
 one, otherwise a `type:<kind>` label.
+
+### Project boards (`projects`)
+
+| Tool                            | What it does                                                                            | Class      |
+| ------------------------------- | --------------------------------------------------------------------------------------- | ---------- |
+| `github_project_read`           | `view` a board with its fields and views, `list` boards, or `item_list` a board's items | read       |
+| `github_project_create`         | create a board, or reuse the one of that title, with the standard fields and views      | idempotent |
+| `github_project_field_ensure`   | add a field, or the missing options of a single select                                  | idempotent |
+| `github_project_view_ensure`    | add a saved view with its fields, columns, grouping and sort                            | idempotent |
+| `github_project_link`           | link a board to a repository of the same owner                                          | idempotent |
+| `github_project_unlink`         | unlink a board from a repository                                                        | idempotent |
+| `github_project_item_add`       | put an issue or pull request on a board, or return its item, with field values          | idempotent |
+| `github_project_item_create`    | create a draft item with field values                                                   | add        |
+| `github_project_item_edit`      | set or clear field values, and change a draft's title and body                          | overwrite  |
+| `github_project_item_archive`   | archive an item                                                                         | overwrite  |
+| `github_project_item_unarchive` | bring an archived item back                                                             | overwrite  |
+| `github_project_item_convert`   | turn a draft into an issue, with its kind, labels and milestone                         | add        |
+
+The toolset is off by default: add `projects` to `toolsets`. The skill is
+[`github-projects`](skills/github-projects/SKILL.md), shown as
+`github-tools:github-projects` in Claude Code and `github-tools:projects` in
+Hermes. A board is named by its number, `owner/N`, URL or title (`Roadmap` when
+none is given), and found among the boards linked to the repository, then its
+organization's, then the viewer's. The token needs the `project` scope
+(`gh auth refresh -s project`). No API sets a roadmap view's date fields, so
+after `github_project_create` set the Roadmap view's "Date fields" to Start and
+Target in the web UI.
 
 ## Reads and writes
 
