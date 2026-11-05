@@ -174,8 +174,32 @@ function stoppedError(result: ExecResult, timeoutMs: number): ToolError | undefi
   return new ToolError("github_error", message)
 }
 
+/**
+ * The details of a REST error body `gh api` prints on stdout, such as
+ * `{"message":"Unprocessable Entity","errors":["Line could not be resolved"]}`:
+ * its `errors` as text (a string, or an object's `message`), else nothing.
+ * stderr then says only `gh: Unprocessable Entity (HTTP 422)`.
+ */
+function restErrorDetails(stdout: string): string[] {
+  let body: unknown
+  try {
+    body = JSON.parse(stdout)
+  } catch {
+    return []
+  }
+  const errors = typeof body === "object" && body !== null ? (body as { errors?: unknown }).errors : undefined
+  if (!Array.isArray(errors)) return []
+  return errors.flatMap((entry) => {
+    if (typeof entry === "string") return [entry]
+    const message = typeof entry === "object" && entry !== null ? (entry as { message?: unknown }).message : undefined
+    return typeof message === "string" ? [message] : []
+  })
+}
+
 function failureText(stderr: string, stdout: string): string {
-  const text = stderr.trim() || stdout.trim()
+  const details = stderr.trim() ? restErrorDetails(stdout.trim()) : []
+  const base = stderr.trim() || stdout.trim()
+  const text = details.length ? `${base}: ${details.join("; ")}` : base
   return text.length > MAX_MESSAGE_LENGTH ? `${text.slice(0, MAX_MESSAGE_LENGTH)}…` : text
 }
 

@@ -105,6 +105,20 @@ describe("classifyGhFailure", () => {
     expect(classifyGhFailure("", "", 2).message).toBe("gh failed (exit 2):")
   })
 
+  test("a REST error body on stdout adds its errors to gh's stderr", () => {
+    const body = JSON.stringify({
+      message: "Unprocessable Entity",
+      errors: ["Line could not be resolved", { message: "Another", code: "custom" }, { code: "no message" }],
+    })
+    expect(classifyGhFailure("gh: Unprocessable Entity (HTTP 422)\n", body, 1).message).toBe(
+      "gh failed (exit 1): gh: Unprocessable Entity (HTTP 422): Line could not be resolved; Another",
+    )
+    expect(classifyGhFailure("gh: boom", "not json", 1).message).toBe("gh failed (exit 1): gh: boom")
+    expect(classifyGhFailure("gh: boom", JSON.stringify({ message: "x" }), 1).message).toBe(
+      "gh failed (exit 1): gh: boom",
+    )
+  })
+
   test("the message is capped, so a huge reply is not echoed whole", () => {
     expect(classifyGhFailure("x".repeat(10_000), "", 1).message.length).toBeLessThan(2100)
   })
