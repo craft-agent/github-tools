@@ -199,7 +199,7 @@ are confirmed by the harness.
 | OpenCode    | always; the plugin asks only before a write                                                                                                             |
 | Claude Code | the rule `mcp__plugin_github-tools_github-tools__*_read` in `permissions.allow` of `~/.claude/settings.json` or a project                               |
 | Codex       | always; Codex runs tools that declare `readOnlyHint` unasked, as the read tools do                                                                      |
-| Grok Build  | `grok --allow 'MCPTool(github-tools__*_read)'`                                                                                                          |
+| Grok Build  | `grok --allow 'MCPTool(github-tools__*_read)' --allow 'MCPTool(github_*_read)'` (both rules; see below)                                                 |
 | Antigravity | the rule `mcp(github-tools_github-tools/github_issue_read)` in `permissions.allow` of `~/.gemini/antigravity-cli/settings.json`, one for each read tool |
 | Hermes      | always; the plugin asks only before a write                                                                                                             |
 
@@ -209,6 +209,12 @@ Where a write is asked about, and where it is not:
   a rule asks for it: add the `github_*` rule shown under [OpenCode](#opencode).
 - **Codex** under `codex exec`, and **Grok Build** under `grok -p`, refuse a
   write they cannot ask about, unless it is allowed beforehand.
+- **Grok Build** calls the plugin's tools through its `use_tool` tool, and the
+  agent often names a tool without its server first (`github_project_read`).
+  Grok checks the rules against the name as given, so the server-qualified rule
+  alone does not match that first call, and `grok -p` refuses it and stops
+  instead of letting the agent retry with `github-tools__github_project_read`.
+  The second rule matches the short name; a write still matches neither.
 - **Antigravity** asks before any MCP tool no rule allows, reads included, and
   names the plugin's server `github-tools_github-tools` (plugin, then server).
   `agy -p` refuses a tool it cannot ask about; `--dangerously-skip-permissions`
