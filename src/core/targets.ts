@@ -3,7 +3,9 @@ import {
   CURRENT_USER,
   boardOwnerLogin,
   boardResource,
+  givenOwner,
   isBoardItemId,
+  newBoardResource,
   parseBoardProject,
   readBoardItemBoard,
   resolveBoard,
@@ -76,7 +78,7 @@ function ownRepository(
 }
 
 function isBoardKind(kind: TargetKind): boolean {
-  return kind === "board" || kind === "item"
+  return kind === "board" || kind === "item" || kind === "owner"
 }
 
 /** An argument's text; `undefined` when it is absent, `null` when it is not text. */
@@ -130,6 +132,16 @@ async function itemTarget(
   return attempt(async () => boardResource(await readBoardItemBoard(value.trim(), ctx)))
 }
 
+/** The board about to be created for an owner, as `owner/projects/new`; `@me` asks for the viewer's login. */
+async function ownerTarget(value: unknown, ctx: RefContext): Promise<string | undefined> {
+  if (typeof value !== "string") return undefined
+  return attempt(async () => {
+    const login = givenOwner(value)
+    if (login === undefined) return undefined
+    return newBoardResource(login === CURRENT_USER ? await viewerLogin(ctx) : login)
+  })
+}
+
 /** The repository an issue reference names: its own when qualified, the call's when it is a bare number. */
 async function issueRepository(value: unknown, own: OwnRepository, ctx: RefContext): Promise<RepoName | undefined> {
   if (typeof value !== "string") return undefined
@@ -158,10 +170,12 @@ async function targetRepository(
  * working tree without a GitHub `origin`) is `*`. A spec without `targets` has
  * just its own repository.
  *
- * A spec with a `"board"` or `"item"` target names no own repository: it
- * writes to a board (`owner/projects/N`), and to a repository only through a
+ * A spec with a `"board"`, `"item"` or `"owner"` target names no own repository:
+ * it writes to a board (`owner/projects/N`), and to a repository only through a
  * `repo` argument declared as a `"repo"` target (the working tree's when `repo`
- * is absent). The board is told without `gh` where the arguments say it
+ * is absent). An `"owner"` target names the board to be created for that owner,
+ * `owner/projects/new` (`*` when the owner is absent or invalid; `@me` reads the
+ * viewer's login). The board is told without `gh` where the arguments say it
  * (`owner/N`, a URL, a number with `owner`, `repo` or the working tree); a
  * board they name by title, or not at all, is found with the lookup of `resolveBoard`,
  * and an item's board is read from GitHub, which only read. For repositories
@@ -185,6 +199,10 @@ export async function writeTargets(spec: Pick<ToolSpec, "targets">, args: unknow
     const value = given[name]
     if (kind === "board") {
       addResource(await boardTarget(boardSelector(given, value), fromArguments, ctx))
+      continue
+    }
+    if (kind === "owner") {
+      addResource(await ownerTarget(value, ctx))
       continue
     }
     if (value === undefined || (namesBoard && name === REPO_ARGUMENT && kind === "repo")) continue
