@@ -38,6 +38,15 @@ export const pullRequestRowSchema = z.object({
   updated_at: z.string(),
 })
 
+/** An issue a pull request closes when it merges, as GitHub links it. */
+export const closingIssueSchema = z.object({
+  number: z.number().int(),
+  title: z.string(),
+  url: z.string(),
+  state: z.string(),
+  repo: z.string(),
+})
+
 export const pullRequestDetailSchema = z.object({
   id: z.string(),
   number: z.number().int(),
@@ -77,9 +86,7 @@ export const pullRequestDetailSchema = z.object({
     }),
   ),
   unresolved_threads_truncated: z.boolean(),
-  closing_issues: z.array(
-    z.object({ number: z.number().int(), title: z.string(), url: z.string(), state: z.string(), repo: z.string() }),
-  ),
+  closing_issues: z.array(closingIssueSchema),
   auto_merge: z.object({ method: z.string(), enabled_by: z.string().nullable() }).nullable(),
   checks: checksSummarySchema,
   projects: z.array(
@@ -120,10 +127,15 @@ export const checkRunSchema = z.object({
   url: z.string().nullable(),
 })
 
+export type ClosingIssue = z.output<typeof closingIssueSchema>
 export type PullRequestDetail = z.output<typeof pullRequestDetailSchema>
 export type PullRequestRow = z.output<typeof pullRequestRowSchema>
 export type CheckRunRow = z.output<typeof checkRunSchema>
 export type PullRequestRef = { repo: RepoName; number: number }
+
+/** What a pull request write needs to know of the pull request before or after it changes it. */
+export type PullRequestState = Pick<PullRequestDetail, "id" | "number" | "url" | "draft" | "body" | "base" | "head"> &
+  Pick<PullRequestDetail, "head_sha" | "closing_issues"> & { state: string }
 
 /** A failed check that is a GitHub Actions job, whose log can be read by its job id. */
 export type FailedJob = { name: string; job: number; url: string | null }
@@ -247,6 +259,11 @@ const CHECKS_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(own
   lastCommit: commits(last:1){nodes{commit{statusCheckRollup{contexts(first:${MAX_CONTEXTS}){pageInfo{hasNextPage} nodes{__typename ... on CheckRun{name status conclusion isRequired(pullRequestNumber:$n) detailsUrl databaseId checkSuite{workflowRun{databaseId workflow{name}}}} ... on StatusContext{context state isRequired(pullRequestNumber:$n) targetUrl description}}}}}}}
 }}}`
 
+const STATE_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){pullRequest(number:$n){
+  id number url state isDraft body baseRefName headRefName headRefOid
+  closingIssuesReferences(first:${MAX_LINKED}){nodes{number title url state repository{nameWithOwner}}}
+}}}`
+
 const HEAD_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){pullRequest(number:$n){headRefOid changedFiles state}}}`
 
 /** Plain ISSUE search keeps every qualifier, including the repository, scoped across OR expressions. */
@@ -272,6 +289,16 @@ function row(node: RawRow): PullRequestRow {
     milestone: node.milestone?.title ?? null,
     updated_at: node.updatedAt,
   }
+}
+
+function closingIssues(pull: Pick<RawPullRequest, "closingIssuesReferences">): ClosingIssue[] {
+  return nodesOf(pull.closingIssuesReferences).map((issue) => ({
+    number: issue.number,
+    title: issue.title,
+    url: issue.url,
+    state: stateWord(issue.state),
+    repo: issue.repository.nameWithOwner,
+  }))
 }
 
 function pullRequestNotFound(repo: RepoName, number: number, cause?: unknown): ToolError {
@@ -360,13 +387,7 @@ export async function readPullRequest(
         }
       }),
     unresolved_threads_truncated: (pull.reviewThreads?.totalCount ?? 0) > threads.length,
-    closing_issues: nodesOf(pull.closingIssuesReferences).map((issue) => ({
-      number: issue.number,
-      title: issue.title,
-      url: issue.url,
-      state: stateWord(issue.state),
-      repo: issue.repository.nameWithOwner,
-    })),
+    closing_issues: closingIssues(pull),
     auto_merge: pull.autoMergeRequest
       ? {
           method: stateWord(pull.autoMergeRequest.mergeMethod),
@@ -392,6 +413,37 @@ export async function readPullRequest(
     updated_at: pull.updatedAt,
     merged_at: pull.mergedAt ?? null,
     closed_at: pull.closedAt ?? null,
+  }
+}
+
+/** A pull request's state, body, branches and closing issues, from a small read. */
+export async function readPullRequestState(ref: PullRequestRef, ctx: RefContext): Promise<PullRequestState> {
+  const pull = await readPullRequestNode<
+    Pick<
+      RawPullRequest,
+      | "id"
+      | "number"
+      | "url"
+      | "state"
+      | "isDraft"
+      | "body"
+      | "baseRefName"
+      | "headRefName"
+      | "headRefOid"
+      | "closingIssuesReferences"
+    >
+  >(STATE_QUERY, ref, {}, ctx)
+  return {
+    id: pull.id,
+    number: pull.number,
+    url: pull.url,
+    state: stateWord(pull.state),
+    draft: pull.isDraft,
+    body: pull.body ?? "",
+    base: pull.baseRefName,
+    head: pull.headRefName,
+    head_sha: pull.headRefOid,
+    closing_issues: closingIssues(pull),
   }
 }
 
