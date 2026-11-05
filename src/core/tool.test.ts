@@ -247,9 +247,16 @@ describe("selectTools", () => {
   ]
   const ids = (settings?: Parameters<typeof selectTools>[1]) => selectTools(all, settings).map((s) => s.id)
 
-  test("defaults to issues and pull_requests", () => {
-    expect(DEFAULT_TOOLSETS).toEqual(["issues", "pull_requests"])
-    expect(ids()).toEqual(["github_issue_read", "github_issue_create", "github_pr_read", "github_pr_merge"])
+  test("defaults to issues, pull_requests and projects", () => {
+    expect(DEFAULT_TOOLSETS).toEqual(["issues", "pull_requests", "projects"])
+    expect(ids()).toEqual([
+      "github_issue_read",
+      "github_issue_create",
+      "github_pr_read",
+      "github_pr_merge",
+      "github_project_read",
+      "github_project_item_add",
+    ])
   })
 
   test('"all" turns on every toolset', () => {
@@ -263,8 +270,12 @@ describe("selectTools", () => {
   test("an empty toolsets list means the default toolsets, like an absent one", () => {
     expect(ids({ toolsets: [] })).toEqual(ids())
     expect(ids({ toolsets: [] })).toEqual(ids({ toolsets: undefined }))
-    expect(ids({ toolsets: [], tools: ["github_project_read"] })).toContain("github_project_read")
-    expect(ids({ toolsets: [], read_only: true })).toEqual(["github_issue_read", "github_pr_read"])
+    expect(ids({ toolsets: [], tools: ["github_release_create"] })).toContain("github_release_create")
+    expect(ids({ toolsets: [], read_only: true })).toEqual([
+      "github_issue_read",
+      "github_pr_read",
+      "github_project_read",
+    ])
   })
 
   test("tools adds single tools across toolsets", () => {
@@ -284,16 +295,14 @@ describe("selectTools", () => {
   })
 
   test("read_only drops every non-read tool and wins over tools", () => {
-    expect(ids({ read_only: true })).toEqual(["github_issue_read", "github_pr_read"])
-    expect(ids({ read_only: true, tools: ["github_release_create", "github_project_read"] })).toEqual([
-      "github_issue_read",
-      "github_pr_read",
-      "github_project_read",
-    ])
+    expect(ids({ read_only: true })).toEqual(["github_issue_read", "github_pr_read", "github_project_read"])
+    expect(
+      ids({ toolsets: ["issues"], read_only: true, tools: ["github_release_create", "github_project_read"] }),
+    ).toEqual(["github_issue_read", "github_project_read"])
   })
 
   test("keeps the order of the full list", () => {
-    expect(ids({ toolsets: ["pull_requests", "issues"] })).toEqual(ids())
+    expect(ids({ toolsets: ["projects", "pull_requests", "issues"] })).toEqual(ids())
   })
 
   test("an unknown toolset is invalid_argument naming it", () => {

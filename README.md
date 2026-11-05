@@ -179,7 +179,7 @@ one, otherwise a `type:<kind>` label.
 | `github_project_item_unarchive` | bring an archived item back                                                             | overwrite  |
 | `github_project_item_convert`   | turn a draft into an issue, with its kind, labels and milestone                         | add        |
 
-The toolset is off by default: add `projects` to `toolsets`. The skill is
+The skill is
 [`github-projects`](skills/github-projects/SKILL.md), shown as
 `github-tools:github-projects` in Claude Code and `github-tools:projects` in
 Hermes. A board is named by its number, `owner/N`, URL or title (`Roadmap` when
@@ -221,13 +221,13 @@ Where a write is asked about, and where it is not:
 Every entry point takes the same settings. A flag wins over its environment
 variable, and an option or setting wins over the variable too.
 
-| Setting         | Flag              | Variable                     | Meaning                                                                                                              |
-| --------------- | ----------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `toolsets`      | `--toolsets`      | `GITHUB_TOOLS_TOOLSETS`      | `issues`, `pull_requests`, `projects`, `repos`, `releases`, `actions` or `all`; default `issues` and `pull_requests` |
-| `read_only`     | `--read-only`     | `GITHUB_TOOLS_READ_ONLY`     | registers no tool that writes; wins over every other setting                                                         |
-| `tools`         | `--tools`         | `GITHUB_TOOLS_TOOLS`         | single tools to add by ID, whatever their toolset                                                                    |
-| `exclude_tools` | `--exclude-tools` | `GITHUB_TOOLS_EXCLUDE_TOOLS` | single tools to remove by ID; wins over `tools` and `toolsets`                                                       |
-| `confirm`       | `--confirm`       | `GITHUB_TOOLS_CONFIRM`       | MCP server only: `harness` (default) or `elicitation`, as `docs/conventions.md` describes                            |
+| Setting         | Flag              | Variable                     | Meaning                                                                                                                          |
+| --------------- | ----------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `toolsets`      | `--toolsets`      | `GITHUB_TOOLS_TOOLSETS`      | `issues`, `pull_requests`, `projects`, `repos`, `releases`, `actions` or `all`; default `issues`, `pull_requests` and `projects` |
+| `read_only`     | `--read-only`     | `GITHUB_TOOLS_READ_ONLY`     | registers no tool that writes; wins over every other setting                                                                     |
+| `tools`         | `--tools`         | `GITHUB_TOOLS_TOOLS`         | single tools to add by ID, whatever their toolset                                                                                |
+| `exclude_tools` | `--exclude-tools` | `GITHUB_TOOLS_EXCLUDE_TOOLS` | single tools to remove by ID; wins over `tools` and `toolsets`                                                                   |
+| `confirm`       | `--confirm`       | `GITHUB_TOOLS_CONFIRM`       | MCP server only: `harness` (default) or `elicitation`, as `docs/conventions.md` describes                                        |
 
 Lists are comma-separated in a flag or a variable. GitHub Actions does not let a
 secret or configuration variable be named `GITHUB_*`, so in a workflow pass a
