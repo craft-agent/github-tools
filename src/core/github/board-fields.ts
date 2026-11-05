@@ -7,8 +7,12 @@ import { PAGE_INFO, PAGE_SIZE } from "./projects"
 
 const VIEW_LAYOUT_SUFFIX = /_LAYOUT$/
 
-const FIELDS_QUERY = `query($id:ID!,$after:String){node(id:$id){... on ProjectV2{fields(first:${PAGE_SIZE},after:$after){${PAGE_INFO} nodes{__typename ... on ProjectV2FieldCommon{id name dataType} ... on ProjectV2SingleSelectField{options{id name color description}} ... on ProjectV2IterationField{configuration{iterations{id title startDate duration}}}}}}}}`
-const VIEWS_QUERY = `query($id:ID!,$after:String){node(id:$id){... on ProjectV2{views(first:${PAGE_SIZE},after:$after){${PAGE_INFO} nodes{number name layout filter}}}}}`
+/** What a read or a write of a field selects of it, whatever its kind. */
+export const FIELD_SELECTION =
+  "__typename ... on ProjectV2FieldCommon{id name dataType} ... on ProjectV2SingleSelectField{options{id name color description}} ... on ProjectV2IterationField{configuration{iterations{id title startDate duration}}}"
+
+const FIELDS_QUERY = `query($id:ID!,$after:String){node(id:$id){... on ProjectV2{fields(first:${PAGE_SIZE},after:$after){${PAGE_INFO} nodes{${FIELD_SELECTION}}}}}}`
+const VIEWS_QUERY = `query($id:ID!,$after:String){node(id:$id){... on ProjectV2{views(first:${PAGE_SIZE},after:$after){${PAGE_INFO} nodes{id number name layout filter}}}}}`
 
 export const boardFieldSchema = z.object({
   id: z.string(),
@@ -36,7 +40,7 @@ export const boardViewSchema = z.object({
 export type BoardField = z.output<typeof boardFieldSchema>
 export type BoardView = z.output<typeof boardViewSchema>
 
-type RawField = {
+export type RawField = {
   id?: string
   name?: string
   dataType?: string
@@ -46,9 +50,13 @@ type RawField = {
   } | null
 }
 
-type RawView = { number: number; name: string; layout?: string; filter?: string | null }
+type RawView = { id: string; number: number; name: string; layout?: string; filter?: string | null }
 
-function toField(raw: RawField & { id: string }): BoardField {
+/** A view with the node ID that deleting it takes. */
+export type BoardViewNode = BoardView & { id: string }
+
+/** The field as a tool reports it, from the reply of a read or a write. */
+export function toField(raw: RawField & { id: string }): BoardField {
   const field: BoardField = { id: raw.id, name: raw.name ?? "", type: (raw.dataType ?? "").toLowerCase() }
   if (raw.options) {
     field.options = raw.options.map((option) => ({
@@ -78,8 +86,8 @@ export async function readBoardFields(projectId: string, ctx: RefContext): Promi
   return items.filter((raw): raw is RawField & { id: string } => Boolean(raw?.id)).map(toField)
 }
 
-/** Every view of a board by its node ID, in GitHub's order. */
-export async function readBoardViews(projectId: string, ctx: RefContext): Promise<BoardView[]> {
+/** Every view of a board by its node ID, in GitHub's order, each with its own node ID. */
+export async function readBoardViewNodes(projectId: string, ctx: RefContext): Promise<BoardViewNode[]> {
   const { items } = await paginate<RawView | null>(VIEWS_QUERY, { id: projectId }, (data) => data?.node?.views, {
     cwd: ctx.cwd,
     signal: ctx.signal,
@@ -87,9 +95,16 @@ export async function readBoardViews(projectId: string, ctx: RefContext): Promis
   return items
     .filter((raw): raw is RawView => raw != null)
     .map((raw) => ({
+      id: raw.id,
       number: raw.number,
       name: raw.name,
       layout: (raw.layout ?? "").replace(VIEW_LAYOUT_SUFFIX, "").toLowerCase(),
       filter: raw.filter ?? null,
     }))
+}
+
+/** Every view of a board by its node ID, in GitHub's order. */
+export async function readBoardViews(projectId: string, ctx: RefContext): Promise<BoardView[]> {
+  const nodes = await readBoardViewNodes(projectId, ctx)
+  return nodes.map(({ number, name, layout, filter }) => ({ number, name, layout, filter }))
 }
