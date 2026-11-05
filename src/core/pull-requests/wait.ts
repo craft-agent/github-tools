@@ -28,7 +28,7 @@ export type WaitOptions = {
 }
 
 /** Sleeps, and throws the abort error of `signal` when it aborts meanwhile. */
-async function pause(ms: number, signal: AbortSignal | undefined): Promise<void> {
+export async function pause(ms: number, signal: AbortSignal | undefined): Promise<void> {
   try {
     await sleep(ms, undefined, { signal })
   } catch (error) {
