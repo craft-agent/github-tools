@@ -12,7 +12,12 @@ provides_tools:
   - github_issue_read
   - github_issue_relate
   - github_issue_reopen
+  - github_project_create
+  - github_project_field_ensure
+  - github_project_link
   - github_project_read
+  - github_project_unlink
+  - github_project_view_ensure
 provides_hooks:
   - pre_tool_call
 config_schema:
