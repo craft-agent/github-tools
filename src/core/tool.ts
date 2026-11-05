@@ -6,7 +6,7 @@ export const TOOLSETS = ["issues", "pull_requests", "projects", "repos", "releas
 export type Toolset = (typeof TOOLSETS)[number]
 
 /** The toolsets that are on when a setting does not name any. */
-export const DEFAULT_TOOLSETS: Toolset[] = ["issues", "pull_requests"]
+export const DEFAULT_TOOLSETS: Toolset[] = ["issues", "pull_requests", "projects"]
 
 /** How far a tool's effect reaches; `docs/conventions.md` defines each class and its annotations. */
 export type WriteClass = "read" | "add" | "idempotent" | "overwrite" | "administrative"

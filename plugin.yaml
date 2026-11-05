@@ -28,7 +28,7 @@ provides_hooks:
   - pre_tool_call
 config_schema:
   toolsets:
-    description: 'The toolsets that are on: a list of issues, pull_requests, projects, repos, releases and actions, or "all". Defaults to issues and pull_requests.'
+    description: 'The toolsets that are on: a list of issues, pull_requests, projects, repos, releases and actions, or "all". Defaults to issues, pull_requests and projects.'
   read_only:
     type: bool
     description: Registers no tool that writes. Wins over every other setting.
