@@ -11,6 +11,7 @@ import {
 import { kindLabel } from "../github/kind"
 import { issueTypes } from "../github/repository"
 import { parseNumberRef, resolveRepo, type RepoName } from "../refs"
+import { given, quoted, searchWords, LOGIN_PATTERN } from "../search"
 import { defineTool, type ToolContext } from "../tool"
 
 const METHODS = ["view", "list"] as const
@@ -24,12 +25,6 @@ const DEFAULT_STATE = "open"
 
 const NO_VALUE = "none"
 const CURRENT_USER = "@me"
-/** A GitHub login (Enterprise Managed User logins contain `_`), or `@me`. */
-const ASSIGNEE_PATTERN = /^(?:@me|[A-Za-z0-9][A-Za-z0-9_-]{0,38})$/
-/** Characters that would end or escape a quoted search value. */
-const UNQUOTABLE = /["\\\r\n]/
-/** A qualifier that would aim the search at another repository or owner, possibly negated or in parentheses. */
-const SCOPE_QUALIFIER = /(?:^|\W)-?(?:repo|org|user):/i
 
 const input = z.object({
   method: z.enum(METHODS).describe('"view" reads one issue in full; "list" lists issues.'),
@@ -102,11 +97,6 @@ function invalid(message: string): ToolError {
   return new ToolError("invalid_argument", message)
 }
 
-/** An argument's text with its surrounding space removed; blank counts as not given. */
-function given(value: string | undefined): string | undefined {
-  return value?.trim() || undefined
-}
-
 function refuseOtherMethod(args: Args): void {
   const otherArgs: readonly (keyof Args)[] = args.method === "view" ? LIST_ONLY : VIEW_ONLY
   const other: Method = args.method === "view" ? "list" : "view"
@@ -123,13 +113,6 @@ async function view(args: Args, ctx: ToolContext) {
   return { repo: ref.repo.full, issue: await readIssue(ref, { comments: args.comments ?? DEFAULT_COMMENTS }, ctx) }
 }
 
-function quoted(name: string, value: string): string {
-  if (UNQUOTABLE.test(value)) {
-    throw invalid(`${name} cannot contain a double quote, a backslash or a line break.`)
-  }
-  return `"${value}"`
-}
-
 /** The qualifiers of the filters that need no lookup, validated; each is only added when given. */
 function filterQualifiers(args: Args): string[] {
   const qualifiers: string[] = []
@@ -141,18 +124,13 @@ function filterQualifiers(args: Args): string[] {
   if (label) qualifiers.push(`label:${quoted("label", label)}`)
   const assignee = given(args.assignee)
   if (assignee) {
-    if (assignee !== NO_VALUE && !ASSIGNEE_PATTERN.test(assignee)) {
+    if (assignee !== NO_VALUE && !LOGIN_PATTERN.test(assignee)) {
       throw invalid(`assignee must be a GitHub login, "${CURRENT_USER}" or "${NO_VALUE}".`)
     }
     qualifiers.push(assignee === NO_VALUE ? "no:assignee" : `assignee:${assignee}`)
   }
-  const words = given(args.query)
-  if (words) {
-    if (SCOPE_QUALIFIER.test(words)) {
-      throw invalid("query cannot name another repository or owner (repo:, org:, user:); list one repository per call.")
-    }
-    qualifiers.push(words)
-  }
+  const words = searchWords(args.query)
+  if (words) qualifiers.push(words)
   return qualifiers
 }
 
