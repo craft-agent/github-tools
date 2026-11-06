@@ -1,4 +1,6 @@
 import { z } from "zod"
+import { ToolError } from "../errors"
+import { gh, ghJson } from "../gh"
 import type { RefContext, RepoName } from "../refs"
 import { readRepositoryPages } from "./repos"
 
@@ -47,4 +49,44 @@ export async function listLabels(
       .map((label) => ({ name: label.name, color: label.color, description: label.description ?? "" })),
     truncated: truncated || matching.length > options.limit,
   }
+}
+
+export const labelNameInput = z.string().trim().min(1).describe("The label's name, matched without regard to case.")
+export const labelColorInput = z
+  .string()
+  .regex(/^#?[0-9a-f]{6}$/i)
+  .describe("Six hex digits, with or without #.")
+
+export async function labelsForWrite(repo: RepoName, ctx: RefContext): Promise<Label[]> {
+  return (await listLabels(repo, { limit: Number.MAX_SAFE_INTEGER }, ctx)).labels
+}
+
+export function findLabel(labels: Label[], name: string): Label {
+  const found = labels.find((label) => label.name.toLowerCase() === name.toLowerCase())
+  if (!found) throw new ToolError("not_found", `Label "${name}" was not found.`)
+  return found
+}
+
+export type LabelBody = Partial<Label> & { new_name?: string }
+
+export async function writeLabel(
+  repo: RepoName,
+  method: "POST" | "PATCH",
+  body: LabelBody,
+  ctx: RefContext,
+  name?: string,
+): Promise<{ label: Label }> {
+  const path = `repos/${repo.full}/labels${name === undefined ? "" : `/${encodeURIComponent(name)}`}`
+  const raw = await ghJson<RawLabel>(["api", "-X", method, path, "--input", "-"], {
+    ...ctx,
+    stdin: JSON.stringify(body),
+  })
+  if (!raw) throw new ToolError("github_error", "GitHub did not return the label it wrote.")
+  return {
+    label: { name: raw.name, color: raw.color, description: raw.description ?? "" },
+  }
+}
+
+export async function deleteLabel(repo: RepoName, name: string, ctx: RefContext): Promise<void> {
+  await gh(["api", "-X", "DELETE", `repos/${repo.full}/labels/${encodeURIComponent(name)}`], ctx)
 }

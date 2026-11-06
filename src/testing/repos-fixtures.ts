@@ -50,3 +50,43 @@ export const restFailure = (match: string, status: string, body: Extra = {}): Gh
   stdout: JSON.stringify(body),
   code: 1,
 })
+
+export const labelPages = (labels: unknown[], next: string | null = null, times?: number): GhRule =>
+  graphqlRule("labels\\(first:100", { repository: { labels: page(labels, next) } }, times)
+
+export const milestonePages = (milestones: unknown[], next: string | null = null): GhRule =>
+  graphqlRule("milestones\\(first:100", { repository: { milestones: page(milestones, next) } })
+
+export const LABEL_ROW = { name: "Bug", color: "d73a4a", description: "Something is broken" }
+export const MILESTONE_ROW = {
+  number: 1,
+  title: "Release",
+  state: "OPEN",
+  dueOn: "2026-12-01T12:00:00Z",
+  description: "Next release",
+  openIssueCount: 2,
+  closedIssueCount: 1,
+  url: "https://github.com/octo/hello/milestone/1",
+}
+
+export const milestoneRest = (overrides: Extra = {}) => ({
+  number: 1,
+  title: "Release",
+  state: "open",
+  due_on: MILESTONE_ROW.dueOn,
+  description: MILESTONE_ROW.description,
+  html_url: MILESTONE_ROW.url,
+  ...overrides,
+})
+
+/** The REST mutations with their JSON request bodies, in order. */
+export function writeLog(installed: FakeGh): { args: string[]; body: unknown }[] {
+  const stdins = installed.stdins()
+  return installed
+    .calls()
+    .flatMap((args, index) =>
+      args[0] === "api" && args.some((arg) => ["POST", "PATCH", "DELETE"].includes(arg))
+        ? [{ args, body: stdins[index] ? JSON.parse(stdins[index]!) : null }]
+        : [],
+    )
+}

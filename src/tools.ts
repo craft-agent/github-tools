@@ -30,6 +30,9 @@ import { stackLink } from "./core/pull-requests/stack-link"
 import { stackRead } from "./core/pull-requests/stack-read"
 import { stackUnlink } from "./core/pull-requests/stack-unlink"
 import { labelRead } from "./core/repos/label-read"
+import { labelCreate } from "./core/repos/label-create"
+import { labelEdit } from "./core/repos/label-edit"
+import { labelDelete } from "./core/repos/label-delete"
 import { milestoneRead } from "./core/repos/milestone-read"
 import { repoRead } from "./core/repos/repo-read"
 import { rulesetRead } from "./core/repos/ruleset-read"
@@ -72,4 +75,7 @@ export const ALL_TOOLS: ToolSpec[] = [
   labelRead,
   milestoneRead,
   rulesetRead,
+  labelCreate,
+  labelEdit,
+  labelDelete,
 ]
