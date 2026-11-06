@@ -97,7 +97,9 @@ user does it in the web UI.
 An item is an issue, a pull request or a draft on a board.
 
 - **`item_add`** puts an issue or pull request on the board, or returns its
-  item when it is there already (`created: false`, archived ones too).
+  item when it is there already (`created: false`, archived ones too). A new
+  issue or pull request goes on a board in the call that makes it:
+  `github_issue_create` and `github_pr_create` take `project` and `fields`.
 - **`item_create`** makes a draft: a title and body that live only on the
   board. **`item_convert`** turns it into an issue of `repo`, keeping its field
   values, and sets kind, labels and milestone as `github_issue_create` does.
