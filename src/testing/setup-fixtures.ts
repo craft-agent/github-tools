@@ -76,6 +76,14 @@ export const boardOwnerRule = (login: string, typename: "User" | "Organization",
   stdout: gqlReply({ repositoryOwner: { __typename: typename, id, login } }),
 })
 
+/** The issue fields of the organization `login` as the owner query replies with them; `null` nodes answer as a user, who has none. */
+export const organizationIssueFieldsRule = (login: string, nodes: unknown[] | null): GhRule => ({
+  match: `repositoryOwner\\(login:\\$login\\)\\{__typename \\.\\.\\. on Organization\\{issueFields[\\s\\S]*login=${login}${END}`,
+  stdout: gqlReply({
+    repositoryOwner: nodes === null ? { __typename: "User" } : { __typename: "Organization", issueFields: { nodes } },
+  }),
+})
+
 /** The fields of a board as its REST route lists them: one page. */
 export const restFieldsRule = (root: "orgs" | "users", login: string, number: number, names: string[]): GhRule => ({
   match: `^api -H X-GitHub-Api-Version: 2026-03-10 ${root}/${login}/projectsV2/${number}/fields\\?per_page=100 --paginate --slurp$`,

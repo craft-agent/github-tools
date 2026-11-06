@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { installFakeGh, type FakeGh, type GhRule } from "../../testing/fake-gh"
 import { gqlErrors } from "../../testing/gql"
+import { organizationIssueFieldsRule } from "../../testing/setup-fixtures"
 import {
   ISSUE_FIELD_NODES,
   ISSUE_FIELD_MUTATION,
@@ -13,12 +14,14 @@ import { ToolError } from "../errors"
 import { GraphQLToolError } from "../gh"
 import { parseRepo } from "../refs"
 import {
+  findIssueField,
   isIssueFieldsMissingError,
   issueFieldValueOf,
   issueFieldValues,
   issueFieldValuesSchema,
   planIssueFieldWrites,
   readIssueFieldDefinitions,
+  readOrganizationIssueFields,
   readIssueFieldValuesById,
   writeIssueFields,
   type IssueFieldDefinition,
@@ -231,6 +234,12 @@ describe("isIssueFieldsMissingError", () => {
     expect(isIssueFieldsMissingError(new ToolError("github_error", message))).toBe(true)
   })
 
+  test("detects issueFields missing on Organization", () => {
+    const message = "Field 'issueFields' doesn't exist on type 'Organization'"
+    expect(isIssueFieldsMissingError(new GraphQLToolError("github_error", message, [{ message }], null))).toBe(true)
+    expect(isIssueFieldsMissingError(new ToolError("github_error", message))).toBe(true)
+  })
+
   test("detects isIssueField missing on ProjectV2Field", () => {
     const message = "Field 'isIssueField' doesn't exist on type 'ProjectV2Field'"
     expect(isIssueFieldsMissingError(new GraphQLToolError("github_error", message, [{ message }], null))).toBe(true)
@@ -287,6 +296,53 @@ describe("readIssueFieldDefinitions", () => {
   test("another failure is thrown", async () => {
     useFake([{ match: "issueFields", stderr: "HTTP 500", code: 1 }])
     await expect(readIssueFieldDefinitions(REPO, CTX)).rejects.toBeInstanceOf(ToolError)
+  })
+})
+
+describe("readOrganizationIssueFields", () => {
+  test("reads the fields of the organization by its login", async () => {
+    const installed = useFake([organizationIssueFieldsRule("octo", ISSUE_FIELD_NODES)])
+    expect(await readOrganizationIssueFields("octo", CTX)).toEqual(DEFINITIONS)
+    expect(sent(installed)).toHaveLength(1)
+    expect(sent(installed)[0]).toContain("login=octo")
+  })
+
+  test("a field of a type this code does not know is left out", async () => {
+    useFake([
+      organizationIssueFieldsRule("octo", [
+        ...ISSUE_FIELD_NODES.slice(1, 2),
+        { __typename: "IssueFieldFuture", id: "IF_x", name: "Future", dataType: "HOLOGRAM" },
+      ]),
+    ])
+    expect((await readOrganizationIssueFields("octo", CTX))?.map((field) => field.name)).toEqual(["Effort"])
+  })
+
+  test("an organization without any gives an empty list", async () => {
+    useFake([organizationIssueFieldsRule("octo", [])])
+    expect(await readOrganizationIssueFields("octo", CTX)).toEqual([])
+  })
+
+  test("a user has none: null", async () => {
+    useFake([organizationIssueFieldsRule("alice", null)])
+    expect(await readOrganizationIssueFields("alice", CTX)).toBeNull()
+  })
+
+  test("a GitHub without issue fields: null", async () => {
+    const message = "Field 'issueFields' doesn't exist on type 'Organization'"
+    useFake([{ match: "issueFields", stdout: gqlErrors([{ type: "undefinedField", message }]) }])
+    expect(await readOrganizationIssueFields("octo", CTX)).toBeNull()
+  })
+
+  test("another failure is thrown", async () => {
+    useFake([{ match: "issueFields", stderr: "HTTP 500", code: 1 }])
+    await expect(readOrganizationIssueFields("octo", CTX)).rejects.toBeInstanceOf(ToolError)
+  })
+})
+
+describe("findIssueField", () => {
+  test("matches the name without regard to case or surrounding space", () => {
+    expect(findIssueField(DEFINITIONS, " target DATE ")?.id).toBe("IF_target")
+    expect(findIssueField(DEFINITIONS, "Start date")).toBeUndefined()
   })
 })
 

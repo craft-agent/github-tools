@@ -84,7 +84,7 @@ export function issueFieldValues(connection: IssueFieldValueConnection): IssueFi
 
 const SCHEMA_ERROR_PATTERNS = [
   /issueFieldValues.*(?:doesn['’]t exist on type|is not defined on type).*['"`]?Issue['"`]?/i,
-  /issueFields.*(?:doesn['’]t exist on type|is not defined on type).*['"`]?Repository['"`]?/i,
+  /issueFields.*(?:doesn['’]t exist on type|is not defined on type).*['"`]?(?:Repository|Organization)['"`]?/i,
   /(?:isIssueField|issueField).*(?:doesn['’]t exist on type|is not defined on type).*['"`]?ProjectV2/i,
   /(?:No such type\s+['"`]?(?:ProjectV2ItemIssueFieldValue|ProjectV2IssueFieldValues)['"`]?|(?:ProjectV2ItemIssueFieldValue|ProjectV2IssueFieldValues).*(?:doesn['’]t exist|is not defined))/i,
 ]
@@ -95,7 +95,7 @@ function matchesSchemaError(text: string): boolean {
 
 /**
  * Whether a GraphQL error indicates that GitHub's schema lacks issue fields: `issueFieldValues` on
- * `Issue`, `issueFields` on `Repository`, `isIssueField` on `ProjectV2Field`, or `ProjectV2ItemIssueFieldValue` /
+ * `Issue`, `issueFields` on `Repository` or `Organization`, `isIssueField` on `ProjectV2Field`, or `ProjectV2ItemIssueFieldValue` /
  * `ProjectV2IssueFieldValues` on board items (such as GitHub Enterprise Server older than 3.23).
  */
 export function isIssueFieldsMissingError(error: unknown): boolean {
@@ -118,7 +118,13 @@ export const ISSUE_FIELDS_ARGUMENT =
 /** The most issue fields an organization defines, which one read covers. */
 const MAX_ISSUE_FIELDS = 25
 
-const DEFINITIONS_QUERY = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){issueFields(first:${MAX_ISSUE_FIELDS}){nodes{__typename ... on IssueFieldCommon{name dataType} ... on IssueFieldText{id} ... on IssueFieldNumber{id} ... on IssueFieldDate{id} ... on IssueFieldSingleSelect{id options{id name}} ... on IssueFieldMultiSelect{id options{id name}}}}}}`
+/** What a definitions read selects of each issue field: `IssueFieldCommon` has no `id`, so it is selected per type. */
+const DEFINITION_SELECTION =
+  "__typename ... on IssueFieldCommon{name dataType} ... on IssueFieldText{id} ... on IssueFieldNumber{id} ... on IssueFieldDate{id} ... on IssueFieldSingleSelect{id options{id name}} ... on IssueFieldMultiSelect{id options{id name}}"
+
+const DEFINITIONS_QUERY = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){issueFields(first:${MAX_ISSUE_FIELDS}){nodes{${DEFINITION_SELECTION}}}}}`
+
+const ORGANIZATION_DEFINITIONS_QUERY = `query($login:String!){repositoryOwner(login:$login){__typename ... on Organization{issueFields(first:${MAX_ISSUE_FIELDS}){nodes{${DEFINITION_SELECTION}}}}}}`
 
 const VALUES_QUERY = `query($id:ID!){node(id:$id){... on Issue{${ISSUE_FIELD_VALUES_FRAGMENT}}}}`
 
@@ -201,6 +207,40 @@ export async function readIssueFieldDefinitions(repo: RepoName, ctx: RefContext)
   return (data?.repository?.issueFields?.nodes ?? []).flatMap((raw) => definitionOf(raw) ?? [])
 }
 
+/**
+ * The issue fields the organization `login` defines, whatever repository they are set on; fields of a
+ * type this code does not know are left out. `null` when the owner is not an organization (a user has
+ * none) and when GitHub has no issue fields, so a caller can tell that from an organization that
+ * defines none (`[]`). Other failures are thrown.
+ */
+export async function readOrganizationIssueFields(
+  login: string,
+  ctx: RefContext,
+): Promise<IssueFieldDefinition[] | null> {
+  let data: {
+    repositoryOwner?: {
+      __typename?: string
+      issueFields?: { nodes?: (RawIssueFieldDefinition | null)[] | null } | null
+    } | null
+  } | null
+  try {
+    data = await graphql(ORGANIZATION_DEFINITIONS_QUERY, { login }, ctx)
+  } catch (error) {
+    if (isIssueFieldsMissingError(error)) return null
+    throw error
+  }
+  if (data?.repositoryOwner?.__typename !== "Organization") return null
+  return (data.repositoryOwner.issueFields?.nodes ?? []).flatMap((raw) => definitionOf(raw) ?? [])
+}
+
+/** The issue field of this name (without regard to case or surrounding space), if the definitions have one. */
+export function findIssueField(
+  definitions: readonly IssueFieldDefinition[],
+  name: string,
+): IssueFieldDefinition | undefined {
+  return definitions.find((candidate) => sameTitle(candidate.name, name))
+}
+
 function invalid(message: string): ToolError {
   return new ToolError("invalid_argument", message)
 }
@@ -210,7 +250,7 @@ function fieldNames(definitions: readonly IssueFieldDefinition[]): string {
 }
 
 function fieldOf(repo: RepoName, definitions: readonly IssueFieldDefinition[], name: string): IssueFieldDefinition {
-  const field = definitions.find((candidate) => sameTitle(candidate.name, name))
+  const field = findIssueField(definitions, name)
   if (!field) throw invalid(`${repo.full} has no issue field "${name}". Fields: ${fieldNames(definitions)}.`)
   return field
 }

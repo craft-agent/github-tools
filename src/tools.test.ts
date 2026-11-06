@@ -60,7 +60,10 @@ const NOT_TARGETS: Record<string, Record<string, string>> = {
     clear_issue_fields: "field names of the issue it edits",
   },
   github_issue_relate: { remove_parent: "a flag; the parent is read from the issue" },
-  github_project_field_ensure: { repo: "where the board lookup starts; nothing is written to it" },
+  github_project_field_ensure: {
+    repo: "where the board lookup starts; nothing is written to it",
+    issue_field: "a flag; the column is added to the board, no issue is written",
+  },
   github_project_view_ensure: { repo: "where the board lookup starts; nothing is written to it" },
   github_project_item_add: { repo: "where the board lookup starts; the issue is only put on the board" },
   github_project_item_create: { repo: "where the board lookup starts; nothing is written to it" },

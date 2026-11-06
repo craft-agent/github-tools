@@ -94,6 +94,13 @@ view and leave an existing one of that name as it is. Options are written
 and sort can only be set when it is created; to change an existing view, the
 user does it in the web UI.
 
+On an organization's board, `github_project_field_ensure` with
+`issue_field: true` adds a column that mirrors one of the organization's issue
+fields (Priority, Start date, Target date or any other it defines) by name,
+without `type` or `options`: the options and the values are the organization's
+and the issue's. Views can show, group and sort by such a column like any
+other. A field of the board's own with the same name blocks it.
+
 ## Items
 
 An item is an issue, a pull request or a draft on a board.
