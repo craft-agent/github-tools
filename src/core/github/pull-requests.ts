@@ -148,6 +148,30 @@ export type PullRequestState = Pick<
 > &
   Pick<PullRequestDetail, "head_sha" | "closing_issues"> & { state: string }
 
+/** The ways GitHub merges a pull request, in the order the tools list them. */
+export const MERGE_METHODS = ["merge", "squash", "rebase"] as const
+export type MergeMethod = (typeof MERGE_METHODS)[number]
+
+/** What a merge needs to know of a pull request: whether it can merge, its head, and its place in a stack. */
+export type MergeState = {
+  number: number
+  /** open, closed or merged. */
+  state: string
+  draft: boolean
+  /** mergeable, conflicting or unknown. */
+  mergeable: string
+  /** GitHub's merge state status, lower-cased: clean, blocked, behind, dirty, unstable, … */
+  merge_state: string
+  head: string
+  head_sha: string
+  base: string
+  cross_repository: boolean
+  /** The commit the merge made; `null` until it is merged. */
+  merge_commit: string | null
+  /** The native stack the pull request is in; `null` when it is in none. Position 1 is the bottom. */
+  stack: { number: number; position: number } | null
+}
+
 /** A failed check that is a GitHub Actions job, whose log can be read by its job id. */
 export type FailedJob = { name: string; job: number; url: string | null }
 
@@ -279,6 +303,12 @@ const STATE_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owne
 }}}`
 
 const HEAD_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){pullRequest(number:$n){headRefOid changedFiles state}}}`
+
+const MERGE_STATE_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){pullRequest(number:$n){
+  number state isDraft mergeable mergeStateStatus headRefOid headRefName baseRefName isCrossRepository mergeCommit{oid} stack{number} stackEntry{position}
+}}}`
+
+const MERGE_METHODS_QUERY = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed}}`
 
 /** Plain ISSUE search keeps every qualifier, including the repository, scoped across OR expressions. */
 const SEARCH_QUERY = `query($q:String!,$first:Int!,$after:String){search(type:ISSUE,query:$q,first:$first,after:$after){pageInfo{hasNextPage endCursor} nodes{... on PullRequest{${ROW_FIELDS}}}}}`
@@ -519,6 +549,55 @@ export async function readPullRequestHead(
     ctx,
   )
   return { head_sha: pull.headRefOid, changed_files: pull.changedFiles, state: stateWord(pull.state) }
+}
+
+/** A pull request's merge state and the place it holds in a stack, from a small read. */
+export async function readMergeState(ref: PullRequestRef, ctx: RefContext): Promise<MergeState> {
+  const pull = await readPullRequestNode<
+    Pick<
+      RawPullRequest,
+      | "number"
+      | "state"
+      | "isDraft"
+      | "mergeable"
+      | "mergeStateStatus"
+      | "headRefOid"
+      | "headRefName"
+      | "baseRefName"
+      | "isCrossRepository"
+      | "stackEntry"
+    > & { mergeCommit?: { oid: string } | null; stack?: { number: number } | null }
+  >(MERGE_STATE_QUERY, ref, {}, ctx)
+  return {
+    number: pull.number,
+    state: stateWord(pull.state),
+    draft: pull.isDraft,
+    mergeable: stateWord(pull.mergeable),
+    merge_state: stateWord(pull.mergeStateStatus),
+    head: pull.headRefName,
+    head_sha: pull.headRefOid,
+    base: pull.baseRefName,
+    cross_repository: pull.isCrossRepository,
+    merge_commit: pull.mergeCommit?.oid ?? null,
+    stack: pull.stack && pull.stackEntry ? { number: pull.stack.number, position: pull.stackEntry.position } : null,
+  }
+}
+
+/** The merge methods the repository allows, in the order of `MERGE_METHODS`. */
+export async function readMergeMethods(repo: RepoName, ctx: RefContext): Promise<MergeMethod[]> {
+  const data = await graphql<{
+    repository?: { mergeCommitAllowed: boolean; squashMergeAllowed: boolean; rebaseMergeAllowed: boolean } | null
+  } | null>(MERGE_METHODS_QUERY, { owner: repo.owner, name: repo.name }, ctx)
+  const settings = data?.repository
+  if (!settings) {
+    throw new ToolError("not_found", `Repository ${repo.full} was not found, or the viewer cannot see it.`)
+  }
+  const allowed: Record<MergeMethod, boolean> = {
+    merge: settings.mergeCommitAllowed,
+    squash: settings.squashMergeAllowed,
+    rebase: settings.rebaseMergeAllowed,
+  }
+  return MERGE_METHODS.filter((method) => allowed[method])
 }
 
 /** Matching pull requests, at most `limit`; the caller builds and checks the query. */
