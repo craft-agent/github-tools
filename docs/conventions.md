@@ -17,8 +17,10 @@ discussion behind them is on
   written once, and an ID is a public interface: renaming one is a breaking
   change.
 - **Verbs are the CLI's**: `view`, `list`, `create`, `edit`, `close`, `reopen`,
-  `comment`, `delete`, and `add` for putting an item on a board. A verb of our
-  own only where the CLI has no command for the operation:
+  `comment`, `review`, `ready`, `merge`, `delete`, and `add` for putting an
+  item on a board. Native stacks are `github_stack_*`, after the `gh stack`
+  extension's command group (`link`, and `unlink` for its `unstack`). A verb of
+  our own only where the CLI has no command for the operation:
 
   | Verb      | Means                                                        |
   | --------- | ------------------------------------------------------------ |
@@ -56,6 +58,14 @@ discussion behind them is on
   it, and the viewer. Several candidates on one route stop the call with the
   candidates listed, and a repository that cannot be read fails instead of
   falling through to another route.
+- **A write that acts on a commit takes `head_sha`.** Opening, reviewing and
+  merging a pull request check, when it is given, that the branch on GitHub is
+  still at that commit, and stop with `stale` before writing otherwise. The
+  caller pushed or read that commit; anything newer arrived unseen.
+- **A read that waits is bounded.** A read that waits for GitHub (checks to
+  settle) waits at most `wait` seconds, 45 by default, then returns what it
+  has and says to call again. Hosts stop a tool call after about a minute, so a
+  longer wait would end in a failed call instead of an answer.
 - **The tools' own install directory is never the working tree.** A harness may
   start a tool inside the directory the package is installed in, a checkout of
   this package, whose `origin` is not the caller's project. A bare number there
@@ -73,7 +83,10 @@ discussion behind them is on
 - **One exception: what a call created is never lost.** Once a tool has
   created something, a later step of the same call that fails (a milestone, a
   relation, a board item) does not throw. The result names what was created
-  and lists the failed steps under `errors`, keyed by step.
+  and lists the failed steps under `errors`, keyed by step. When the create
+  itself reports a failure, the tool looks for what it may have made (a `gh`
+  command can make an object, then fail on a second request) and returns it
+  under `errors.create` rather than failing.
 - **A write to a repository the viewer does not own succeeds** and says
   `foreign: true`, so the caller notices it is in someone else's tracker.
 - **Text read from GitHub is returned as it is.** Bodies, comments, titles and
@@ -123,9 +136,10 @@ Every tool belongs to one class, and the class sets its MCP annotations.
   call**, since the tools a native plugin adds pass through no harness
   approval of their own.
 - **It asks for every repository and board the call writes to.** Each write
-  tool declares which arguments name one (`repo`, an issue reference, a list of
-  them, a board); a bare number means the call's own repository, and what
-  cannot be told is `*`. An "always" answer then covers only what it named,
+  tool declares which arguments name one (`repo`, an issue or pull request
+  reference, a list of issues, a board, or a board that is written to only when
+  it is given); a bare number means the call's own repository, and what cannot
+  be told is `*`. An "always" answer then covers only what it named,
   never a write into another repository or board.
 - **A board is named `owner/projects/N`.** A board belongs to a user or an
   organization, not to a repository, so its writes name the board rather than
@@ -149,9 +163,11 @@ Every tool belongs to one class, and the class sets its MCP annotations.
 
 Every entry point takes the same settings:
 
-- **Toolsets**: one per domain. `issues` and `pull_requests` are on by
-  default; `projects`, `repos`, `releases` and `actions` are opt-in. A small
-  default keeps the model's choice sharp.
+- **Toolsets**: one per domain. `issues`, `pull_requests` and `projects` are on
+  by default; `repos`, `releases` and `actions` are opt-in. A small default
+  keeps the model's choice sharp, but some plugins pass no settings at all, and
+  they ship every skill: a skill whose tools are off by default would describe
+  tools the agent does not have.
 - **`read_only`** registers no write tool, and wins over every other setting.
 - **`tools` / `exclude_tools`** add or remove single tools; an exclusion wins
   over an inclusion.
@@ -187,7 +203,11 @@ Every entry point takes the same settings:
   `SIGTERM`, then `SIGKILL` after two seconds. A hung `gh` neither holds a
   harness forever nor outlives its call.
 - **It checks the `gh` version once per process** against the minimum the
-  tools need, and maps `gh`'s failures to the error codes above.
+  tools need, and maps `gh`'s failures to the error codes above. A feature that
+  needs a newer `gh` (attachments) checks for it only in the calls that use
+  it, so every other call keeps the lower minimum.
+- **A failure keeps GitHub's reason.** `gh api` prints a failed reply's body on
+  stdout and only its status on stderr; the reply's `errors` join the message.
 
 ## Tests
 
