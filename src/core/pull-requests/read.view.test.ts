@@ -38,6 +38,7 @@ test("maps a pull request in full from one query", async () => {
   const query = variable(apiCalls(installed)[0]!, "query")!
   expect(query).toContain("lastCommit: commits(last:1)")
   expect(query).toContain("isRequired(pullRequestNumber:$n)")
+  expect(query).toContain("stack{number size} stackEntry{position}")
 })
 
 test("merged state and a deleted head repository", async () => {
@@ -57,6 +58,8 @@ test("nullable fields and absent connections", async () => {
         milestone: null,
         reviewDecision: null,
         autoMergeRequest: null,
+        stack: null,
+        stackEntry: null,
         reviewThreads: {
           totalCount: 1,
           nodes: [{ isResolved: false, isOutdated: false, path: "a", line: 1, comments: { nodes: [] } }],
@@ -71,6 +74,7 @@ test("nullable fields and absent connections", async () => {
   expect(pull.author).toBeNull()
   expect(pull.milestone).toBeNull()
   expect(pull.auto_merge).toBeNull()
+  expect(pull.stack).toBeNull()
   expect(pull.review_decision).toBeNull()
   expect(pull.unresolved_threads).toEqual([{ path: "a", line: 1, outdated: false, author: null, body: "", url: null }])
   expect(pull.unresolved_threads_truncated).toBe(false)

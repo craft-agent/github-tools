@@ -106,6 +106,8 @@ export const rawPullRequest = (extra: Record<string, unknown> = {}) => ({
     ],
   },
   autoMergeRequest: { mergeMethod: "SQUASH", enabledBy: { login: "alice" } },
+  stack: { number: 5, size: 3 },
+  stackEntry: { position: 2 },
   lastCommit: {
     nodes: [
       {
@@ -189,6 +191,7 @@ export const EXPECTED_PULL_REQUEST: PullRequestDetail = {
     { number: 4, title: "Bug", url: "https://github.com/octo/hello/issues/4", state: "open", repo: "octo/hello" },
   ],
   auto_merge: { method: "squash", enabled_by: "alice" },
+  stack: { number: 5, position: 2, size: 3 },
   checks: {
     overall: "fail",
     pass: 1,

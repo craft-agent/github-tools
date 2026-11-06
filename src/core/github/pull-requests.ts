@@ -88,6 +88,14 @@ export const pullRequestDetailSchema = z.object({
   unresolved_threads_truncated: z.boolean(),
   closing_issues: z.array(closingIssueSchema),
   auto_merge: z.object({ method: z.string(), enabled_by: z.string().nullable() }).nullable(),
+  stack: z
+    .object({
+      number: z.number().int().describe("The stack's number."),
+      position: z.number().int().describe("1 is the bottom of the stack."),
+      size: z.number().int().describe("How many pull requests the stack holds."),
+    })
+    .nullable()
+    .describe("The native stack the pull request belongs to; null when it is in none."),
   checks: checksSummarySchema,
   projects: z.array(
     z.object({
@@ -204,6 +212,8 @@ type RawPullRequest = Omit<RawRow, "milestone"> & {
     repository: { nameWithOwner: string }
   }>
   autoMergeRequest?: { mergeMethod: string; enabledBy?: Author | null } | null
+  stack?: { number: number; size: number } | null
+  stackEntry?: { position: number } | null
   projectItems?: Connection<{
     id: string
     isArchived?: boolean
@@ -251,6 +261,7 @@ const DETAIL_QUERY = `query($owner:String!,$name:String!,$n:Int!,$comments:Int!,
   reviewThreads(first:${MAX_THREADS}){totalCount nodes{isResolved isOutdated path line comments(first:1){nodes{author{login} body url}}}}
   closingIssuesReferences(first:${MAX_LINKED}){nodes{number title url state repository{nameWithOwner}}}
   autoMergeRequest{mergeMethod enabledBy{login}}
+  stack{number size} stackEntry{position}
   projectItems(first:${MAX_LINKED}){nodes{id isArchived project{number title url}}}
   lastCommit: commits(last:1){nodes{commit{statusCheckRollup{state contexts(first:${MAX_CONTEXTS}){totalCount pageInfo{hasNextPage} nodes{__typename ... on CheckRun{name status conclusion isRequired(pullRequestNumber:$n) detailsUrl} ... on StatusContext{context state isRequired(pullRequestNumber:$n) targetUrl}}}}}}}
   comments(last:$comments){totalCount nodes @include(if:$withComments){author{login} createdAt body url}}
@@ -304,7 +315,7 @@ function closingIssues(pull: Pick<RawPullRequest, "closingIssuesReferences">): C
   }))
 }
 
-function pullRequestNotFound(repo: RepoName, number: number, cause?: unknown): ToolError {
+export function pullRequestNotFound(repo: RepoName, number: number, cause?: unknown): ToolError {
   return new ToolError(
     "not_found",
     `Pull request ${repo.full}#${number} was not found: it does not exist, is an issue, or the viewer cannot see it.`,
@@ -397,6 +408,10 @@ export async function readPullRequest(
           enabled_by: pull.autoMergeRequest.enabledBy?.login ?? null,
         }
       : null,
+    stack:
+      pull.stack && pull.stackEntry
+        ? { number: pull.stack.number, position: pull.stackEntry.position, size: pull.stack.size }
+        : null,
     checks: summarizeChecks(nodesOf(pull.lastCommit)[0]?.commit?.statusCheckRollup?.contexts),
     projects: nodesOf(pull.projectItems).map((item) => ({
       item_id: item.id,

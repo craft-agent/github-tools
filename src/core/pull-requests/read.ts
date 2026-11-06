@@ -212,7 +212,7 @@ export const prRead = defineTool({
   id: "github_pr_read",
   title: "Read GitHub pull requests",
   description: [
-    'Read GitHub pull requests. method "view": one pull request in full: state, draft, body, branches, mergeability, reviews, unresolved threads, closing issues, auto-merge, check summary, boards and the latest comments. A cancelled check counts as failed.',
+    'Read GitHub pull requests. method "view": one pull request in full: state, draft, body, branches, mergeability, reviews, unresolved threads, closing issues, auto-merge, its place in a stack, check summary, boards and the latest comments. A cancelled check counts as failed.',
     `method "list": a repository's pull requests filtered by state (default ${DEFAULT_STATE}), author, assignee, base, head, label and extra search words in query (repo:, org:, user: are refused); truncated says more matched than limit.`,
     `method "checks": the checks of the last commit, each with its outcome, and the end of the log of failed GitHub Actions jobs (log_lines each, at most 3 jobs). It waits up to wait seconds (default ${DEFAULT_WAIT_SECONDS}, 0 reads once; fail_fast stops at the first failure) and returns with waited.ended_by "timeout" and a hint when the checks still run, so call again to keep waiting.`,
     `method "diff": the changed files with additions, deletions and patches; paths keeps only files at or under those paths, patch false leaves the patches out. Patches together are capped at ${PATCH_BUDGET} characters: past that, later files have patch null and patches_truncated is true.`,
