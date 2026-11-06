@@ -76,6 +76,30 @@ describe("list: building the search", () => {
     expect(error.message).toContain("cannot be searched")
   })
 
+  test("the search query sent includes the issueFieldValues fragment", async () => {
+    const installed = useFake([searchRule([rawRow(1)])])
+    await read({ method: "list" })
+    const call = apiCalls(installed).find((args) => args.join(" ").includes("search(type:ISSUE"))
+    expect(variable(call!, "query")).toContain("issueFieldValues(first:25)")
+  })
+
+  test("a schema error on issueFieldValues re-runs without the fragment and gives issue_fields: null on rows", async () => {
+    const installed = useFake([
+      {
+        match: SEARCH,
+        stdout: gqlErrors([{ message: "Field 'issueFieldValues' doesn't exist on type 'Issue'" }]),
+        times: 1,
+      },
+      searchRule([rawRow(1)]),
+    ])
+    const result = await read({ method: "list" })
+    expect(result.issues?.[0]?.issue_fields).toBeNull()
+    const calls = apiCalls(installed).filter((args) => args.join(" ").includes("search(type:ISSUE"))
+    expect(calls).toHaveLength(2)
+    expect(variable(calls[0]!, "query")).toContain("issueFieldValues(first:25)")
+    expect(variable(calls[1]!, "query")).not.toContain("issueFieldValues(first:25)")
+  })
+
   test.each([
     ["open", " state:open"],
     ["closed", " state:closed"],
@@ -301,6 +325,30 @@ describe("list: a parent's sub-issues", () => {
     const error = await failure(read({ method: "list", parent: "https://github.com/octo/hello/pull/1" }))
     expect(error.code).toBe("invalid_argument")
     expect(apiCalls(installed)).toHaveLength(0)
+  })
+
+  test("the sub-issues query sent includes the issueFieldValues fragment", async () => {
+    const installed = useFake([subIssuesRule(subs)])
+    await read({ method: "list", parent: "1" })
+    const call = apiCalls(installed).find((args) => new RegExp(SUB_ISSUES).test(args.join(" ")))
+    expect(variable(call!, "query")).toContain("issueFieldValues(first:25)")
+  })
+
+  test("a schema error on issueFieldValues re-runs without the fragment and gives issue_fields: null on sub-issue rows", async () => {
+    const installed = useFake([
+      {
+        match: SUB_ISSUES,
+        stdout: gqlErrors([{ message: "Field 'issueFieldValues' doesn't exist on type 'Issue'" }]),
+        times: 1,
+      },
+      subIssuesRule(subs),
+    ])
+    const result = await read({ method: "list", parent: "1" })
+    expect(result.issues?.[0]?.issue_fields).toBeNull()
+    const calls = apiCalls(installed).filter((args) => new RegExp(SUB_ISSUES).test(args.join(" ")))
+    expect(calls).toHaveLength(2)
+    expect(variable(calls[0]!, "query")).toContain("issueFieldValues(first:25)")
+    expect(variable(calls[1]!, "query")).not.toContain("issueFieldValues(first:25)")
   })
 
   test.each(["kind", "milestone", "label", "assignee", "query"])("%s cannot be combined with parent", async (name) => {
