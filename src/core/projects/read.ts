@@ -224,7 +224,7 @@ export const projectRead = defineTool({
   id: "github_project_read",
   title: "Read GitHub project boards",
   description: [
-    'Read GitHub project boards (Projects v2). method "view": the board the lookup finds, its fields (with single-select options and iterations) and its views, with the route that found it and what every route considered.',
+    'Read GitHub project boards (Projects v2). method "view": the board the lookup finds, its fields (with single-select options and iterations; a field mirroring an issue field is marked issue_field) and its views, with the route that found it and what every route considered.',
     `method "list": an owner's boards (owner, a login or @me) or the boards linked to a repository (repo, default the working tree's), open ones unless include_closed; truncated says more matched than limit (default ${DEFAULT_LIST_LIMIT}).`,
     `method "item_list": the board's items, filtered here by status (names, comma-separated, "-Name" leaves one out), content_type (issue, pr, draft), content_repo, search in the title and include_archived, with field values flattened by field name; truncated says the board holds more than ${MAX_BOARD_ITEMS} items or more matched than limit (default ${DEFAULT_ITEM_LIMIT}).`,
     "A board is named by project: its number, owner/number or its URL, used as it is (closed too); a bare number takes owner, else the owner of repo or of the working tree's repository.",

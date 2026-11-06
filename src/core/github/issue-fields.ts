@@ -71,6 +71,7 @@ export function issueFieldValues(connection: IssueFieldValueConnection): IssueFi
 const SCHEMA_ERROR_PATTERNS = [
   /issueFieldValues.*(?:doesn['’]t exist on type|is not defined on type).*['"`]?Issue['"`]?/i,
   /issueFields.*(?:doesn['’]t exist on type|is not defined on type).*['"`]?Repository['"`]?/i,
+  /(?:isIssueField|issueField).*(?:doesn['’]t exist on type|is not defined on type).*['"`]?ProjectV2/i,
 ]
 
 function matchesSchemaError(text: string): boolean {
@@ -79,7 +80,7 @@ function matchesSchemaError(text: string): boolean {
 
 /**
  * Whether a GraphQL error indicates that GitHub's schema lacks issue fields: `issueFieldValues` on
- * `Issue` or `issueFields` on `Repository` (such as GitHub Enterprise Server older than 3.23).
+ * `Issue`, `issueFields` on `Repository`, or `isIssueField` on `ProjectV2Field` (such as GitHub Enterprise Server older than 3.23).
  */
 export function isIssueFieldsMissingError(error: unknown): boolean {
   if (!isToolError(error)) return false

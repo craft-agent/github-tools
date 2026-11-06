@@ -214,6 +214,12 @@ describe("isIssueFieldsMissingError", () => {
     expect(isIssueFieldsMissingError(new GraphQLToolError("github_error", message, [{ message }], null))).toBe(true)
     expect(isIssueFieldsMissingError(new ToolError("github_error", message))).toBe(true)
   })
+
+  test("detects isIssueField missing on ProjectV2Field", () => {
+    const message = "Field 'isIssueField' doesn't exist on type 'ProjectV2Field'"
+    expect(isIssueFieldsMissingError(new GraphQLToolError("github_error", message, [{ message }], null))).toBe(true)
+    expect(isIssueFieldsMissingError(new ToolError("github_error", message))).toBe(true)
+  })
 })
 
 describe("readIssueFieldDefinitions", () => {

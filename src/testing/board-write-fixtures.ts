@@ -2,7 +2,14 @@ import type { FakeGh, GhRule } from "./fake-gh"
 import { gqlReply } from "./gql"
 import { DEPENDENCIES, brief, variable } from "./issue-fixtures"
 import { fieldsRule, octoBoardRules } from "./project-fixtures"
-import { mutationRule, queryOf, rawField, rawOption } from "./setup-fixtures"
+import {
+  mutationRule,
+  queryOf,
+  rawField,
+  rawIssueFieldDate,
+  rawIssueFieldSingleSelect,
+  rawOption,
+} from "./setup-fixtures"
 import { sent } from "./write-fixtures"
 
 /** What GitHub replies with for the board item tools, and a view of the field values and items they wrote. */
@@ -39,16 +46,27 @@ export const rawIterationField = (
 })
 
 export const STATUS_OPTIONS = [rawOption("O_todo", "Todo"), rawOption("O_wait", "Waiting"), rawOption("O_done", "Done")]
+export const PRIORITY_OPTIONS = [
+  rawOption("IFSSO_1", "Urgent", "RED"),
+  rawOption("IFSSO_2", "High", "ORANGE"),
+  rawOption("IFSSO_3", "Medium", "YELLOW"),
+  rawOption("IFSSO_4", "Low", "BLUE"),
+]
 
-/** The fields of a board: GitHub's own, then Status, a text, a number, a date and an iteration field. */
+export const MIRRORED_PRIORITY = rawIssueFieldSingleSelect("F_priority", "Priority", PRIORITY_OPTIONS)
+export const MIRRORED_TARGET_DATE = rawIssueFieldDate("F_target_date", "Target date")
+
+/** The fields of a board: GitHub's own, then Status, Priority, a text, a number, a date, Target date and an iteration field. */
 export const BOARD_FIELD_NODES = [
   rawField("F_title", "Title", "TITLE"),
   rawField("F_assignees", "Assignees", "ASSIGNEES"),
   rawField("F_milestone", "Milestone", "MILESTONE"),
   rawField("F_status", "Status", "SINGLE_SELECT", STATUS_OPTIONS),
+  MIRRORED_PRIORITY,
   rawField("F_notes", "Notes", "TEXT"),
   rawField("F_estimate", "Estimate", "NUMBER"),
   rawField("F_target", "Target", "DATE"),
+  MIRRORED_TARGET_DATE,
   rawIterationField("F_sprint", "Sprint", [
     ["IT_1", "Sprint 1", "2026-11-02"],
     ["IT_2", "Sprint 2", "2026-11-16"],

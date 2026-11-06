@@ -48,13 +48,23 @@ export function listOf(names: readonly string[]): string {
 }
 
 function settableNames(fields: readonly BoardField[]): string {
-  return listOf(fields.filter((field) => isSettable(field.type)).map((field) => field.name))
+  return listOf(fields.filter((field) => isSettable(field.type) && !field.issue_field).map((field) => field.name))
 }
 
 /** The field of the board with this name (without regard to case), once it is one whose value can be set. */
-function settableField(fields: readonly BoardField[], name: string): SettableField {
+function settableField(fields: readonly BoardField[], name: string, action: "set" | "clear" = "set"): SettableField {
   const field = fields.find((candidate) => sameTitle(candidate.name, name))
   if (!field) throw invalid(`The board has no field "${name}". Fields that can be set: ${settableNames(fields)}.`)
+  if (field.issue_field) {
+    const verb = action === "clear" ? "cleared" : "set"
+    const fix =
+      action === "clear"
+        ? "Clear it with clear_issue_fields in github_issue_edit."
+        : "Set it with issue_fields in github_issue_edit or github_issue_create."
+    throw invalid(
+      `"${field.name}" mirrors the organization's issue field; its value is the issue's own and cannot be ${verb} on a board. ${fix} Fields that can be set: ${settableNames(fields)}.`,
+    )
+  }
   if (!isSettable(field.type)) {
     const hint = ISSUE_FIELD_TYPES.includes(field.type)
       ? " github_issue_edit sets assignees, labels and milestone on the issue."
@@ -163,7 +173,7 @@ export function planFieldValues(
 ): FieldWrite[] {
   const writes: FieldWrite[] = []
   for (const [name, value] of Object.entries(values)) {
-    const field = settableField(fields, name)
+    const field = settableField(fields, name, "set")
     if (writes.some((write) => write.field.id === field.id)) {
       throw invalid(`fields names "${field.name}" twice; field names are matched without regard to case.`)
     }
@@ -176,7 +186,7 @@ export function planFieldValues(
 export function planClears(fields: readonly BoardField[], names: readonly string[]): BoardField[] {
   const cleared: BoardField[] = []
   for (const name of names) {
-    const field = settableField(fields, name)
+    const field = settableField(fields, name, "clear")
     if (!cleared.some((each) => each.id === field.id)) cleared.push(field)
   }
   return cleared

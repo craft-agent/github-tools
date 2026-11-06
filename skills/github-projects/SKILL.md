@@ -135,7 +135,12 @@ them; names, options and iterations match without regard to case.
 
 Title, Assignees, Labels, Milestone, Repository, Linked pull requests and
 GitHub's other own fields belong to the issue, not the board: set them with
-`github_issue_edit`. Every field and value is checked before anything is
+`github_issue_edit`. A column that mirrors one of the organization's issue
+fields (`issue_field: true` in `github_project_read`, such as Priority or
+Target date) holds the issue's own value, the same on every board: set it
+with `issue_fields` and clear it with `clear_issue_fields` in
+`github_issue_edit` (or `issue_fields` in `github_issue_create`); the board
+tools refuse it. Every field and value is checked before anything is
 written, so a refused call wrote nothing.
 
 ### Editing and archiving
