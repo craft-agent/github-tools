@@ -146,21 +146,24 @@ toolset with no tools yet registers none (so far `issues`, `pull_requests` and
 
 ### Issues (`issues`)
 
-| Tool                   | What it does                                                                              | Class      |
-| ---------------------- | ----------------------------------------------------------------------------------------- | ---------- |
-| `github_issue_read`    | `view` one issue in full, or `list` a repository's issues or a parent's sub-issues        | read       |
-| `github_issue_create`  | create an issue with its kind, labels, assignees, milestone, parent and blocked-by issues | add        |
-| `github_issue_edit`    | change the title, body (or append to it), kind, labels, assignees or milestone            | overwrite  |
-| `github_issue_comment` | comment on an issue                                                                       | add        |
-| `github_issue_close`   | close with a reason (`completed`, `not_planned`, `duplicate`)                             | overwrite  |
-| `github_issue_reopen`  | reopen a closed issue                                                                     | overwrite  |
-| `github_issue_relate`  | set the parent, sub-issues, blocked-by and blocking issues, sending only what differs     | idempotent |
-| `github_issue_develop` | create a branch on GitHub linked to the issue, or return the one already linked           | idempotent |
+| Tool                   | What it does                                                                                                        | Class      |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `github_issue_read`    | `view` one issue in full, or `list` a repository's issues or a parent's sub-issues, with their issue fields         | read       |
+| `github_issue_create`  | create an issue with its kind, labels, assignees, milestone, parent and blocked-by issues, issue fields and a board | add        |
+| `github_issue_edit`    | change the title, body (or append to it), kind, labels, assignees, milestone or issue fields                        | overwrite  |
+| `github_issue_comment` | comment on an issue                                                                                                 | add        |
+| `github_issue_close`   | close with a reason (`completed`, `not_planned`, `duplicate`)                                                       | overwrite  |
+| `github_issue_reopen`  | reopen a closed issue                                                                                               | overwrite  |
+| `github_issue_relate`  | set the parent, sub-issues, blocked-by and blocking issues, sending only what differs                               | idempotent |
+| `github_issue_develop` | create a branch on GitHub linked to the issue, or return the one already linked                                     | idempotent |
 
 The skill is [`github-issues`](skills/github-issues/SKILL.md), shown as
 `github-tools:github-issues` in Claude Code and `github-tools:issues` in Hermes.
 An issue's kind is the organization's Issue Type of that name when it defines
-one, otherwise a `type:<kind>` label.
+one, otherwise a `type:<kind>` label. Issue fields (Priority, Effort, Start
+date, Target date and any others) are the organization's own, so only an
+organization's repositories have them; `list` filters by one with
+`field.<name>:<value>` in `query`.
 
 ### Pull requests and stacks (`pull_requests`)
 
