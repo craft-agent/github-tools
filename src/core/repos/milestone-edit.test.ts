@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { failure } from "../../testing/issue-fixtures"
-import { MILESTONE_ROW, milestonePages, milestoneRest, writeLog } from "../../testing/repos-fixtures"
+import { MILESTONE_ROW, milestonePages, milestoneRest, restFailure, writeLog } from "../../testing/repos-fixtures"
 import { milestonesRule, repositoryRule } from "../../testing/write-fixtures"
 import { writeHarness } from "../../testing/write-harness"
 import { milestoneEdit } from "./milestone-edit"
@@ -26,6 +26,22 @@ test("PATCH changes all fields and returns GitHub's milestone", async () => {
       body: { title: "v2", due_on: "2028-02-29T12:00:00Z", description: "", state: "closed" },
     },
   ])
+})
+
+test("GitHub's HTTP 422 is invalid_argument with GitHub's own words", async () => {
+  use([
+    repositoryRule(),
+    milestonePages([MILESTONE_ROW]),
+    restFailure("-X PATCH", "Validation Failed (HTTP 422)", { errors: ["due_on is invalid"] }),
+  ])
+  const error = await failure(run({ milestone: 1, state: "closed" }))
+  expect(error.code).toBe("invalid_argument")
+  expect(error.message).toBe("GitHub refused it: Validation Failed: due_on is invalid.")
+})
+
+test("another failed write keeps its code", async () => {
+  use([repositoryRule(), milestonePages([MILESTONE_ROW]), restFailure("-X PATCH", "Server Error (HTTP 500)")])
+  expect((await failure(run({ milestone: 1, state: "closed" }))).code).toBe("github_error")
 })
 
 test("title matches case-insensitively in closed state and clear_due sends null", async () => {

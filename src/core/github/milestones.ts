@@ -2,6 +2,7 @@ import { z } from "zod"
 import { ToolError, isToolError } from "../errors"
 import { ghJson } from "../gh"
 import type { RefContext, RepoName } from "../refs"
+import { refusalAsInvalid } from "./refusal"
 import { readRepositoryPages } from "./repos"
 
 /** A milestone a call settled on; `created` says whether this call made it. */
@@ -105,16 +106,18 @@ export async function writeMilestone(
   ctx: RefContext,
   number?: number,
 ): Promise<Milestone> {
-  const raw = await ghJson<RestMilestone>(
-    [
-      "api",
-      "-X",
-      number === undefined ? "POST" : "PATCH",
-      `${milestonesPath(repo)}${number === undefined ? "" : `/${number}`}`,
-      "--input",
-      "-",
-    ],
-    { ...ctx, stdin: JSON.stringify(body) },
+  const raw = await refusalAsInvalid(() =>
+    ghJson<RestMilestone>(
+      [
+        "api",
+        "-X",
+        number === undefined ? "POST" : "PATCH",
+        `${milestonesPath(repo)}${number === undefined ? "" : `/${number}`}`,
+        "--input",
+        "-",
+      ],
+      { ...ctx, stdin: JSON.stringify(body) },
+    ),
   )
   if (!raw) throw new ToolError("github_error", "GitHub did not return the milestone it wrote.")
   return fromRest(raw)
@@ -224,7 +227,9 @@ export async function resolveMilestone(
         : `Milestone "${title}" does not exist in ${repo.full}; pass create_milestone: true to create it.`,
     )
   }
-  const made = await ghJson<RawMilestone>(["api", "-X", "POST", milestonesPath(repo), "-f", `title=${title}`], ctx)
+  const made = await refusalAsInvalid(() =>
+    ghJson<RawMilestone>(["api", "-X", "POST", milestonesPath(repo), "-f", `title=${title}`], ctx),
+  )
   if (!isMilestone(made))
     throw new ToolError("github_error", `GitHub did not return the milestone "${title}" it created.`)
   return { number: made.number, title: made.title, created: true }

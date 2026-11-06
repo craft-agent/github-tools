@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { failure } from "../../testing/issue-fixtures"
-import { LABEL_ROW, labelPages, writeLog } from "../../testing/repos-fixtures"
+import { LABEL_ROW, labelPages, restFailure, writeLog } from "../../testing/repos-fixtures"
 import { repositoryRule } from "../../testing/write-fixtures"
 import { writeHarness } from "../../testing/write-harness"
 import { labelCreate } from "./label-create"
@@ -59,6 +59,22 @@ test.each([{ name: " " }, { name: "Bug", color: "12345" }, { name: "Bug", color:
     expect(writeLog(installed)).toEqual([])
   },
 )
+
+test("GitHub's HTTP 422 is invalid_argument with GitHub's own words", async () => {
+  use([
+    repositoryRule(),
+    labelPages([]),
+    restFailure("-X POST", "Validation Failed (HTTP 422)", { errors: ["color is invalid"] }),
+  ])
+  const error = await failure(run({ name: "Bug" }))
+  expect(error.code).toBe("invalid_argument")
+  expect(error.message).toBe("GitHub refused it: Validation Failed: color is invalid.")
+})
+
+test("another failed write keeps its code", async () => {
+  use([repositoryRule(), labelPages([]), restFailure("-X POST", "Server Error (HTTP 500)")])
+  expect((await failure(run({ name: "Bug" }))).code).toBe("github_error")
+})
 
 test("write permission is required", async () => {
   const installed = use([repositoryRule({ permission: "READ" }), labelPages([]), made()])

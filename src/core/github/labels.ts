@@ -2,6 +2,7 @@ import { z } from "zod"
 import { ToolError } from "../errors"
 import { gh, ghJson } from "../gh"
 import type { RefContext, RepoName } from "../refs"
+import { refusalAsInvalid } from "./refusal"
 import { readRepositoryPages } from "./repos"
 
 /** The most labels read while looking for a name; a repository with more is reported as truncated. */
@@ -77,10 +78,12 @@ export async function writeLabel(
   name?: string,
 ): Promise<{ label: Label }> {
   const path = `repos/${repo.full}/labels${name === undefined ? "" : `/${encodeURIComponent(name)}`}`
-  const raw = await ghJson<RawLabel>(["api", "-X", method, path, "--input", "-"], {
-    ...ctx,
-    stdin: JSON.stringify(body),
-  })
+  const raw = await refusalAsInvalid(() =>
+    ghJson<RawLabel>(["api", "-X", method, path, "--input", "-"], {
+      ...ctx,
+      stdin: JSON.stringify(body),
+    }),
+  )
   if (!raw) throw new ToolError("github_error", "GitHub did not return the label it wrote.")
   return {
     label: { name: raw.name, color: raw.color, description: raw.description ?? "" },
@@ -88,5 +91,7 @@ export async function writeLabel(
 }
 
 export async function deleteLabel(repo: RepoName, name: string, ctx: RefContext): Promise<void> {
-  await gh(["api", "-X", "DELETE", `repos/${repo.full}/labels/${encodeURIComponent(name)}`], ctx)
+  await refusalAsInvalid(() =>
+    gh(["api", "-X", "DELETE", `repos/${repo.full}/labels/${encodeURIComponent(name)}`], ctx),
+  )
 }
