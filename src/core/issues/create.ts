@@ -1,7 +1,18 @@
 import { z } from "zod"
-import { ToolError, isAbortError } from "../errors"
+import { ToolError, isAbortError, isToolError } from "../errors"
 import { gh } from "../gh"
+import {
+  ISSUE_FIELDS_ARGUMENT,
+  issueFieldInputSchema,
+  issueFieldValuesSchema,
+  planIssueFieldWrites,
+  readIssueFieldDefinitions,
+  readIssueFieldValuesById,
+  writeIssueFields,
+  type IssueFieldWrite,
+} from "../github/issue-fields"
 import { ghIssueRef, issueLabel, resolveRelatedIssue, type IssueRef } from "../github/issue-refs"
+import { readIssueFields } from "../github/issues"
 import { kindPlacementSchema, resolveKind } from "../github/kind"
 import { milestoneSchema, resolveMilestone, type MilestoneRef } from "../github/milestones"
 import { resolveRepo, type RepoName } from "../refs"
@@ -24,6 +35,7 @@ const input = z.object({
   create_milestone: z.boolean().optional().describe("Create the milestone when it does not exist; needs milestone."),
   parent: z.string().optional().describe("The parent issue: 12, #12, owner/repo#12 or its URL."),
   blocked_by: z.array(z.string()).optional().describe("Issues that block this one, in the same forms as parent."),
+  issue_fields: issueFieldInputSchema.optional().describe(ISSUE_FIELDS_ARGUMENT),
 })
 
 const output = z.object({
@@ -35,10 +47,15 @@ const output = z.object({
     parent: z.string().nullable().describe("owner/repo#N of the parent that was set."),
     blocked_by: z.array(z.string()).describe("owner/repo#N of each blocker that was set."),
   }),
+  issue_fields: issueFieldValuesSchema
+    .nullable()
+    .describe(
+      "The new issue's field values, by field name; null when issue_fields was not given, its step failed, or the values could not be read back.",
+    ),
   foreign: z.boolean(),
   errors: z
     .record(z.string(), z.string())
-    .describe("Failed steps (kind, parent, blocked_by), keyed by step; {} when none."),
+    .describe("Failed steps (kind, parent, blocked_by, issue_fields), keyed by step; {} when none."),
 })
 
 /** Where the issue goes in the result: its number and URL, from what `gh issue create` printed. */
@@ -79,9 +96,9 @@ export const issueCreate = defineTool({
   id: "github_issue_create",
   title: "Create a GitHub issue",
   description: [
-    "Create an issue in a repository the viewer may write to, and settle its place in the same call: kind (an Issue Type, else a type:<kind> label that is created when missing), labels, assignees (they are notified), milestone, parent and blocked-by issues.",
-    "A milestone that does not exist fails before the issue is made unless create_milestone is true.",
-    "Once the issue exists, a failed kind, parent or blocked_by step does not fail the call: it is listed in errors and the issue is still returned.",
+    "Create an issue in a repository the viewer may write to, and settle its place in the same call: kind (an Issue Type, else a type:<kind> label that is created when missing), labels, assignees (they are notified), milestone, parent and blocked-by issues, and organization issue fields.",
+    "A milestone that does not exist fails before the issue is made unless create_milestone is true. Issue fields, their options and values are checked before the issue is made; a repository without issue fields refuses them.",
+    "Once the issue exists, a failed kind, parent, blocked_by or issue_fields step does not fail the call: it is listed in errors and the issue is still returned.",
     "An issue is 12, #12, owner/repo#12 or its URL; a bare number means the new issue's repository.",
   ].join(" "),
   toolset: "issues",
@@ -109,6 +126,13 @@ export const issueCreate = defineTool({
 
     const context = await writableContext(requested, ctx)
     const target = context.repo
+    let fieldWrites: IssueFieldWrite[] | undefined
+    if (args.issue_fields && Object.keys(args.issue_fields).length > 0) {
+      if (Object.keys(args.issue_fields).some((name) => !name.trim())) {
+        throw invalid("issue_fields has a blank field name; pass the field's name.")
+      }
+      fieldWrites = planIssueFieldWrites(target, await readIssueFieldDefinitions(target, ctx), args.issue_fields, [])
+    }
     const milestone: MilestoneRef | null = milestoneTitle
       ? await resolveMilestone(target, milestoneTitle, { create: Boolean(args.create_milestone) }, ctx)
       : null
@@ -140,6 +164,16 @@ export const issueCreate = defineTool({
     const blockedBy: string[] = []
     if (blockers.length)
       await steps.record("blocked_by", () => addBlockers(target, created.number, blockers, blockedBy, ctx))
+    const issueFields = fieldWrites
+      ? await steps.record("issue_fields", async () => {
+          const { id } = await readIssueFields({ repo: target, number: created.number }, ctx)
+          await writeIssueFields(id, fieldWrites, ctx)
+          return readIssueFieldValuesById(id, ctx).catch((error: unknown) => {
+            if (!isToolError(error)) throw error
+            return null
+          })
+        })
+      : null
 
     return {
       repo: target.full,
@@ -147,6 +181,7 @@ export const issueCreate = defineTool({
       kind: kindPlacement ?? null,
       milestone,
       relations: { parent: parentSet ?? null, blocked_by: blockedBy },
+      issue_fields: issueFields ?? null,
       foreign: context.foreign,
       errors: steps.errors,
     }
