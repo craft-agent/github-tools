@@ -3,7 +3,7 @@
  * The fake `gh`: answers from rules.json next to this file and logs every call.
  * A plain Node script, so it runs wherever the tests do.
  */
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs"
+import { appendFileSync, existsSync, readFileSync, renameSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -35,7 +35,10 @@ const index = rules.findIndex(
 
 if (index >= 0) {
   used[index] = (used[index] ?? 0) + 1
-  writeFileSync(usedFile, JSON.stringify(used))
+  // Written aside and renamed, so a call running at the same time never reads half a file.
+  const pending = `${usedFile}.${process.pid}`
+  writeFileSync(pending, JSON.stringify(used))
+  renameSync(pending, usedFile)
   if (rules[index].delayMs) await new Promise((resolve) => setTimeout(resolve, rules[index].delayMs))
   if (rules[index].killSelf) process.kill(process.pid, rules[index].killSelf)
   reply(rules[index])
