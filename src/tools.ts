@@ -33,6 +33,8 @@ import { labelRead } from "./core/repos/label-read"
 import { labelCreate } from "./core/repos/label-create"
 import { labelEdit } from "./core/repos/label-edit"
 import { labelDelete } from "./core/repos/label-delete"
+import { milestoneCreate } from "./core/repos/milestone-create"
+import { milestoneEdit } from "./core/repos/milestone-edit"
 import { milestoneRead } from "./core/repos/milestone-read"
 import { repoRead } from "./core/repos/repo-read"
 import { rulesetRead } from "./core/repos/ruleset-read"
@@ -78,4 +80,6 @@ export const ALL_TOOLS: ToolSpec[] = [
   labelCreate,
   labelEdit,
   labelDelete,
+  milestoneCreate,
+  milestoneEdit,
 ]

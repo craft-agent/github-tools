@@ -16,6 +16,8 @@ provides_tools:
   - github_label_delete
   - github_label_edit
   - github_label_read
+  - github_milestone_create
+  - github_milestone_edit
   - github_milestone_read
   - github_pr_close
   - github_pr_comment

@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { ToolError } from "../errors"
+import { ToolError, isToolError } from "../errors"
 import { ghJson } from "../gh"
 import type { RefContext, RepoName } from "../refs"
 import { readRepositoryPages } from "./repos"
@@ -37,6 +37,88 @@ export const milestoneRowSchema = z.object({
 })
 
 export type MilestoneRow = z.output<typeof milestoneRowSchema>
+
+export const milestoneWriteSchema = milestoneRowSchema.omit({ progress: true, open_issues: true, closed_issues: true })
+export type Milestone = z.output<typeof milestoneWriteSchema>
+export const milestoneTitleInput = z.string().trim().min(1)
+export const milestoneDueInput = z.iso.date().describe("The due date as YYYY-MM-DD, a real calendar date.")
+
+type RestMilestone = Omit<Milestone, "due" | "url" | "description"> & {
+  due_on?: string | null
+  html_url: string
+  description?: string | null
+}
+
+function fromRest(raw: RestMilestone): Milestone {
+  return {
+    number: raw.number,
+    title: raw.title,
+    state: raw.state,
+    due: raw.due_on?.slice(0, DATE_LENGTH) ?? null,
+    description: raw.description ?? "",
+    url: raw.html_url,
+  }
+}
+
+export async function milestonesForWrite(repo: RepoName, ctx: RefContext): Promise<Milestone[]> {
+  const listed = await listMilestones(repo, { state: "all", limit: MAX_MILESTONES_READ }, ctx)
+  if (!listed.truncated) return listed.milestones.map((row) => milestoneWriteSchema.parse(row))
+  const pages = await ghJson<RestMilestone[][]>(
+    ["api", `${milestonesPath(repo)}?state=all&per_page=100`, "--paginate", "--slurp"],
+    ctx,
+  )
+  return (pages ?? []).flat().map(fromRest)
+}
+
+export async function findMilestone(
+  repo: RepoName,
+  milestones: Milestone[],
+  reference: string | number,
+  ctx: RefContext,
+): Promise<Milestone> {
+  const text = String(reference).trim()
+  let number: number
+  if (/^\d+$/.test(text)) number = Number(text)
+  else {
+    try {
+      number = (await resolveMilestone(repo, text, { create: false }, ctx)).number
+    } catch (error) {
+      if (!isToolError(error) || error.code !== "invalid_argument") throw error
+      throw new ToolError("not_found", `Milestone "${text}" was not found.`)
+    }
+  }
+  const found = milestones.find((row) => row.number === number)
+  if (!found) throw new ToolError("not_found", `Milestone "${text}" was not found.`)
+  return found
+}
+
+export type MilestoneBody = Partial<Pick<Milestone, "title" | "description" | "state">> & { due_on?: string | null }
+
+export function milestoneDue(date: string): string {
+  // Noon UTC is the time GitHub uses to show the requested due date across time zones.
+  return `${date}T12:00:00Z`
+}
+
+export async function writeMilestone(
+  repo: RepoName,
+  body: MilestoneBody,
+  ctx: RefContext,
+  number?: number,
+): Promise<Milestone> {
+  const raw = await ghJson<RestMilestone>(
+    [
+      "api",
+      "-X",
+      number === undefined ? "POST" : "PATCH",
+      `${milestonesPath(repo)}${number === undefined ? "" : `/${number}`}`,
+      "--input",
+      "-",
+    ],
+    { ...ctx, stdin: JSON.stringify(body) },
+  )
+  if (!raw) throw new ToolError("github_error", "GitHub did not return the milestone it wrote.")
+  return fromRest(raw)
+}
 
 type RawMilestoneRow = {
   number: number
