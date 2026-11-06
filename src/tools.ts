@@ -36,6 +36,7 @@ import { labelDelete } from "./core/repos/label-delete"
 import { milestoneCreate } from "./core/repos/milestone-create"
 import { milestoneEdit } from "./core/repos/milestone-edit"
 import { milestoneRead } from "./core/repos/milestone-read"
+import { repoCreate } from "./core/repos/repo-create"
 import { repoRead } from "./core/repos/repo-read"
 import { rulesetRead } from "./core/repos/ruleset-read"
 
@@ -82,4 +83,5 @@ export const ALL_TOOLS: ToolSpec[] = [
   labelDelete,
   milestoneCreate,
   milestoneEdit,
+  repoCreate,
 ]
