@@ -21,6 +21,7 @@ const EXPECTED_TARGETS: Record<string, Record<string, TargetKind>> = {
   github_repo_visibility: { repo: "repo" },
   github_repo_archive: { repo: "repo" },
   github_repo_unarchive: { repo: "repo" },
+  github_ruleset_create: { repo: "repo" },
   github_issue_create: { repo: "repo", parent: "issue", blocked_by: "issues", project: "optional_board" },
   github_issue_edit: { issue: "issue", repo: "repo" },
   github_issue_comment: { issue: "issue", repo: "repo" },

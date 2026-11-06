@@ -46,6 +46,7 @@ provides_tools:
   - github_repo_read
   - github_repo_unarchive
   - github_repo_visibility
+  - github_ruleset_create
   - github_ruleset_read
   - github_stack_link
   - github_stack_read
