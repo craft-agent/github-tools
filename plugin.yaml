@@ -33,6 +33,7 @@ provides_tools:
   - github_project_read
   - github_project_unlink
   - github_project_view_ensure
+  - github_repo_read
   - github_stack_link
   - github_stack_read
   - github_stack_unlink
