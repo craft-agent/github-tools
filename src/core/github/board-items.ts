@@ -1,6 +1,12 @@
 import { z } from "zod"
 import { graphql, paginate } from "../gh"
 import type { RefContext } from "../refs"
+import {
+  isIssueFieldsMissingError,
+  issueFieldValueOf,
+  ISSUE_FIELD_VALUE_SELECTION,
+  type RawIssueFieldValue,
+} from "./issue-fields"
 import { stateWord } from "./issues"
 import { readKind } from "./kind"
 
@@ -18,8 +24,11 @@ const FIELD_PULL_REQUESTS = 10
 
 const FIELD_NAME = "field{... on ProjectV2FieldCommon{name}}"
 
-/** `state` is aliased in each branch: an issue's and a pull request's states are different enums, which one response key cannot hold. */
-const ITEM_FIELDS = `id isArchived
+function itemFields(includeIssueFields = true): string {
+  const issueFieldSelection = includeIssueFields
+    ? `\n ... on ProjectV2ItemIssueFieldValue{${FIELD_NAME} issueFieldValue{${ISSUE_FIELD_VALUE_SELECTION}}}`
+    : ""
+  return `id isArchived
 fieldValues(first:${FIELD_VALUES}){nodes{
  ... on ProjectV2ItemFieldTextValue{text ${FIELD_NAME}}
  ... on ProjectV2ItemFieldNumberValue{number ${FIELD_NAME}}
@@ -30,16 +39,26 @@ fieldValues(first:${FIELD_VALUES}){nodes{
  ... on ProjectV2ItemFieldRepositoryValue{repository{nameWithOwner} ${FIELD_NAME}}
  ... on ProjectV2ItemFieldLabelValue{labels(first:${FIELD_LABELS}){nodes{name}} ${FIELD_NAME}}
  ... on ProjectV2ItemFieldUserValue{users(first:${FIELD_USERS}){nodes{login}} ${FIELD_NAME}}
- ... on ProjectV2ItemFieldPullRequestValue{pullRequests(first:${FIELD_PULL_REQUESTS}){nodes{number}} ${FIELD_NAME}}
+ ... on ProjectV2ItemFieldPullRequestValue{pullRequests(first:${FIELD_PULL_REQUESTS}){nodes{number}} ${FIELD_NAME}}${issueFieldSelection}
 }}
 content{__typename
  ... on DraftIssue{id title body}
  ... on Issue{number title url issueState: state repository{nameWithOwner} issueType{name} labels(first:${CONTENT_LABELS}){nodes{name}} assignees(first:${CONTENT_ASSIGNEES}){nodes{login}} parent{number repository{nameWithOwner}} subIssuesSummary{total completed}}
  ... on PullRequest{number title url pullRequestState: state repository{nameWithOwner} labels(first:${CONTENT_LABELS}){nodes{name}} assignees(first:${CONTENT_ASSIGNEES}){nodes{login}}}
 }`
+}
 
-const ITEMS_QUERY = `query($id:ID!,$after:String){node(id:$id){... on ProjectV2{items(first:${PAGE_SIZE},after:$after){pageInfo{hasNextPage endCursor} nodes{${ITEM_FIELDS}}}}}}`
-const ITEM_QUERY = `query($id:ID!){node(id:$id){... on ProjectV2Item{${ITEM_FIELDS}}}}`
+const ITEM_FIELDS = itemFields(true)
+const ITEM_FIELDS_WITHOUT_ISSUE_FIELDS = itemFields(false)
+
+const itemsQuery = (fields: string) =>
+  `query($id:ID!,$after:String){node(id:$id){... on ProjectV2{items(first:${PAGE_SIZE},after:$after){pageInfo{hasNextPage endCursor} nodes{${fields}}}}}}`
+const itemQuery = (fields: string) => `query($id:ID!){node(id:$id){... on ProjectV2Item{${fields}}}}`
+
+const ITEMS_QUERY = itemsQuery(ITEM_FIELDS)
+const ITEMS_QUERY_WITHOUT_ISSUE_FIELDS = itemsQuery(ITEM_FIELDS_WITHOUT_ISSUE_FIELDS)
+const ITEM_QUERY = itemQuery(ITEM_FIELDS)
+const ITEM_QUERY_WITHOUT_ISSUE_FIELDS = itemQuery(ITEM_FIELDS_WITHOUT_ISSUE_FIELDS)
 
 export const iterationValueSchema = z.object({
   title: z.string(),
@@ -79,7 +98,7 @@ export const boardItemSchema = z.object({
   fields: z
     .record(z.string(), itemFieldValueSchema)
     .describe(
-      "Values by field name: text, number, date and single select as they are (the option's name), iteration as { title, start_date, duration }, milestone as its title, repository as owner/name, labels as names, users as logins, linked pull requests as numbers.",
+      "Values by field name: text, number, date and single select as they are (the option's name), a column mirroring an organization issue field as the issue's value (an option's name, or a list of names for a multi-select), iteration as { title, start_date, duration }, milestone as its title, repository as owner/name, labels as names, users as logins, linked pull requests as numbers.",
     ),
   content: itemContentSchema.nullable().describe("What the item stands for; null when GitHub did not return it."),
 })
@@ -92,6 +111,7 @@ type Nodes<T> = { nodes?: (T | null)[] | null } | null | undefined
 
 type RawFieldValue = {
   field?: { name?: string } | null
+  issueFieldValue?: RawIssueFieldValue | null
   text?: string | null
   number?: number | null
   date?: string | null
@@ -136,6 +156,7 @@ function nodesOf<T>(connection: Nodes<T>): T[] {
 
 /** One field value as the tools report it; `undefined` for a kind of value that is not reported. */
 function fieldValue(raw: RawFieldValue): ItemFieldValue | undefined {
+  if ("issueFieldValue" in raw) return issueFieldValueOf(raw.issueFieldValue)
   if ("text" in raw) return raw.text ?? null
   if ("number" in raw) return raw.number ?? null
   if ("date" in raw) return raw.date ?? null
@@ -210,13 +231,23 @@ export async function readBoardItems(
   projectId: string,
   ctx: RefContext,
 ): Promise<{ items: BoardItem[]; truncated: boolean }> {
-  const { items, truncated } = await paginate<RawItem | null>(
-    ITEMS_QUERY,
-    { id: projectId },
-    (data) => data?.node?.items,
-    { cwd: ctx.cwd, signal: ctx.signal, limit: MAX_BOARD_ITEMS },
-  )
-  return { items: items.filter((raw): raw is RawItem => raw != null).map(toItem), truncated }
+  const run = (query: string) =>
+    paginate<RawItem | null>(query, { id: projectId }, (data) => data?.node?.items, {
+      cwd: ctx.cwd,
+      signal: ctx.signal,
+      limit: MAX_BOARD_ITEMS,
+    })
+  let result: Awaited<ReturnType<typeof run>>
+  try {
+    result = await run(ITEMS_QUERY)
+  } catch (error) {
+    if (isIssueFieldsMissingError(error)) {
+      result = await run(ITEMS_QUERY_WITHOUT_ISSUE_FIELDS)
+    } else {
+      throw error
+    }
+  }
+  return { items: result.items.filter((raw): raw is RawItem => raw != null).map(toItem), truncated: result.truncated }
 }
 
 /** One item read on its own; `draftId` is the node ID of a draft's text (`DI_…`), which editing the draft takes. */
@@ -224,7 +255,16 @@ export type BoardItemRead = { item: BoardItem; draftId: string | null }
 
 /** One item by its node ID, in the shape `readBoardItems` gives; `null` when it does not exist or cannot be seen. */
 export async function readBoardItem(itemId: string, ctx: RefContext): Promise<BoardItemRead | null> {
-  const data = await graphql<{ node?: RawItem | null } | null>(ITEM_QUERY, { id: itemId }, ctx)
+  let data: { node?: RawItem | null } | null
+  try {
+    data = await graphql<{ node?: RawItem | null } | null>(ITEM_QUERY, { id: itemId }, ctx)
+  } catch (error) {
+    if (isIssueFieldsMissingError(error)) {
+      data = await graphql<{ node?: RawItem | null } | null>(ITEM_QUERY_WITHOUT_ISSUE_FIELDS, { id: itemId }, ctx)
+    } else {
+      throw error
+    }
+  }
   const raw = data?.node
   if (!raw?.id) return null
   return { item: toItem(raw), draftId: raw.content?.__typename === "DraftIssue" ? (raw.content.id ?? null) : null }

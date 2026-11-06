@@ -54,3 +54,18 @@ export const rawDraftContent = (title: string, body: string | null = null) => ({
 
 /** A single-select value of the `Status` field. */
 export const statusValue = (name: string) => ({ name, field: { name: "Status" } })
+
+/** A board item field value mirroring an organization issue field. */
+export const issueFieldValue = (
+  name: string,
+  issueFieldValue: {
+    __typename?: string
+    value?: string | number | null
+    name?: string | null
+    options?: ({ name?: string | null } | null)[] | null
+  } | null,
+) => ({
+  __typename: "ProjectV2ItemIssueFieldValue",
+  field: { name },
+  issueFieldValue,
+})

@@ -14,6 +14,7 @@ import { GraphQLToolError } from "../gh"
 import { parseRepo } from "../refs"
 import {
   isIssueFieldsMissingError,
+  issueFieldValueOf,
   issueFieldValues,
   issueFieldValuesSchema,
   planIssueFieldWrites,
@@ -92,6 +93,21 @@ describe("issueFieldValuesSchema", () => {
 })
 
 describe("issueFieldValues mapper", () => {
+  test("issueFieldValueOf extracts value per type or undefined", () => {
+    expect(issueFieldValueOf({ __typename: "IssueFieldTextValue", value: "hello" })).toBe("hello")
+    expect(issueFieldValueOf({ __typename: "IssueFieldNumberValue", value: 42 })).toBe(42)
+    expect(issueFieldValueOf({ __typename: "IssueFieldDateValue", value: "2026-11-30" })).toBe("2026-11-30")
+    expect(issueFieldValueOf({ __typename: "IssueFieldSingleSelectValue", name: "High" })).toBe("High")
+    expect(
+      issueFieldValueOf({ __typename: "IssueFieldMultiSelectValue", options: [{ name: "A" }, { name: "B" }] }),
+    ).toEqual(["A", "B"])
+    expect(issueFieldValueOf({ __typename: "IssueFieldMultiSelectValue", options: [] })).toBeUndefined()
+    expect(issueFieldValueOf({ __typename: "IssueFieldSingleSelectValue", name: null })).toBeUndefined()
+    expect(issueFieldValueOf({ __typename: "Unknown", value: "foo" })).toBeUndefined()
+    expect(issueFieldValueOf(null)).toBeUndefined()
+    expect(issueFieldValueOf(undefined)).toBeUndefined()
+  })
+
   test("maps each of the five value types", () => {
     const nodes: RawIssueFieldValue[] = [
       {
@@ -219,6 +235,24 @@ describe("isIssueFieldsMissingError", () => {
     const message = "Field 'isIssueField' doesn't exist on type 'ProjectV2Field'"
     expect(isIssueFieldsMissingError(new GraphQLToolError("github_error", message, [{ message }], null))).toBe(true)
     expect(isIssueFieldsMissingError(new ToolError("github_error", message))).toBe(true)
+  })
+
+  test("detects ProjectV2ItemIssueFieldValue missing from schema", () => {
+    const message = "No such type ProjectV2ItemIssueFieldValue, so it can't be a fragment condition"
+    expect(isIssueFieldsMissingError(new GraphQLToolError("github_error", message, [{ message }], null))).toBe(true)
+    expect(isIssueFieldsMissingError(new ToolError("github_error", message))).toBe(true)
+  })
+
+  test("detects ProjectV2IssueFieldValues missing from schema", () => {
+    const message = "No such type ProjectV2IssueFieldValues, so it can't be a fragment condition"
+    expect(isIssueFieldsMissingError(new GraphQLToolError("github_error", message, [{ message }], null))).toBe(true)
+    expect(isIssueFieldsMissingError(new ToolError("github_error", message))).toBe(true)
+  })
+
+  test("ignores unrelated missing type errors", () => {
+    const message = "No such type Foo, so it can't be a fragment condition"
+    expect(isIssueFieldsMissingError(new GraphQLToolError("github_error", message, [{ message }], null))).toBe(false)
+    expect(isIssueFieldsMissingError(new ToolError("github_error", message))).toBe(false)
   })
 })
 
