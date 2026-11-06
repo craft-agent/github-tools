@@ -12,6 +12,8 @@ provides_tools:
   - github_issue_read
   - github_issue_relate
   - github_issue_reopen
+  - github_label_read
+  - github_milestone_read
   - github_pr_close
   - github_pr_comment
   - github_pr_create
