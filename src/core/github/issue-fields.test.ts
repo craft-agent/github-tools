@@ -1,7 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { installFakeGh, type FakeGh, type GhRule } from "../../testing/fake-gh"
 import { gqlErrors } from "../../testing/gql"
-import { ISSUE_FIELD_NODES, issueFieldDefinitionsRule, sent } from "../../testing/write-fixtures"
+import {
+  ISSUE_FIELD_NODES,
+  ISSUE_FIELD_MUTATION,
+  issueFieldDefinitionsRule,
+  issueFieldValuesRule,
+  issueFieldsSetRule,
+  sent,
+} from "../../testing/write-fixtures"
 import { ToolError } from "../errors"
 import { GraphQLToolError } from "../gh"
 import { parseRepo } from "../refs"
@@ -11,6 +18,8 @@ import {
   issueFieldValuesSchema,
   planIssueFieldWrites,
   readIssueFieldDefinitions,
+  readIssueFieldValuesById,
+  writeIssueFields,
   type IssueFieldDefinition,
   type RawIssueFieldValue,
 } from "./issue-fields"
@@ -334,5 +343,61 @@ describe("planIssueFieldWrites", () => {
 
   test("a multi select needs an option and points to clearing", () => {
     expect(refusal(() => plan({ Components: [] }))).toContain("clear_issue_fields")
+  })
+})
+
+describe("writeIssueFields", () => {
+  test("sets and clears in one mutation with each value in its input", async () => {
+    const installed = useFake([issueFieldsSetRule()])
+    await writeIssueFields(
+      "I_12",
+      [
+        { fieldId: "IF_sprint", textValue: 'Say "hi"' },
+        { fieldId: "IF_effort", numberValue: 2.5 },
+        { fieldId: "IF_target", dateValue: "2026-12-01" },
+        { fieldId: "IF_priority", singleSelectOptionId: "IFO_high" },
+        { fieldId: "IF_components", multiSelectOptionIds: ["IFO_ui", "IFO_api"] },
+        { fieldId: "IF_old", delete: true },
+      ],
+      CTX,
+    )
+    const calls = sent(installed)
+    expect(calls).toHaveLength(1)
+    const text = calls[0]!.join(" ")
+    expect(text).toContain("issueId:$issueId")
+    expect(text).toContain(
+      'issueFields:[{fieldId:"IF_sprint",textValue:"Say \\"hi\\""},{fieldId:"IF_effort",numberValue:2.5},{fieldId:"IF_target",dateValue:"2026-12-01"},{fieldId:"IF_priority",singleSelectOptionId:"IFO_high"},{fieldId:"IF_components",multiSelectOptionIds:["IFO_ui","IFO_api"]},{fieldId:"IF_old",delete:true}]',
+    )
+    expect(calls[0]).toContain("issueId=I_12")
+  })
+
+  test("an empty list sends nothing", async () => {
+    const installed = useFake([issueFieldsSetRule()])
+    await writeIssueFields("I_12", [], CTX)
+    expect(sent(installed)).toEqual([])
+  })
+
+  test("a failure is thrown with the code GitHub's error maps to", async () => {
+    useFake([
+      {
+        match: ISSUE_FIELD_MUTATION,
+        stdout: gqlErrors([{ type: "VALIDATION", message: "Date is invalid" }]),
+      },
+    ])
+    await expect(writeIssueFields("I_12", [{ fieldId: "IF_target", dateValue: "2026-12-01" }], CTX)).rejects.toThrow(
+      "Date is invalid",
+    )
+  })
+})
+
+describe("readIssueFieldValuesById", () => {
+  test("maps the issue's field values", async () => {
+    useFake([
+      issueFieldValuesRule([
+        { __typename: "IssueFieldSingleSelectValue", field: { name: "Priority" }, name: "High" },
+        { __typename: "IssueFieldNumberValue", field: { name: "Effort" }, value: 3 },
+      ]),
+    ])
+    expect(await readIssueFieldValuesById("I_12", CTX)).toEqual({ Priority: "High", Effort: 3 })
   })
 })

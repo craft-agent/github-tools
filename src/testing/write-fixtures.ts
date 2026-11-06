@@ -13,6 +13,8 @@ export const MILESTONES = "milestones\\?state=all"
 export const MILESTONE_CREATE = "-X POST"
 export const FIELDS = "labels\\(first:100\\)"
 export const ISSUE_FIELD_DEFINITIONS = "issueFields\\(first"
+export const ISSUE_FIELD_VALUES = "issueFieldValues\\(first"
+export const ISSUE_FIELD_MUTATION = "setIssueFieldValue"
 
 /** The repository query's reply: `octo/hello` unless `repo` says otherwise, owned by the viewer unless `viewer` does. */
 export function repositoryRule(options: { repo?: string; permission?: string | null; viewer?: string } = {}): GhRule {
@@ -124,6 +126,18 @@ export const ISSUE_FIELD_NODES = [
 export const issueFieldDefinitionsRule = (nodes: unknown[] | null = ISSUE_FIELD_NODES): GhRule => ({
   match: ISSUE_FIELD_DEFINITIONS,
   stdout: gqlReply({ repository: { issueFields: nodes === null ? null : { nodes } } }),
+})
+
+/** The mutation that sets and clears issue fields succeeding. */
+export const issueFieldsSetRule = (): GhRule => ({
+  match: ISSUE_FIELD_MUTATION,
+  stdout: gqlReply({ setIssueFieldValue: { issueFieldValues: [] } }),
+})
+
+/** The values of the issue's fields as the read after a write returns them. */
+export const issueFieldValuesRule = (nodes: unknown[]): GhRule => ({
+  match: ISSUE_FIELD_VALUES,
+  stdout: gqlReply({ node: { issueFieldValues: { nodes } } }),
 })
 
 /** What `gh issue create` prints: the new issue's URL. */

@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { ToolError, isToolError } from "../errors"
-import { GraphQLToolError, graphql } from "../gh"
+import { GraphQLToolError, graphql, lit } from "../gh"
 import type { RefContext, RepoName } from "../refs"
 import { dateOf, listOf, numberOf, textOf, type FieldValue } from "./board-field-values"
 import { sameTitle } from "./projects"
@@ -102,6 +102,8 @@ export const ISSUE_FIELDS_ARGUMENT =
 const MAX_ISSUE_FIELDS = 25
 
 const DEFINITIONS_QUERY = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){issueFields(first:${MAX_ISSUE_FIELDS}){nodes{__typename ... on IssueFieldCommon{name dataType} ... on IssueFieldText{id} ... on IssueFieldNumber{id} ... on IssueFieldDate{id} ... on IssueFieldSingleSelect{id options{id name}} ... on IssueFieldMultiSelect{id options{id name}}}}}}`
+
+const VALUES_QUERY = `query($id:ID!){node(id:$id){... on Issue{${ISSUE_FIELD_VALUES_FRAGMENT}}}}`
 
 const issueFieldTypes = {
   TEXT: "text",
@@ -275,4 +277,43 @@ export function planIssueFieldWrites(
     writes.push({ fieldId: field.id, delete: true })
   }
   return writes
+}
+
+/** One write as a GraphQL input object literal; the values are checked, so the number is a finite one. */
+function writeLiteral(write: IssueFieldWrite): string {
+  const parts = [`fieldId:${lit(write.fieldId)}`]
+  if (write.textValue !== undefined) parts.push(`textValue:${lit(write.textValue)}`)
+  if (write.numberValue !== undefined) parts.push(`numberValue:${write.numberValue}`)
+  if (write.dateValue !== undefined) parts.push(`dateValue:${lit(write.dateValue)}`)
+  if (write.singleSelectOptionId !== undefined) parts.push(`singleSelectOptionId:${lit(write.singleSelectOptionId)}`)
+  if (write.multiSelectOptionIds !== undefined) {
+    parts.push(`multiSelectOptionIds:[${write.multiSelectOptionIds.map(lit).join(",")}]`)
+  }
+  if (write.delete) parts.push("delete:true")
+  return `{${parts.join(",")}}`
+}
+
+/** Sets and clears the issue's fields in one call; nothing is sent for an empty list. A failure keeps the code `graphql` maps it to. */
+export async function writeIssueFields(
+  issueId: string,
+  writes: readonly IssueFieldWrite[],
+  ctx: RefContext,
+): Promise<void> {
+  if (writes.length === 0) return
+  const inputs = writes.map(writeLiteral).join(",")
+  await graphql(
+    `mutation($issueId:ID!){setIssueFieldValue(input:{issueId:$issueId,issueFields:[${inputs}]}){issueFieldValues{__typename}}}`,
+    { issueId },
+    ctx,
+  )
+}
+
+/** The values of the issue's fields by the issue's node id, as `issueFieldValues` maps them. */
+export async function readIssueFieldValuesById(issueId: string, ctx: RefContext): Promise<IssueFieldValues> {
+  const data = await graphql<{ node?: { issueFieldValues?: IssueFieldValueConnection } | null } | null>(
+    VALUES_QUERY,
+    { id: issueId },
+    ctx,
+  )
+  return issueFieldValues(data?.node?.issueFieldValues)
 }
