@@ -83,9 +83,17 @@ open board of that owner and title, so calling it again is safe.
 - `link_repo` links the board to a repository of the **same owner**; GitHub
   links no other. A personal board cannot be linked to an organization's
   repository.
+- `dates: "issue_fields"` (an organization's board only) makes the dates the
+  organization's issue fields **Start date** and **Target date** instead of
+  the board's own Start and Target: an issue then carries the same dates on
+  every board, they are set with `issue_fields` in `github_issue_edit` (the
+  board tools refuse them), and a pull request or draft has none. It is
+  refused before a board is made when the owner is a user or the organization
+  lacks either field. Use it when the user wants dates shared across boards.
 - **Tell the user to set the Roadmap view's date fields.** No API can set
   them, so the roadmap shows no bars until, in the web UI, the view's
-  "Date fields" are set to Start and Target. `notes` in the result says so;
+  "Date fields" are set to Start and Target (or Start date and Target date).
+  `notes` in the result says so;
   pass it on.
 
 `github_project_field_ensure` and `github_project_view_ensure` add one field or
