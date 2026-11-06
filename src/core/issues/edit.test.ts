@@ -29,6 +29,7 @@ describe("one gh issue edit", () => {
       changed: ["title"],
       kind: null,
       milestone: null,
+      issue_fields: null,
       foreign: false,
     })
     expect(commands(installed)).toEqual([{ args: [...EDIT, "--title", "New title"], stdin: "" }])

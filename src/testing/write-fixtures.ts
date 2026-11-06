@@ -5,6 +5,9 @@ import { gqlReply } from "./gql"
 
 export const ORIGIN = "https://github.com/octo/hello.git"
 
+/** The node id `issueFieldsRule` gives the issue unless it is told another. */
+export const ISSUE_ID = "I_12"
+
 /** Each is a token only one of the queries holds, so a fake `gh` rule can pick it. */
 export const REPOSITORY = "viewerPermission"
 export const ISSUE_TYPES = "issueTypes\\(first"
@@ -78,14 +81,15 @@ export const writeRules = (...rules: GhRule[]): GhRule[] => [
   { match: "^issue edit" },
 ]
 
-/** The state, body and labels of the issue, as the fields query returns them. */
+/** The node id, state, body and labels of the issue, as the fields query returns them. */
 export const issueFieldsRule = (
-  fields: { state?: string; stateReason?: string | null; body?: string; labels?: string[] } = {},
+  fields: { id?: string; state?: string; stateReason?: string | null; body?: string; labels?: string[] } = {},
 ): GhRule => ({
   match: FIELDS,
   stdout: gqlReply({
     repository: {
       issue: {
+        id: fields.id ?? ISSUE_ID,
         state: fields.state ?? "OPEN",
         stateReason: fields.stateReason ?? null,
         body: fields.body ?? "",

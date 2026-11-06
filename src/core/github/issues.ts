@@ -236,7 +236,7 @@ const LINKED_BRANCHES_QUERY = `query($owner:String!,$name:String!,$n:Int!){repos
 const CREATE_LINKED_BRANCH_MUTATION = `mutation($issueId:ID!,$oid:GitObjectID!,$repositoryId:ID!,$name:String){createLinkedBranch(input:{issueId:$issueId,oid:$oid,repositoryId:$repositoryId,name:$name}){linkedBranch{ref{name repository{nameWithOwner}}}}}`
 
 const FIELDS_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){issue(number:$n){
-  state stateReason body labels(first:${MAX_LABELS}){nodes{name}}
+  id state stateReason body labels(first:${MAX_LABELS}){nodes{name}}
 }}}`
 
 /**
@@ -453,18 +453,19 @@ export async function searchIssues(
   return { issues, truncated }
 }
 
-/** What a write needs to know about an issue before it changes it: its state and reason (as `stateWord` gives them), body and labels. */
-export type IssueFields = { state: string; state_reason: string | null; body: string; labels: string[] }
+/** What a write needs to know about an issue before it changes it: its node id, state and reason (as `stateWord` gives them), body and labels. */
+export type IssueFields = { id: string; state: string; state_reason: string | null; body: string; labels: string[] }
 
-/** The state, body and labels of one issue, in one small read. */
+/** The node id, state, body and labels of one issue, in one small read. */
 export async function readIssueFields(ref: { repo: RepoName; number: number }, ctx: RefContext): Promise<IssueFields> {
-  const issue = await readIssueData<Pick<RawIssue, "state" | "stateReason" | "body" | "labels">>(
+  const issue = await readIssueData<Pick<RawIssue, "id" | "state" | "stateReason" | "body" | "labels">>(
     FIELDS_QUERY,
     ref,
     {},
     ctx,
   )
   return {
+    id: issue.id,
     state: stateWord(issue.state),
     state_reason: stateWord(issue.stateReason),
     body: issue.body ?? "",

@@ -54,6 +54,10 @@ const EXPECTED_TARGETS: Record<string, Record<string, TargetKind>> = {
 /** Arguments that look like they name a repository but do not make the call write to one, and why. */
 const NOT_TARGETS: Record<string, Record<string, string>> = {
   github_issue_close: { duplicate_of: "closing as a duplicate writes nothing to the original's repository" },
+  github_issue_edit: {
+    issue_fields: "field values of the issue it edits",
+    clear_issue_fields: "field names of the issue it edits",
+  },
   github_issue_relate: { remove_parent: "a flag; the parent is read from the issue" },
   github_project_field_ensure: { repo: "where the board lookup starts; nothing is written to it" },
   github_project_view_ensure: { repo: "where the board lookup starts; nothing is written to it" },

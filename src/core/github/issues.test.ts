@@ -452,11 +452,18 @@ describe("stateWord", () => {
 })
 
 describe("readIssueFields", () => {
-  test("reads the state, the reason, the body and the labels in one query", async () => {
+  test("reads the id, the state, the reason, the body and the labels in one query", async () => {
     const installed = useFake([
-      issueFieldsRule({ state: "CLOSED", stateReason: "NOT_PLANNED", body: "Text", labels: ["bug", "type:bug"] }),
+      issueFieldsRule({
+        id: "I_7",
+        state: "CLOSED",
+        stateReason: "NOT_PLANNED",
+        body: "Text",
+        labels: ["bug", "type:bug"],
+      }),
     ])
     expect(await readIssueFields(REF, CTX)).toEqual({
+      id: "I_7",
       state: "closed",
       state_reason: "not_planned",
       body: "Text",
@@ -473,9 +480,18 @@ describe("readIssueFields", () => {
 
   test("a missing body is empty and a missing reason is null", async () => {
     useFake([
-      { match: FIELDS, stdout: gqlReply({ repository: { issue: { state: "OPEN", body: null, labels: null } } }) },
+      {
+        match: FIELDS,
+        stdout: gqlReply({ repository: { issue: { id: "I_1", state: "OPEN", body: null, labels: null } } }),
+      },
     ])
-    expect(await readIssueFields(REF, CTX)).toEqual({ state: "open", state_reason: null, body: "", labels: [] })
+    expect(await readIssueFields(REF, CTX)).toEqual({
+      id: "I_1",
+      state: "open",
+      state_reason: null,
+      body: "",
+      labels: [],
+    })
   })
 
   test("an issue that does not exist is not_found", async () => {

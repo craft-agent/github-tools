@@ -40,6 +40,10 @@ describe("arguments", () => {
     ["nothing to change", {}],
     ["only empty lists and blanks", { append_body: "  ", add_labels: [], remove_assignees: [" "] }],
     ["remove_milestone: false alone", { remove_milestone: false }],
+    ["a blank issue field name", { issue_fields: { " ": "High" } }],
+    ["a blank name to clear", { clear_issue_fields: ["Priority", " "] }],
+    ["an issue field set and cleared", { issue_fields: { Priority: "High" }, clear_issue_fields: [" priority"] }],
+    ["empty issue fields alone", { issue_fields: {}, clear_issue_fields: [] }],
     ["a pull request URL", { title: "T", issue: "https://github.com/octo/hello/pull/12" }],
   ])("%s is invalid_argument, before any call to GitHub", async (_name, args) => {
     const installed = use(base())
