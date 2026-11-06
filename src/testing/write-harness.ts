@@ -27,8 +27,8 @@ export function writeHarness<I extends z.ZodObject<any>, O extends z.ZodObject<a
   })
 
   return {
-    use(rules: GhRule[]): FakeGh {
-      fake = installFakeGh(rules)
+    use(rules: GhRule[], options?: { version?: string }): FakeGh {
+      fake = installFakeGh(rules, options)
       return fake
     },
     run: (args: Record<string, unknown>) => invoke(spec, args, { cwd: repo.dir }),
