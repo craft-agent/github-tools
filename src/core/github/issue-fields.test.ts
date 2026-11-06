@@ -1,12 +1,69 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
+import { installFakeGh, type FakeGh, type GhRule } from "../../testing/fake-gh"
+import { gqlErrors } from "../../testing/gql"
+import { ISSUE_FIELD_NODES, issueFieldDefinitionsRule, sent } from "../../testing/write-fixtures"
 import { ToolError } from "../errors"
 import { GraphQLToolError } from "../gh"
+import { parseRepo } from "../refs"
 import {
   isIssueFieldsMissingError,
   issueFieldValues,
   issueFieldValuesSchema,
+  planIssueFieldWrites,
+  readIssueFieldDefinitions,
+  type IssueFieldDefinition,
   type RawIssueFieldValue,
 } from "./issue-fields"
+
+const CTX = { cwd: process.cwd() }
+const REPO = parseRepo("octo/hello")
+
+let fake: FakeGh | undefined
+
+afterEach(() => {
+  fake?.restore()
+  fake = undefined
+})
+
+function useFake(rules: GhRule[]): FakeGh {
+  fake = installFakeGh(rules)
+  return fake
+}
+
+const DEFINITIONS: IssueFieldDefinition[] = [
+  {
+    id: "IF_priority",
+    name: "Priority",
+    type: "single_select",
+    options: [
+      { id: "IFO_high", name: "High" },
+      { id: "IFO_low", name: "Low" },
+    ],
+  },
+  { id: "IF_effort", name: "Effort", type: "number", options: [] },
+  { id: "IF_target", name: "Target date", type: "date", options: [] },
+  { id: "IF_sprint", name: "Sprint", type: "text", options: [] },
+  {
+    id: "IF_components",
+    name: "Components",
+    type: "multi_select",
+    options: [
+      { id: "IFO_ui", name: "UI" },
+      { id: "IFO_api", name: "API" },
+    ],
+  },
+]
+
+function refusal(run: () => unknown): string {
+  try {
+    run()
+  } catch (error) {
+    expect(error).toBeInstanceOf(ToolError)
+    expect((error as ToolError).code).toBe("invalid_argument")
+    return (error as ToolError).message
+  }
+  throw new Error("expected the call to be refused")
+}
 
 describe("issueFieldValuesSchema", () => {
   test("accepts valid issue fields mapping", () => {
@@ -141,5 +198,141 @@ describe("isIssueFieldsMissingError", () => {
         null,
       ),
     ).toSatisfy((e) => !isIssueFieldsMissingError(e))
+  })
+
+  test("detects issueFields missing on Repository", () => {
+    const message = "Field 'issueFields' doesn't exist on type 'Repository'"
+    expect(isIssueFieldsMissingError(new GraphQLToolError("github_error", message, [{ message }], null))).toBe(true)
+    expect(isIssueFieldsMissingError(new ToolError("github_error", message))).toBe(true)
+  })
+})
+
+describe("readIssueFieldDefinitions", () => {
+  test("reads the fields of an organization with their types, ids and options", async () => {
+    const installed = useFake([issueFieldDefinitionsRule()])
+    expect(await readIssueFieldDefinitions(REPO, CTX)).toEqual(DEFINITIONS)
+    expect(sent(installed)).toHaveLength(1)
+  })
+
+  test("a field of a type this code does not know is left out", async () => {
+    useFake([
+      issueFieldDefinitionsRule([
+        ...ISSUE_FIELD_NODES.slice(1, 2),
+        { __typename: "IssueFieldFuture", id: "IF_x", name: "Future", dataType: "HOLOGRAM" },
+      ]),
+    ])
+    expect((await readIssueFieldDefinitions(REPO, CTX)).map((field) => field.name)).toEqual(["Effort"])
+  })
+
+  test("a personal account's repository has none", async () => {
+    useFake([issueFieldDefinitionsRule(null)])
+    expect(await readIssueFieldDefinitions(REPO, CTX)).toEqual([])
+  })
+
+  test("a GitHub without issue fields has none", async () => {
+    const message = "Field 'issueFields' doesn't exist on type 'Repository'"
+    useFake([{ match: "issueFields", stdout: gqlErrors([{ type: "undefinedField", message }]) }])
+    expect(await readIssueFieldDefinitions(REPO, CTX)).toEqual([])
+  })
+
+  test("another failure is thrown", async () => {
+    useFake([{ match: "issueFields", stderr: "HTTP 500", code: 1 }])
+    await expect(readIssueFieldDefinitions(REPO, CTX)).rejects.toBeInstanceOf(ToolError)
+  })
+})
+
+describe("planIssueFieldWrites", () => {
+  const plan = (values: Record<string, string | number | string[]>, clear: string[] = []) =>
+    planIssueFieldWrites(REPO, DEFINITIONS, values, clear)
+
+  test("turns each type into its input, matching names without regard to case", () => {
+    expect(
+      plan({
+        priority: "high",
+        EFFORT: 3,
+        "target DATE": "2026-12-01",
+        Sprint: "Sprint 4",
+        Components: ["ui", "API", "UI"],
+      }),
+    ).toEqual([
+      { fieldId: "IF_priority", singleSelectOptionId: "IFO_high" },
+      { fieldId: "IF_effort", numberValue: 3 },
+      { fieldId: "IF_target", dateValue: "2026-12-01" },
+      { fieldId: "IF_sprint", textValue: "Sprint 4" },
+      { fieldId: "IF_components", multiSelectOptionIds: ["IFO_ui", "IFO_api"] },
+    ])
+  })
+
+  test("a number may be a numeric string, and a multi select one name", () => {
+    expect(plan({ Effort: " -2.5 ", Components: "api" })).toEqual([
+      { fieldId: "IF_effort", numberValue: -2.5 },
+      { fieldId: "IF_components", multiSelectOptionIds: ["IFO_api"] },
+    ])
+  })
+
+  test("clearing is a delete, once per field", () => {
+    expect(plan({ Effort: 1 }, ["priority", "Priority", "Sprint"])).toEqual([
+      { fieldId: "IF_effort", numberValue: 1 },
+      { fieldId: "IF_priority", delete: true },
+      { fieldId: "IF_sprint", delete: true },
+    ])
+  })
+
+  test("nothing to set or clear gives no writes, even without definitions", () => {
+    expect(planIssueFieldWrites(REPO, [], {}, [])).toEqual([])
+  })
+
+  test("a repository without issue fields refuses both setting and clearing", () => {
+    expect(refusal(() => planIssueFieldWrites(REPO, [], { Priority: "High" }, []))).toContain(
+      "octo/hello has no issue fields",
+    )
+    expect(refusal(() => planIssueFieldWrites(REPO, [], {}, ["Priority"]))).toContain("octo/hello has no issue fields")
+  })
+
+  test("an unknown field names the fields", () => {
+    const message = refusal(() => plan({ Severity: "High" }))
+    expect(message).toContain('no issue field "Severity"')
+    expect(message).toContain('"Priority", "Effort", "Target date", "Sprint", "Components"')
+    expect(refusal(() => plan({}, ["Severity"]))).toContain('no issue field "Severity"')
+  })
+
+  test("an unknown option names the options", () => {
+    expect(refusal(() => plan({ Priority: "Urgent" }))).toContain('no option "Urgent". Options: "High", "Low"')
+    expect(refusal(() => plan({ Components: ["UI", "Docs"] }))).toContain('no option "Docs". Options: "UI", "API"')
+  })
+
+  test("a field named twice is refused", () => {
+    expect(refusal(() => plan({ Priority: "High", priority: "Low" }))).toContain('names "Priority" twice')
+    expect(refusal(() => plan({ Priority: "High" }, ["priority"]))).toContain('"Priority" is in both')
+  })
+
+  test("a text takes a string, not a number", () => {
+    expect(refusal(() => plan({ Sprint: 4 }))).toContain('"Sprint" takes text as text; got the number 4')
+  })
+
+  test("a number must be a number", () => {
+    expect(refusal(() => plan({ Effort: "lots" }))).toContain('"Effort" takes a number; got "lots"')
+    expect(refusal(() => plan({ Effort: "NaN" }))).toContain('"Effort" takes a number')
+  })
+
+  test("a date must be a real YYYY-MM-DD", () => {
+    expect(refusal(() => plan({ "Target date": "2026-02-30" }))).toContain('"Target date" takes a date as YYYY-MM-DD')
+    expect(refusal(() => plan({ "Target date": "12/01/2026" }))).toContain("YYYY-MM-DD")
+    expect(refusal(() => plan({ "Target date": 20261201 }))).toContain('"Target date" takes a date as text')
+  })
+
+  test("a single select takes one option, not a list", () => {
+    const message = refusal(() => plan({ Priority: ["High"] }))
+    expect(message).toContain('"Priority" takes one option name, not a list')
+    expect(message).toContain('Options: "High", "Low"')
+  })
+
+  test("a list is refused for the other single-valued types", () => {
+    expect(refusal(() => plan({ Effort: ["1"] }))).toContain('"Effort" takes a number, not a list')
+    expect(refusal(() => plan({ Sprint: ["a"] }))).toContain('"Sprint" takes text, not a list')
+  })
+
+  test("a multi select needs an option and points to clearing", () => {
+    expect(refusal(() => plan({ Components: [] }))).toContain("clear_issue_fields")
   })
 })

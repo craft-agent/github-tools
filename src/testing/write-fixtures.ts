@@ -12,6 +12,7 @@ export const LABEL = "label\\(name:"
 export const MILESTONES = "milestones\\?state=all"
 export const MILESTONE_CREATE = "-X POST"
 export const FIELDS = "labels\\(first:100\\)"
+export const ISSUE_FIELD_DEFINITIONS = "issueFields\\(first"
 
 /** The repository query's reply: `octo/hello` unless `repo` says otherwise, owned by the viewer unless `viewer` does. */
 export function repositoryRule(options: { repo?: string; permission?: string | null; viewer?: string } = {}): GhRule {
@@ -90,6 +91,39 @@ export const issueFieldsRule = (
       },
     },
   }),
+})
+
+/** An organization's issue fields as the definitions query returns them: one of each type. */
+export const ISSUE_FIELD_NODES = [
+  {
+    __typename: "IssueFieldSingleSelect",
+    id: "IF_priority",
+    name: "Priority",
+    dataType: "SINGLE_SELECT",
+    options: [
+      { id: "IFO_high", name: "High" },
+      { id: "IFO_low", name: "Low" },
+    ],
+  },
+  { __typename: "IssueFieldNumber", id: "IF_effort", name: "Effort", dataType: "NUMBER" },
+  { __typename: "IssueFieldDate", id: "IF_target", name: "Target date", dataType: "DATE" },
+  { __typename: "IssueFieldText", id: "IF_sprint", name: "Sprint", dataType: "TEXT" },
+  {
+    __typename: "IssueFieldMultiSelect",
+    id: "IF_components",
+    name: "Components",
+    dataType: "MULTI_SELECT",
+    options: [
+      { id: "IFO_ui", name: "UI" },
+      { id: "IFO_api", name: "API" },
+    ],
+  },
+]
+
+/** The repository's issue fields: these definitions, or none (`null`, as a personal account's repository answers). */
+export const issueFieldDefinitionsRule = (nodes: unknown[] | null = ISSUE_FIELD_NODES): GhRule => ({
+  match: ISSUE_FIELD_DEFINITIONS,
+  stdout: gqlReply({ repository: { issueFields: nodes === null ? null : { nodes } } }),
 })
 
 /** What `gh issue create` prints: the new issue's URL. */
