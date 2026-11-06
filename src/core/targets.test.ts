@@ -276,7 +276,7 @@ describe("writeTargets", () => {
 
 describe("the issue write tools' targets", () => {
   test.each([
-    [issueCreate.id, issueCreate, { repo: "repo", parent: "issue", blocked_by: "issues" }],
+    [issueCreate.id, issueCreate, { repo: "repo", parent: "issue", blocked_by: "issues", project: "optional_board" }],
     [issueEdit.id, issueEdit, { issue: "issue", repo: "repo" }],
     [issueComment.id, issueComment, { issue: "issue", repo: "repo" }],
     [issueClose.id, issueClose, { issue: "issue", repo: "repo" }],
@@ -414,6 +414,12 @@ describe("an optional board target", () => {
     useFake([])
     const args = { head: "x", title: "t", project: "craftsamo/1", repo: "a/b" }
     expect(await writeTargets(prCreate, args, { cwd: tree() })).toEqual(["a/b", "craftsamo/projects/1"])
+  })
+
+  test("issue create names the repository and the board", async () => {
+    useFake([])
+    const args = { title: "t", project: "craftsamo/1", repo: "a/b" }
+    expect(await writeTargets(issueCreate, args, { cwd: tree() })).toEqual(["a/b", "craftsamo/projects/1"])
   })
 })
 

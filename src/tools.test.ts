@@ -11,7 +11,7 @@ const PR_TARGETS: Record<string, TargetKind> = { pr: "pull", repo: "repo" }
  * on purpose: an undeclared one would be written to without being asked for.
  */
 const EXPECTED_TARGETS: Record<string, Record<string, TargetKind>> = {
-  github_issue_create: { repo: "repo", parent: "issue", blocked_by: "issues" },
+  github_issue_create: { repo: "repo", parent: "issue", blocked_by: "issues", project: "optional_board" },
   github_issue_edit: { issue: "issue", repo: "repo" },
   github_issue_comment: { issue: "issue", repo: "repo" },
   github_issue_close: { issue: "issue", repo: "repo" },
