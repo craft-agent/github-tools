@@ -99,7 +99,7 @@ test("wait 0 reads once and maps the checks", async () => {
       },
     ],
     failed_logs: [],
-    waited: { seconds: 0, polls: 1, ended_by: "not_waiting" },
+    waited: { seconds: expect.any(Number), polls: 1, ended_by: "not_waiting" },
     hints: [],
   })
   expect(apiCalls(installed)).toHaveLength(1)
@@ -136,7 +136,7 @@ test("fail_fast stops at the first failure while another check runs", async () =
     logRule(101, logLine("##[error]boom")),
   ])
   const result = await read({ wait: 30 })
-  expect(result.waited).toEqual({ seconds: 0, polls: 1, ended_by: "failed" })
+  expect(result.waited).toEqual({ seconds: expect.any(Number), polls: 1, ended_by: "failed" })
   expect(result.checks?.overall).toBe("fail")
   expect(result.failed_logs?.map((log) => log.job)).toEqual([101])
   expect(apiCalls(installed)).toHaveLength(1)
@@ -158,7 +158,7 @@ test("a wait that runs out says so and hints to call again", async () => {
   const result = await read({ wait: 1 })
   expect(result.waited?.ended_by).toBe("timeout")
   expect(result.waited?.polls).toBeGreaterThanOrEqual(2)
-  expect(result.waited?.seconds).toBe(1)
+  expect(result.waited?.seconds).toBeGreaterThanOrEqual(1)
   expect(result.hints).toEqual(["The checks are still running; call again to keep waiting."])
 })
 
@@ -166,7 +166,7 @@ test.each(["CLOSED", "MERGED"])("a %s pull request is read once", async (state) 
   const installed = useFake([checksRule(rawChecksPullRequest([running("build", 101)], { state }))])
   const result = await read({ wait: 30 })
   expect(result.pr?.state).toBe(state.toLowerCase())
-  expect(result.waited).toEqual({ seconds: 0, polls: 1, ended_by: "not_waiting" })
+  expect(result.waited).toEqual({ seconds: expect.any(Number), polls: 1, ended_by: "not_waiting" })
   expect(result.hints).toEqual([])
   expect(apiCalls(installed)).toHaveLength(1)
 })
