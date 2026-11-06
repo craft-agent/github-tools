@@ -1,5 +1,5 @@
 import { isAbortError } from "../errors"
-import { gh } from "../gh"
+import { GhCallError, gh } from "../gh"
 import { resolveRelatedIssue, type IssueRef } from "../github/issue-refs"
 import {
   readPullRequestState,
@@ -7,9 +7,9 @@ import {
   type PullRequestRef,
   type PullRequestState,
 } from "../github/pull-requests"
-import { given } from "../issues/write-support"
+import { given, lastUrl } from "../issues/write-support"
 import type { RepoName } from "../refs"
-import type { TargetKind, ToolContext } from "../tool"
+import type { StepErrors, TargetKind, ToolContext } from "../tool"
 import { issueKey } from "./closes"
 import { pause } from "./wait"
 
@@ -33,6 +33,37 @@ export function editPullRequest(
     signal: ctx.signal,
     stdin,
   })
+}
+
+/** The step under `errors` that names a failed upload. */
+export const ATTACHMENTS_STEP = "attachments"
+
+/**
+ * The failure of a `gh` call that attached files and still printed a URL: some
+ * uploads failed, and `gh` made or changed the pull request (or comment)
+ * with the others. `undefined` for any other failure.
+ */
+export function partialUpload(error: unknown): GhCallError | undefined {
+  return error instanceof GhCallError && lastUrl(error.stdout) !== undefined ? error : undefined
+}
+
+/**
+ * Runs a `gh` call that may carry attachments and returns its stdout. A partial
+ * upload does not fail the call: it is recorded under `errors.attachments` of
+ * `steps` and the stdout `gh` printed is returned.
+ */
+export async function settleUpload(call: () => Promise<string>, attached: boolean, steps: StepErrors): Promise<string> {
+  if (!attached) return call()
+  try {
+    return await call()
+  } catch (error) {
+    const partial = partialUpload(error)
+    if (!partial) throw error
+    await steps.record(ATTACHMENTS_STEP, async () => {
+      throw partial
+    })
+    return partial.stdout
+  }
 }
 
 /** The issues a list argument names, without blanks or repeats; a bare number means the pull request's repository. No call to GitHub is made. */

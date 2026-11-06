@@ -1,6 +1,13 @@
 import { z } from "zod"
+import {
+  ATTACHMENTS_NOTE,
+  attachmentsArgument,
+  attachmentsResultSchema,
+  prepareAttachments,
+  sentAttachments,
+} from "../attachments"
 import { ToolError, isAbortError, isToolError, type ErrorCode } from "../errors"
-import { gh, ghJson } from "../gh"
+import { ATTACH_MIN_GH_VERSION, ensureGhAtLeast, gh, ghJson } from "../gh"
 import { planFieldValues } from "../github/board-field-values"
 import { readBoardFields } from "../github/board-fields"
 import { addContentToBoard } from "../github/board-item-write"
@@ -22,7 +29,15 @@ import { BOARD_LOOKUP_NOTE, PROJECT_SCOPE_NOTE, boardSummary, boardSummarySchema
 import { resolveRepo, type RepoName } from "../refs"
 import { StepErrors, defineTool, type ToolContext } from "../tool"
 import { CLOSES_DESCRIPTION, withClosing } from "./closes"
-import { closingNotes, editPullRequest, resolveClosing, settledClosingState, type ClosingChange } from "./write-support"
+import {
+  ATTACHMENTS_STEP,
+  closingNotes,
+  editPullRequest,
+  partialUpload,
+  resolveClosing,
+  settledClosingState,
+  type ClosingChange,
+} from "./write-support"
 
 const PULL_URL = /\/pull\/(\d+)$/
 const SHA_PATTERN = /^[0-9a-f]{40}$/i
@@ -63,6 +78,7 @@ const input = z.object({
     .describe(
       'Board field values to set, by field name: {"Target": "2026-12-01"}; needs project. A Status given here replaces the Todo default.',
     ),
+  attachments: attachmentsArgument,
 })
 
 const output = z.object({
@@ -82,6 +98,7 @@ const output = z.object({
     })
     .nullable()
     .describe("The board item; null when no project was given or its step failed."),
+  attachments: attachmentsResultSchema,
   notes: z.array(z.string()).describe("What to know about the result; [] when nothing."),
   foreign: z.boolean(),
   errors: stepErrorsSchema,
@@ -131,17 +148,35 @@ async function findOpenPullRequest(
   return open?.[0]
 }
 
+/** A failure `gh pr create` reported for a pull request that exists, and the step of the result it is listed under. */
+type CreateFailure = { step: string; error: ToolError }
+
+/** The pull request `gh pr create` printed before it failed to upload some attachments; `undefined` for any other failure. */
+function createdDespiteUploads(
+  error: unknown,
+): { created: { number: number; url: string }; failure: CreateFailure } | undefined {
+  const partial = partialUpload(error)
+  if (!partial) return undefined
+  try {
+    return { created: createdPullRequest(partial.stdout), failure: { step: ATTACHMENTS_STEP, error: partial } }
+  } catch {
+    return undefined
+  }
+}
+
 /**
- * Runs `gh pr create`. When it fails in a way that can follow the pull request
+ * Runs `gh pr create`. When some attachments fail to upload but `gh` printed
+ * the pull request it made, that is returned with the failure under the
+ * attachments step. When it fails in a way that can follow the pull request
  * being made (GitHub failing, a timeout, a failed follow-up request), looks for
  * the pull request: if it is there, it is returned with the failure `gh`
  * reported; if it is not, or the look fails, the original error is thrown.
  */
 async function createPullRequest(
   repo: RepoName,
-  pull: { head: string; base: string; flags: string[]; body: string },
+  pull: { head: string; base: string; flags: string[]; body: string; attached: boolean },
   ctx: ToolContext,
-): Promise<{ created: { number: number; url: string }; failure?: ToolError }> {
+): Promise<{ created: { number: number; url: string }; failure?: CreateFailure }> {
   try {
     const stdout = await gh(["pr", "create", "--repo", repo.full, ...pull.flags], {
       cwd: ctx.cwd,
@@ -150,6 +185,8 @@ async function createPullRequest(
     })
     return { created: createdPullRequest(stdout) }
   } catch (error) {
+    const printed = pull.attached ? createdDespiteUploads(error) : undefined
+    if (printed) return printed
     if (isAbortError(error) || !isToolError(error) || !MAY_HAVE_CREATED.includes(error.code)) throw error
     let found: { number: number; url: string } | undefined
     try {
@@ -158,7 +195,7 @@ async function createPullRequest(
       if (isAbortError(lookupError)) throw lookupError
     }
     if (!found) throw error
-    return { created: found, failure: error }
+    return { created: found, failure: { step: "create", error } }
   }
 }
 
@@ -168,12 +205,13 @@ export const prCreate = defineTool({
   description: [
     "Open a pull request from a pushed branch of a repository the viewer may write to into another branch of it (default: the default branch), and settle its place in the same call: draft, labels, assignees and reviewers (they are notified), milestone, the issues it closes (a `Closes #12` line at the end of the body) and a project board with field values (the Status starts as Todo). Pull requests from forks are not supported yet.",
     "Everything that can fail is checked before the pull request is made: the branches exist, head_sha (when given) is still the head, no pull request is open from head into base already, the milestone exists and the board accepts the values.",
-    "A pull request that was made is always returned, even when GitHub reported a failure while making it or a later step fails (labels, assignees, reviewers and milestone are applied right after it is made; then the read-back, board and field steps): what failed after it is listed in errors, keyed by step (create, metadata, read, head_sha, project, fields.<Name>).",
+    "A pull request that was made is always returned, even when GitHub reported a failure while making it or a later step fails (labels, assignees, reviewers and milestone are applied right after it is made; then the read-back, board and field steps): what failed after it is listed in errors, keyed by step (create, attachments, metadata, read, head_sha, project, fields.<Name>).",
     "GitHub links closing issues only for a pull request into the default branch, and a moment after it exists: the call waits up to a few seconds for the link, and notes say when this pull request is not into the default branch or an issue was not linked yet.",
     "A pull request is 12, #12, owner/repo#12 or its URL; a bare number in closes means the pull request's repository.",
     BOARD_LOOKUP_NOTE,
     FIELDS_NOTE,
     PROJECT_SCOPE_NOTE,
+    ATTACHMENTS_NOTE,
   ].join(" "),
   toolset: "pull_requests",
   class: "add",
@@ -202,6 +240,8 @@ export const prCreate = defineTool({
     const labels = nameList("labels", args.labels)
     const assignees = nameList("assignees", args.assignees)
     const reviewers = nameList("reviewers", args.reviewers)
+    const attached = Boolean(args.attachments?.length)
+    if (attached) await ensureGhAtLeast(ATTACH_MIN_GH_VERSION, "attachments", ctx.signal)
 
     const requested = await resolveRepo(args.repo, ctx)
     const closes = await resolveClosing(args.closes, requested, ctx)
@@ -258,13 +298,24 @@ export const prCreate = defineTool({
     for (const reviewer of reviewers) metadataFlags.push("--add-reviewer", reviewer)
     if (milestone) metadataFlags.push("--milestone", milestone.title)
     const body = closes.length > 0 ? withClosing(args.body ?? "", closes, [], target) : (args.body ?? "")
-    const { created, failure } = await createPullRequest(target, { head, base, flags, body }, ctx)
+    const prepared = await prepareAttachments(args.attachments, ctx)
+    let outcome: Awaited<ReturnType<typeof createPullRequest>>
+    try {
+      outcome = await createPullRequest(
+        target,
+        { head, base, flags: [...flags, ...prepared.flags], body: prepared.rewriteBody(body), attached },
+        ctx,
+      )
+    } finally {
+      await prepared.cleanup()
+    }
+    const { created, failure } = outcome
 
     // The pull request exists from here on, so a failing step is reported beside it instead of failing the call.
     const steps = new StepErrors()
     if (failure) {
-      await steps.record("create", async () => {
-        throw failure
+      await steps.record(failure.step, async () => {
+        throw failure.error
       })
     }
     if (metadataFlags.length > 0) {
@@ -307,7 +358,11 @@ export const prCreate = defineTool({
       draft: read?.draft ?? Boolean(args.draft),
       closing_issues: settled?.closing_issues ?? [],
       project: board && placed ? { ...boardSummary(board), item_id: placed.itemId, fields: set } : null,
-      notes: closingNotes({ ...closing, base, defaultBranch: fallback, linked: settled?.closing_issues }),
+      attachments: sentAttachments(prepared),
+      notes: [
+        ...prepared.notes,
+        ...closingNotes({ ...closing, base, defaultBranch: fallback, linked: settled?.closing_issues }),
+      ],
       foreign: context.foreign,
       errors: steps.errors,
     }

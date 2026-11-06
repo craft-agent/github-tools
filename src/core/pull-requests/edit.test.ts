@@ -37,8 +37,10 @@ describe("one gh pr edit", () => {
       url: URL,
       changed: ["title"],
       milestone: null,
+      attachments: [],
       notes: [],
       foreign: false,
+      errors: {},
     })
     expect(prCommands(installed)).toEqual([{ args: [...EDIT, "--title", "New title"], stdin: "" }])
     expect(readsOf(installed)).toEqual([])

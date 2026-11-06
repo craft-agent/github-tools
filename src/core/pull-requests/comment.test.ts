@@ -15,7 +15,15 @@ describe("commenting", () => {
   test("the body goes on stdin, and the comment's URL comes back", async () => {
     const installed = use([repositoryRule(), COMMENTED])
     const body = "Looks good.\n\n- one\n- two"
-    expect(await run({ pr: "#12", body })).toEqual({ repo: "octo/hello", pr: 12, url: URL, foreign: false })
+    expect(await run({ pr: "#12", body })).toEqual({
+      repo: "octo/hello",
+      pr: 12,
+      url: URL,
+      attachments: [],
+      notes: [],
+      foreign: false,
+      errors: {},
+    })
     expect(prCommands(installed)).toEqual([
       { args: ["pr", "comment", "12", "--repo", "octo/hello", "--body-file", "-"], stdin: body },
     ])

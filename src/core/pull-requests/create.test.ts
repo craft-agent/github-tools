@@ -86,6 +86,7 @@ describe("one gh pr create", () => {
         },
       ],
       project: null,
+      attachments: [],
       notes: [],
       foreign: false,
       errors: {},

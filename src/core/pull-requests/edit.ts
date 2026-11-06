@@ -1,12 +1,21 @@
 import { z } from "zod"
+import {
+  ATTACHMENTS_NOTE,
+  attachmentsArgument,
+  attachmentsResultSchema,
+  prepareAttachments,
+  sentAttachments,
+} from "../attachments"
 import { isAbortError } from "../errors"
+import { ATTACH_MIN_GH_VERSION, ensureGhAtLeast } from "../gh"
 import { branchHead, defaultBranch } from "../github/branches"
 import type { IssueRef } from "../github/issue-refs"
 import { milestoneSchema, resolveMilestone, type MilestoneRef } from "../github/milestones"
 import { closingIssueSchema, readPullRequestState, type PullRequestState } from "../github/pull-requests"
 import { REPO_DESCRIPTION, appended, given, invalid, lastUrl, nameList, writableContext } from "../issues/write-support"
+import { stepErrorsSchema } from "../projects/item-support"
 import { parseNumberRef } from "../refs"
-import { defineTool } from "../tool"
+import { StepErrors, defineTool } from "../tool"
 import { CLOSES_DESCRIPTION, splitClosingBlock, withClosing } from "./closes"
 import {
   PR_DESCRIPTION,
@@ -14,6 +23,7 @@ import {
   closingNotes,
   editPullRequest,
   resolveClosing,
+  settleUpload,
   settledClosingState,
   type ClosingChange,
   type ClosingState,
@@ -41,6 +51,7 @@ const input = z.object({
   remove_milestone: z.boolean().optional().describe("Take the pull request out of its milestone."),
   add_closes: z.array(z.string()).optional().describe(CLOSES_DESCRIPTION.add_closes),
   remove_closes: z.array(z.string()).optional().describe(CLOSES_DESCRIPTION.remove_closes),
+  attachments: attachmentsArgument,
 })
 
 const output = z.object({
@@ -57,8 +68,10 @@ const output = z.object({
     .describe(
       "The issues GitHub links as closed by the pull request now; only when add_closes or remove_closes was given.",
     ),
+  attachments: attachmentsResultSchema,
   notes: z.array(z.string()).describe("What to know about the result; [] when nothing."),
   foreign: z.boolean(),
+  errors: stepErrorsSchema,
 })
 
 type Args = z.output<typeof input>
@@ -79,6 +92,7 @@ type Change = {
   removeMilestone: boolean
   addCloses: IssueRef[]
   removeCloses: IssueRef[]
+  attachments: boolean
 }
 
 function refuseOverlap(what: string, added: readonly string[], removed: readonly string[]): void {
@@ -124,6 +138,7 @@ function parseChange(args: Args, closes: { add: IssueRef[]; remove: IssueRef[] }
     removeMilestone,
     addCloses: closes.add,
     removeCloses: closes.remove,
+    attachments: Boolean(args.attachments?.length),
   }
   refuseOverlap("Label", change.addLabels, change.removeLabels)
   refuseOverlap("Assignee", change.addAssignees, change.removeAssignees)
@@ -131,7 +146,7 @@ function parseChange(args: Args, closes: { add: IssueRef[]; remove: IssueRef[] }
   refuseOverlap("Closing issue", change.addCloses.map(labelOf), change.removeCloses.map(labelOf))
   if (changedArguments(change).length === 0) {
     throw invalid(
-      "Nothing to change: pass at least one of title, body, append_body, base, labels, assignees, reviewers, milestone or closes.",
+      "Nothing to change: pass at least one of title, body, append_body, base, labels, assignees, reviewers, milestone, closes or attachments.",
     )
   }
   return change
@@ -154,6 +169,7 @@ function changedArguments(change: Change): string[] {
     remove_milestone: change.removeMilestone,
     add_closes: change.addCloses.length > 0,
     remove_closes: change.removeCloses.length > 0,
+    attachments: change.attachments,
   }
   return Object.entries(applied).flatMap(([name, isApplied]) => (isApplied ? [name] : []))
 }
@@ -167,6 +183,7 @@ export const prEdit = defineTool({
     "append_body goes before the closing lines (Closes #12) the body ends with, so those stay the last lines.",
     "After closing issues change, the call waits up to a few seconds for GitHub to link them, then lists closing_issues as GitHub links them and notes say when one is not linked (a pull request into a branch other than the default branch links none; otherwise it may link it a moment later) or is still linked (another form of mention in the body or a commit message).",
     "A pull request is 12, #12, owner/repo#12 or its URL; a bare number means the working tree's repository, or repo.",
+    ATTACHMENTS_NOTE,
   ].join(" "),
   toolset: "pull_requests",
   class: "overwrite",
@@ -179,6 +196,7 @@ export const prEdit = defineTool({
       add: await resolveClosing(args.add_closes, ref.repo, ctx),
       remove: await resolveClosing(args.remove_closes, ref.repo, ctx),
     })
+    if (change.attachments) await ensureGhAtLeast(ATTACH_MIN_GH_VERSION, "attachments", ctx.signal)
     const context = await writableContext(ref.repo, ctx)
     const target = context.repo
     const pull = { repo: target, number: ref.number }
@@ -215,19 +233,32 @@ export const prEdit = defineTool({
       ? withClosing(sent ?? current?.body ?? "", change.addCloses, change.removeCloses, target)
       : sent
 
-    const flags: string[] = []
-    if (change.title) flags.push("--title", change.title)
-    if (body !== undefined) flags.push("--body-file", "-")
-    if (change.base) flags.push("--base", change.base)
-    for (const label of change.addLabels) flags.push("--add-label", label)
-    for (const label of change.removeLabels) flags.push("--remove-label", label)
-    for (const assignee of change.addAssignees) flags.push("--add-assignee", assignee)
-    for (const assignee of change.removeAssignees) flags.push("--remove-assignee", assignee)
-    for (const reviewer of change.addReviewers) flags.push("--add-reviewer", reviewer)
-    for (const reviewer of change.removeReviewers) flags.push("--remove-reviewer", reviewer)
-    if (milestone) flags.push("--milestone", milestone.title)
-    if (change.removeMilestone) flags.push("--remove-milestone")
-    const stdout = await editPullRequest(target, ref.number, flags, ctx, body)
+    const steps = new StepErrors()
+    const prepared = await prepareAttachments(args.attachments, ctx)
+    let stdout: string
+    try {
+      const flags: string[] = []
+      if (change.title) flags.push("--title", change.title)
+      if (body !== undefined) flags.push("--body-file", "-")
+      if (change.base) flags.push("--base", change.base)
+      for (const label of change.addLabels) flags.push("--add-label", label)
+      for (const label of change.removeLabels) flags.push("--remove-label", label)
+      for (const assignee of change.addAssignees) flags.push("--add-assignee", assignee)
+      for (const assignee of change.removeAssignees) flags.push("--remove-assignee", assignee)
+      for (const reviewer of change.addReviewers) flags.push("--add-reviewer", reviewer)
+      for (const reviewer of change.removeReviewers) flags.push("--remove-reviewer", reviewer)
+      if (milestone) flags.push("--milestone", milestone.title)
+      if (change.removeMilestone) flags.push("--remove-milestone")
+      flags.push(...prepared.flags)
+      const sentBody = body === undefined ? undefined : prepared.rewriteBody(body)
+      stdout = await settleUpload(
+        () => editPullRequest(target, ref.number, flags, ctx, sentBody),
+        change.attachments,
+        steps,
+      )
+    } finally {
+      await prepared.cleanup()
+    }
 
     const result = {
       repo: target.full,
@@ -235,9 +266,11 @@ export const prEdit = defineTool({
       url: lastUrl(stdout) ?? `https://github.com/${target.full}/pull/${ref.number}`,
       changed: changedArguments(change),
       milestone,
+      attachments: sentAttachments(prepared),
       foreign: context.foreign,
+      errors: steps.errors,
     }
-    if (!closesChanged) return { ...result, notes: [] }
+    if (!closesChanged) return { ...result, notes: prepared.notes }
 
     // The edit is made, so a failed read-back is told in a note instead of failing the call.
     try {
@@ -250,11 +283,14 @@ export const prEdit = defineTool({
         defaultBranch: fallback,
         linked: after.closing_issues,
       }
-      return { ...result, closing_issues: after.closing_issues, notes: closingNotes(state) }
+      return { ...result, closing_issues: after.closing_issues, notes: [...prepared.notes, ...closingNotes(state)] }
     } catch (error) {
       if (isAbortError(error)) throw error
       const why = error instanceof Error ? error.message : String(error)
-      return { ...result, notes: [`The closing issues could not be read back after the edit: ${why}`] }
+      return {
+        ...result,
+        notes: [...prepared.notes, `The closing issues could not be read back after the edit: ${why}`],
+      }
     }
   },
 })
