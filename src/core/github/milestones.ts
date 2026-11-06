@@ -21,12 +21,14 @@ function isMilestone(value: RawMilestone | null | undefined): value is { number:
 /**
  * The milestone of `repo` titled `title`, matched exactly first and then
  * without regard to case, among open and closed ones. A missing one is made
- * when `create` is set, else `invalid_argument` names what to pass.
+ * when `create` is set, else `invalid_argument` names what to pass: the
+ * `create_milestone` argument, or, for a tool without one (`creatable: false`),
+ * creating the milestone first.
  */
 export async function resolveMilestone(
   repo: RepoName,
   title: string,
-  options: { create: boolean },
+  options: { create: boolean; creatable?: boolean },
   ctx: RefContext,
 ): Promise<MilestoneRef> {
   // --slurp keeps the pages a valid JSON document: an array of one array per page.
@@ -44,7 +46,9 @@ export async function resolveMilestone(
   if (!options.create) {
     throw new ToolError(
       "invalid_argument",
-      `Milestone "${title}" does not exist in ${repo.full}; pass create_milestone: true to create it.`,
+      options.creatable === false
+        ? `Milestone "${title}" does not exist in ${repo.full}; create it first, or pass an existing title.`
+        : `Milestone "${title}" does not exist in ${repo.full}; pass create_milestone: true to create it.`,
     )
   }
   const made = await ghJson<RawMilestone>(["api", "-X", "POST", milestonesPath(repo), "-f", `title=${title}`], ctx)

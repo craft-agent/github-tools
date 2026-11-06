@@ -6,11 +6,14 @@ import { installFakeGh, type FakeGh, type GhRule } from "../testing/fake-gh"
 import { gqlErrors, gqlReply } from "../testing/gql"
 import { isToolError, type ErrorCode } from "./errors"
 import {
+  ATTACH_MIN_GH_VERSION,
   DEFAULT_GH_TIMEOUT_MS,
+  GhCallError,
   GraphQLToolError,
   MIN_GH_VERSION,
   classifyGhFailure,
   ensureGh,
+  ensureGhAtLeast,
   gh,
   ghEnv,
   ghJson,
@@ -103,6 +106,20 @@ describe("classifyGhFailure", () => {
     expect(classifyGhFailure("  boom\n", "ignored", 4).message).toBe("gh failed (exit 4): boom")
     expect(classifyGhFailure("", "from stdout\n", 1).message).toBe("gh failed (exit 1): from stdout")
     expect(classifyGhFailure("", "", 2).message).toBe("gh failed (exit 2):")
+  })
+
+  test("a REST error body on stdout adds its errors to gh's stderr", () => {
+    const body = JSON.stringify({
+      message: "Unprocessable Entity",
+      errors: ["Line could not be resolved", { message: "Another", code: "custom" }, { code: "no message" }],
+    })
+    expect(classifyGhFailure("gh: Unprocessable Entity (HTTP 422)\n", body, 1).message).toBe(
+      "gh failed (exit 1): gh: Unprocessable Entity (HTTP 422): Line could not be resolved; Another",
+    )
+    expect(classifyGhFailure("gh: boom", "not json", 1).message).toBe("gh failed (exit 1): gh: boom")
+    expect(classifyGhFailure("gh: boom", JSON.stringify({ message: "x" }), 1).message).toBe(
+      "gh failed (exit 1): gh: boom",
+    )
   })
 
   test("the message is capped, so a huge reply is not echoed whole", () => {
@@ -226,7 +243,57 @@ describe("ensureGh", () => {
   })
 })
 
+describe("ensureGhAtLeast", () => {
+  test("an older gh -> gh_too_old, naming the feature and both versions", async () => {
+    useFake([], { version: "2.98.9" })
+    const error = await ensureGhAtLeast(ATTACH_MIN_GH_VERSION, "attachments").catch((e: unknown) => e)
+    expect(isToolError(error) && error.code).toBe("gh_too_old")
+    expect((error as Error).message).toBe(
+      "attachments needs gh 2.99.0 or newer; this is gh 2.98.9. Update the GitHub CLI.",
+    )
+  })
+
+  test("the minimum itself and newer versions pass, compared numerically", async () => {
+    useFake([], { version: ATTACH_MIN_GH_VERSION })
+    await ensureGhAtLeast(ATTACH_MIN_GH_VERSION, "attachments")
+    fake?.restore()
+    useFake([], { version: "2.100.0" })
+    await ensureGhAtLeast(ATTACH_MIN_GH_VERSION, "attachments")
+  })
+
+  test("the version is read once, shared with ensureGh", async () => {
+    const installed = useFake([], { version: "2.99.0" })
+    await ensureGh()
+    await ensureGhAtLeast(ATTACH_MIN_GH_VERSION, "attachments")
+    await ensureGhAtLeast(ATTACH_MIN_GH_VERSION, "attachments")
+    expect(installed.calls()).toEqual([["--version"]])
+  })
+
+  test("a gh under the general minimum is refused by the general check first", async () => {
+    useFake([], { version: "2.93.0" })
+    const error = await ensureGhAtLeast(ATTACH_MIN_GH_VERSION, "attachments").catch((e: unknown) => e)
+    expect((error as Error).message).toContain(MIN_GH_VERSION)
+  })
+
+  test("gh missing -> gh_missing; an aborted signal rejects before anything runs", async () => {
+    process.env.PATH = emptyPathDir()
+    expect(await codeOf(ensureGhAtLeast(ATTACH_MIN_GH_VERSION, "attachments"))).toBe("gh_missing")
+    const error = await ensureGhAtLeast(ATTACH_MIN_GH_VERSION, "attachments", AbortSignal.abort()).catch(
+      (e: unknown) => e,
+    )
+    expect((error as Error).name).toBe("AbortError")
+  })
+})
+
 describe("gh", () => {
+  test("a non-zero exit keeps the stdout it printed on the error", async () => {
+    useFake([{ match: "^pr create", stdout: "https://github.com/o/r/pull/1\n", stderr: "upload failed", code: 1 }])
+    const error = await gh(["pr", "create"], OPTIONS).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(GhCallError)
+    expect((error as GhCallError).stdout).toBe("https://github.com/o/r/pull/1\n")
+    expect((error as GhCallError).message).toBe("gh failed (exit 1): upload failed")
+  })
+
   test("checks the version once across calls", async () => {
     const installed = useFake([{ match: "^pr list", stdout: "ok" }])
     expect(await gh(["pr", "list"], OPTIONS)).toBe("ok")

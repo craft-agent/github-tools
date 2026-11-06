@@ -1,4 +1,13 @@
-import { chmodSync, copyFileSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { delimiter, join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -30,6 +39,8 @@ export type FakeGh = {
   calls(): string[][]
   /** What each call in `calls()` received on stdin; empty for a call that was given none. */
   stdins(): string[]
+  /** The files named by `--attach` as each call saw them: the path, the alt text, and the content, or `null` when the file was not there. */
+  attached(): { file: string; alt: string | null; content: Buffer | null }[]
   /** Puts `PATH` back, removes the fake and forgets the version check. */
   restore(): void
 }
@@ -66,6 +77,17 @@ export function installFakeGh(rules: GhRule[], options: { version?: string } = {
         .split("\n")
         .filter(Boolean)
         .map((line) => JSON.parse(line) as string),
+    attached() {
+      const log = join(dir, "attached.log")
+      if (!existsSync(log)) return []
+      return readFileSync(log, "utf8")
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => {
+          const entry = JSON.parse(line) as { file: string; alt: string | null; content: string | null }
+          return { ...entry, content: entry.content === null ? null : Buffer.from(entry.content, "base64") }
+        })
+    },
     restore() {
       if (originalPath === undefined) delete process.env.PATH
       else process.env.PATH = originalPath

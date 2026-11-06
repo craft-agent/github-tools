@@ -12,6 +12,15 @@ provides_tools:
   - github_issue_read
   - github_issue_relate
   - github_issue_reopen
+  - github_pr_close
+  - github_pr_comment
+  - github_pr_create
+  - github_pr_edit
+  - github_pr_merge
+  - github_pr_read
+  - github_pr_ready
+  - github_pr_reopen
+  - github_pr_review
   - github_project_create
   - github_project_field_ensure
   - github_project_item_add
@@ -24,6 +33,9 @@ provides_tools:
   - github_project_read
   - github_project_unlink
   - github_project_view_ensure
+  - github_stack_link
+  - github_stack_read
+  - github_stack_unlink
 provides_hooks:
   - pre_tool_call
 config_schema:

@@ -141,8 +141,8 @@ Add the server to the host's MCP configuration. Flags go in `args`:
 ## Tools and skills
 
 Each toolset comes with a skill that tells an agent how to use its tools. A
-toolset with no tools yet registers none (so far `issues` and `projects` have
-tools).
+toolset with no tools yet registers none (so far `issues`, `pull_requests` and
+`projects` have tools).
 
 ### Issues (`issues`)
 
@@ -161,6 +161,33 @@ The skill is [`github-issues`](skills/github-issues/SKILL.md), shown as
 `github-tools:github-issues` in Claude Code and `github-tools:issues` in Hermes.
 An issue's kind is the organization's Issue Type of that name when it defines
 one, otherwise a `type:<kind>` label.
+
+### Pull requests and stacks (`pull_requests`)
+
+| Tool                  | What it does                                                                                                                                           | Class          |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------- |
+| `github_pr_read`      | `view` one pull request in full, `list` a repository's pull requests, read its `checks` (waiting up to 45 seconds, with failed job logs) or its `diff` | read           |
+| `github_pr_create`    | open a pull request from a pushed branch, with labels, assignees, reviewers, milestone, closing issues, a board and attachments                        | add            |
+| `github_pr_edit`      | change the title, body (or append to it), base, labels, assignees, reviewers, milestone or closing issues                                              | overwrite      |
+| `github_pr_comment`   | comment, with attachments                                                                                                                              | add            |
+| `github_pr_review`    | approve, request changes or comment, with line comments                                                                                                | add            |
+| `github_pr_ready`     | mark ready for review, or turn back into a draft                                                                                                       | idempotent     |
+| `github_pr_close`     | close                                                                                                                                                  | overwrite      |
+| `github_pr_reopen`    | reopen a closed pull request                                                                                                                           | overwrite      |
+| `github_pr_merge`     | merge, with the open layers below it in a stack when asked                                                                                             | administrative |
+| `github_stack_read`   | `view` a native stack by its number or a pull request in it, or `list` a repository's stacks                                                           | read           |
+| `github_stack_link`   | join pull requests into a stack, or add them on top of one                                                                                             | idempotent     |
+| `github_stack_unlink` | dissolve a stack, leaving its pull requests open                                                                                                       | overwrite      |
+
+The skill is
+[`github-pull-requests`](skills/github-pull-requests/SKILL.md), shown as
+`github-tools:github-pull-requests` in Claude Code and
+`github-tools:pull-requests` in Hermes. The tools do not push: push the branch
+first and pass the commit it pushed as `head_sha`, so a pull request opens, is
+reviewed or merges on exactly that commit. Closing issues are kept as `Closes
+#N` lines in the body, since GitHub has no other way to link them. Stacks use
+GitHub's REST stack endpoints, so the `gh stack` extension is not needed.
+Attachments need gh 2.99 or newer.
 
 ### Project boards (`projects`)
 

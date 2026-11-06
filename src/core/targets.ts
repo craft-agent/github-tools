@@ -12,7 +12,15 @@ import {
   viewerLogin,
   type BoardSelector,
 } from "./github/projects"
-import { isBareNumber, parseNumberRef, parseRepo, resolveRepo, type RefContext, type RepoName } from "./refs"
+import {
+  isBareNumber,
+  parseNumberRef,
+  parseRepo,
+  resolveRepo,
+  type RefAccept,
+  type RefContext,
+  type RepoName,
+} from "./refs"
 import type { TargetKind, ToolSpec } from "./tool"
 
 /** What stands for a repository or board that cannot be told. */
@@ -21,8 +29,11 @@ export const ANY_TARGET = "*"
 type Args = Readonly<Record<string, unknown>>
 type OwnRepository = () => Promise<RepoName | undefined>
 
-/** The name of the argument that holds the issue a call is about. */
-const ISSUE_ARGUMENT = "issue"
+/** The arguments that hold the issue or pull request a call is about, by the kind that declares them. */
+const SUBJECT_ARGUMENTS = [
+  { name: "issue", kind: "issue", accept: "issue" },
+  { name: "pr", kind: "pull", accept: "pull" },
+] as const
 /** The name of the argument that holds the repository a call is about. */
 const REPO_ARGUMENT = "repo"
 
@@ -56,9 +67,10 @@ function argumentRepository(args: Args, ctx: RefContext): OwnRepository {
 }
 
 /**
- * The call's own repository: that of the `issue` argument when it names one,
- * else `repo`, else the working tree's `origin`. The origin is read on the
- * first call that needs it, and the answer is kept.
+ * The call's own repository: that of the `issue` argument (declared `"issue"`)
+ * or the `pr` argument (declared `"pull"`) when it names one, else `repo`,
+ * else the working tree's `origin`. The origin is read on the first call that
+ * needs it, and the answer is kept.
  */
 function ownRepository(
   spec: Pick<ToolSpec, "targets">,
@@ -66,12 +78,13 @@ function ownRepository(
   fromArguments: OwnRepository,
   ctx: RefContext,
 ): OwnRepository {
-  const issue = args[ISSUE_ARGUMENT]
-
   return once(async () => {
-    if (spec.targets?.[ISSUE_ARGUMENT] === "issue" && typeof issue === "string" && !isBareNumber(issue)) {
-      const named = await attempt(() => parseNumberRef(issue, undefined, ctx, { accept: "issue" }))
-      if (named) return named.repo
+    for (const { name, kind, accept } of SUBJECT_ARGUMENTS) {
+      const value = args[name]
+      if (spec.targets?.[name] === kind && typeof value === "string" && !isBareNumber(value)) {
+        const named = await attempt(() => parseNumberRef(value, undefined, ctx, { accept }))
+        if (named) return named.repo
+      }
     }
     return fromArguments()
   })
@@ -142,13 +155,18 @@ async function ownerTarget(value: unknown, ctx: RefContext): Promise<string | un
   })
 }
 
-/** The repository an issue reference names: its own when qualified, the call's when it is a bare number. */
-async function issueRepository(value: unknown, own: OwnRepository, ctx: RefContext): Promise<RepoName | undefined> {
+/** The repository an issue or pull request reference names: its own when qualified, the call's when it is a bare number. */
+async function referenceRepository(
+  value: unknown,
+  accept: RefAccept,
+  own: OwnRepository,
+  ctx: RefContext,
+): Promise<RepoName | undefined> {
   if (typeof value !== "string") return undefined
   const bare = isBareNumber(value)
   const repoArg = bare ? (await own())?.full : undefined
   if (bare && repoArg === undefined) return undefined
-  return attempt(async () => (await parseNumberRef(value, repoArg, ctx, { accept: "issue" })).repo)
+  return attempt(async () => (await parseNumberRef(value, repoArg, ctx, { accept })).repo)
 }
 
 /** The repository one value of a declared argument names, or `undefined` when it cannot be told. */
@@ -158,17 +176,20 @@ async function targetRepository(
   own: OwnRepository,
   ctx: RefContext,
 ): Promise<RepoName | undefined> {
-  if (kind !== "repo") return issueRepository(value, own, ctx)
+  if (kind !== "repo") return referenceRepository(value, kind === "pull" ? "pull" : "issue", own, ctx)
   return typeof value === "string" ? attempt(() => parseRepo(value)) : undefined
 }
 
 /**
  * What a call writes to, as the permission rule of an entry point names it:
  * the call's own repository (`owner/name`), and each repository the arguments
- * declared in `spec.targets` name. A bare issue number means the call's own
- * repository. Anything that cannot be told (an invalid or non-string value, a
- * working tree without a GitHub `origin`) is `*`. A spec without `targets` has
- * just its own repository.
+ * declared in `spec.targets` name. A bare issue or pull request number means
+ * the call's own repository: that of the qualified `issue` (`"issue"`) or `pr`
+ * (`"pull"`) argument, else `repo`, else the working tree's. A `"pull"` target
+ * takes a pull request reference and refuses an issue URL (`*`). Anything that
+ * cannot be told (an invalid or non-string value, a working tree without a
+ * GitHub `origin`) is `*`. A spec without `targets` has just its own
+ * repository.
  *
  * A spec with a `"board"`, `"item"` or `"owner"` target names no own repository:
  * it writes to a board (`owner/projects/N`), and to a repository only through a
@@ -181,6 +202,11 @@ async function targetRepository(
  * and an item's board is read from GitHub, which only read. For repositories
  * nothing here calls `gh`, and the `origin` is read only when a bare number or
  * a missing `repo` needs it.
+ *
+ * An `"optional_board"` target is a board the call writes to only when the
+ * argument is given: absent, it adds nothing and runs no lookup; given, it is
+ * told like a `"board"` target, beside the call's own repository, which it
+ * does not replace (it does not make the spec one that names a board).
  *
  * Lowercase, without repeats, sorted, with `*` last.
  */
@@ -199,6 +225,10 @@ export async function writeTargets(spec: Pick<ToolSpec, "targets">, args: unknow
     const value = given[name]
     if (kind === "board") {
       addResource(await boardTarget(boardSelector(given, value), fromArguments, ctx))
+      continue
+    }
+    if (kind === "optional_board") {
+      if (value !== undefined) addResource(await boardTarget(boardSelector(given, value), fromArguments, ctx))
       continue
     }
     if (kind === "owner") {

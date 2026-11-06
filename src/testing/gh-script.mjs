@@ -3,7 +3,7 @@
  * The fake `gh`: answers from rules.json next to this file and logs every call.
  * A plain Node script, so it runs wherever the tests do.
  */
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs"
+import { appendFileSync, existsSync, readFileSync, renameSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -18,6 +18,14 @@ try {
   stdin = readFileSync(0, "utf8")
 } catch {}
 appendFileSync(join(dir, "stdin.log"), `${JSON.stringify(stdin)}\n`)
+
+// The files named by `--attach <file>[#<alt>]` are read now, while the caller still holds them.
+for (const [index, arg] of args.entries()) {
+  if (args[index - 1] !== "--attach") continue
+  const [file, alt = null] = arg.split(/#(.*)/s)
+  const content = existsSync(file) ? readFileSync(file).toString("base64") : null
+  appendFileSync(join(dir, "attached.log"), `${JSON.stringify({ file, alt, content })}\n`)
+}
 
 const { rules, version } = JSON.parse(readFileSync(join(dir, "rules.json"), "utf8"))
 const usedFile = join(dir, "used.json")
@@ -35,7 +43,10 @@ const index = rules.findIndex(
 
 if (index >= 0) {
   used[index] = (used[index] ?? 0) + 1
-  writeFileSync(usedFile, JSON.stringify(used))
+  // Written aside and renamed, so a call running at the same time never reads half a file.
+  const pending = `${usedFile}.${process.pid}`
+  writeFileSync(pending, JSON.stringify(used))
+  renameSync(pending, usedFile)
   if (rules[index].delayMs) await new Promise((resolve) => setTimeout(resolve, rules[index].delayMs))
   if (rules[index].killSelf) process.kill(process.pid, rules[index].killSelf)
   reply(rules[index])
