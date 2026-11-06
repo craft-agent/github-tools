@@ -41,9 +41,10 @@ import { repoCreate } from "./core/repos/repo-create"
 import { repoEdit } from "./core/repos/repo-edit"
 import { repoRead } from "./core/repos/repo-read"
 import { repoUnarchive } from "./core/repos/repo-unarchive"
-import { rulesetCreate } from "./core/repos/ruleset-create"
-import { rulesetEdit } from "./core/repos/ruleset-edit"
 import { repoVisibility } from "./core/repos/repo-visibility"
+import { rulesetCreate } from "./core/repos/ruleset-create"
+import { rulesetDelete } from "./core/repos/ruleset-delete"
+import { rulesetEdit } from "./core/repos/ruleset-edit"
 import { rulesetRead } from "./core/repos/ruleset-read"
 
 /** Every tool spec of the package; entry points register their tools from this list. */
@@ -96,4 +97,5 @@ export const ALL_TOOLS: ToolSpec[] = [
   repoUnarchive,
   rulesetCreate,
   rulesetEdit,
+  rulesetDelete,
 ]
