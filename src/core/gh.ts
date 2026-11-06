@@ -7,6 +7,9 @@ import { abortError, exec, type ExecResult } from "./exec"
  */
 export const MIN_GH_VERSION = "2.94.0"
 
+/** The release that added `--attach` to `gh pr create`, `gh pr edit` and `gh pr comment`; only a call that attaches needs it. */
+export const ATTACH_MIN_GH_VERSION = "2.99.0"
+
 const VERSION_CHECK_TIMEOUT_MS = 15_000
 const MAX_MESSAGE_LENGTH = 2000
 
@@ -120,7 +123,7 @@ function isOlder(version: string, minimum: string): boolean {
   return false
 }
 
-async function checkGhVersion(): Promise<void> {
+async function readGhVersion(): Promise<string> {
   let result: ExecResult
   try {
     result = await exec(["gh", "--version"], { env: ghEnv(), timeoutMs: VERSION_CHECK_TIMEOUT_MS })
@@ -140,9 +143,20 @@ async function checkGhVersion(): Promise<void> {
   if (isOlder(version, MIN_GH_VERSION)) {
     throw new ToolError("gh_too_old", `gh ${version} is older than ${MIN_GH_VERSION}; update the GitHub CLI.`)
   }
+  return version
 }
 
-let ghCheck: Promise<void> | undefined
+let ghCheck: Promise<string> | undefined
+
+/** The installed `gh` version, read once per process; see `ensureGh` for what the read promises. */
+async function ghVersion(signal?: AbortSignal): Promise<string> {
+  if (signal?.aborted) throw abortError(signal)
+  ghCheck ??= readGhVersion().catch((error: unknown) => {
+    ghCheck = undefined
+    throw error
+  })
+  return ghCheck
+}
 
 /**
  * Checks once per process that `gh` is installed and recent enough. A failed
@@ -151,12 +165,21 @@ let ghCheck: Promise<void> | undefined
  * others waiting on the same check.
  */
 export async function ensureGh(signal?: AbortSignal): Promise<void> {
-  if (signal?.aborted) throw abortError(signal)
-  ghCheck ??= checkGhVersion().catch((error: unknown) => {
-    ghCheck = undefined
-    throw error
-  })
-  await ghCheck
+  await ghVersion(signal)
+}
+
+/**
+ * Checks, on top of `ensureGh`, that `gh` is at least `minimum`, for a call
+ * that uses `feature`; older throws `gh_too_old`, naming both versions.
+ */
+export async function ensureGhAtLeast(minimum: string, feature: string, signal?: AbortSignal): Promise<void> {
+  const version = await ghVersion(signal)
+  if (isOlder(version, minimum)) {
+    throw new ToolError(
+      "gh_too_old",
+      `${feature} needs gh ${minimum} or newer; this is gh ${version}. Update the GitHub CLI.`,
+    )
+  }
 }
 
 /** Forgets the version check. For tests only, which change `PATH` between cases. */
@@ -246,10 +269,23 @@ async function runGh(args: string[], options: GhOptions): Promise<ExecResult> {
   return result
 }
 
-/** Runs `gh` with the given arguments and returns its stdout; a failure throws the error `classifyGhFailure` picks. */
+/** A `gh` call that exited non-zero; keeps the stdout it printed, since some commands print what they made before failing. */
+export class GhCallError extends ToolError {
+  readonly stdout: string
+
+  constructor(failure: ToolError, stdout: string) {
+    super(failure.code, failure.message, { cause: failure })
+    this.name = "GhCallError"
+    this.stdout = stdout
+  }
+}
+
+/** Runs `gh` with the given arguments and returns its stdout; a failure throws a `GhCallError` of the code `classifyGhFailure` picks. */
 export async function gh(args: string[], options: GhOptions): Promise<string> {
   const result = await runGh(args, options)
-  if (result.code !== 0) throw classifyGhFailure(result.stderr, result.stdout, result.code)
+  if (result.code !== 0) {
+    throw new GhCallError(classifyGhFailure(result.stderr, result.stdout, result.code), result.stdout)
+  }
   return result.stdout
 }
 
