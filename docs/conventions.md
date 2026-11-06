@@ -47,6 +47,13 @@ discussion behind them is on
   `add_assignees`. Shallow schemas are read reliably by every model the
   harnesses run. An argument that replaces a whole list, where one is needed,
   is named for the list (`labels`) and its description says it replaces.
+- **Field values are one map by field name.** A board's fields (`fields`) and
+  an organization's issue fields (`issue_fields`) take `{name: value}`, names
+  and options matched without regard to case; clearing takes a list of names
+  (`clear_fields`, `clear_issue_fields`). A field the owner adds or renames
+  stays reachable without a new argument. Every name, option and value is
+  checked against the field definitions before anything is written, and a
+  refusal names the choices there are.
 - **References.** An issue or pull request is `12`, `#12`, `owner/repo#12` or
   its URL; a board is its number, `owner/number`, its URL or its title. A bare
   number means the working tree's repository (its `origin` on GitHub); `repo`
@@ -87,6 +94,10 @@ discussion behind them is on
   itself reports a failure, the tool looks for what it may have made (a `gh`
   command can make an object, then fail on a second request) and returns it
   under `errors.create` rather than failing.
+- **What a GitHub does not have reads as `null`.** An older GitHub (an
+  Enterprise Server) rejects a whole query that names a field it lacks, such
+  as issue fields. The read then runs again without it and reports `null`
+  there, never `{}` or `[]`, which would say there is none.
 - **A write to a repository the viewer does not own succeeds** and says
   `foreign: true`, so the caller notices it is in someone else's tracker.
 - **Text read from GitHub is returned as it is.** Bodies, comments, titles and
