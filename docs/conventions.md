@@ -22,12 +22,19 @@ discussion behind them is on
   extension's command group (`link`, and `unlink` for its `unstack`). A verb of
   our own only where the CLI has no command for the operation:
 
-  | Verb      | Means                                                        |
-  | --------- | ------------------------------------------------------------ |
-  | `read`    | the one read tool of a domain (below)                        |
-  | `relate`  | set an issue's parent, sub-issues and dependencies           |
-  | `resolve` | find which board, repository or object a call means          |
-  | `ensure`  | create when missing, reuse when present; never a second copy |
+  | Verb         | Means                                                        |
+  | ------------ | ------------------------------------------------------------ |
+  | `read`       | the one read tool of a domain (below)                        |
+  | `relate`     | set an issue's parent, sub-issues and dependencies           |
+  | `resolve`    | find which board, repository or object a call means          |
+  | `ensure`     | create when missing, reuse when present; never a second copy |
+  | `visibility` | change who can read a repository                             |
+
+  `visibility` has a tool of its own although the CLI changes it with
+  `repo edit`: it is administrative, and folded into `github_repo_edit` it
+  would make every description change ask like it. Where a CLI group has no
+  write command (milestones, rulesets), the writes take the CLI's usual
+  `create`, `edit` and `delete`.
 
 - **One read tool per domain, one write tool per operation.**
   `github_<domain>_read` takes a `method` argument whose values are the CLI's
