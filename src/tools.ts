@@ -21,6 +21,7 @@ import { prClose } from "./core/pull-requests/close"
 import { prComment } from "./core/pull-requests/comment"
 import { prCreate } from "./core/pull-requests/create"
 import { prEdit } from "./core/pull-requests/edit"
+import { prMerge } from "./core/pull-requests/merge"
 import { prRead } from "./core/pull-requests/read"
 import { prReady } from "./core/pull-requests/ready"
 import { prReopen } from "./core/pull-requests/reopen"
@@ -47,6 +48,7 @@ export const ALL_TOOLS: ToolSpec[] = [
   prClose,
   prReopen,
   prReview,
+  prMerge,
   stackRead,
   stackLink,
   stackUnlink,
