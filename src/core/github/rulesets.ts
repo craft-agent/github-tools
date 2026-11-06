@@ -1,7 +1,8 @@
 import { z } from "zod"
 import { ToolError, isToolError } from "../errors"
-import { ghJson } from "../gh"
+import { gh, ghJson } from "../gh"
 import type { RefContext, RepoName } from "../refs"
+import { refusalAsInvalid } from "./refusal"
 import { readRepositoryPages } from "./repos"
 import { repositoryNotFound } from "./repository"
 
@@ -145,6 +146,10 @@ export async function readRuleset(repo: RepoName, id: number, ctx: RefContext): 
     throw error
   }
   if (!raw) throw rulesetNotFound(repo, id)
+  return toRuleset(raw)
+}
+
+function toRuleset(raw: RawRuleset): Ruleset {
   return {
     ...toRow(raw),
     conditions: raw.conditions ?? null,
@@ -159,6 +164,51 @@ export async function readRuleset(repo: RepoName, id: number, ctx: RefContext): 
     created_at: raw.created_at ?? null,
     updated_at: raw.updated_at ?? null,
     url: raw._links?.html?.href ?? null,
+  }
+}
+
+/** Sends `POST` to the repository's rulesets with `body` and returns the ruleset GitHub made. */
+export async function createRuleset(repo: RepoName, body: Record<string, unknown>, ctx: RefContext): Promise<Ruleset> {
+  const raw = await refusalAsInvalid(() =>
+    ghJson<RawRuleset>(["api", "-X", "POST", rulesetsPath(repo), "--input", "-"], {
+      ...ctx,
+      stdin: JSON.stringify(body),
+    }),
+  )
+  if (!raw) throw new ToolError("github_error", "GitHub did not return the ruleset it created.")
+  return toRuleset(raw)
+}
+
+/** Sends `PUT` to ruleset `id` with `body`, whose fields replace those of the ruleset, and returns the ruleset as it is now. */
+export async function updateRuleset(
+  repo: RepoName,
+  id: number,
+  body: Record<string, unknown>,
+  ctx: RefContext,
+): Promise<Ruleset> {
+  let raw: RawRuleset | null
+  try {
+    raw = await refusalAsInvalid(() =>
+      ghJson<RawRuleset>(["api", "-X", "PUT", `${rulesetsPath(repo)}/${id}`, "--input", "-"], {
+        ...ctx,
+        stdin: JSON.stringify(body),
+      }),
+    )
+  } catch (error) {
+    if (isToolError(error) && error.code === "not_found") throw rulesetNotFound(repo, id, error)
+    throw error
+  }
+  if (!raw) throw new ToolError("github_error", `GitHub did not return ruleset ${id} it changed.`)
+  return toRuleset(raw)
+}
+
+/** Deletes ruleset `id`. */
+export async function deleteRuleset(repo: RepoName, id: number, ctx: RefContext): Promise<void> {
+  try {
+    await refusalAsInvalid(() => gh(["api", "-X", "DELETE", `${rulesetsPath(repo)}/${id}`], ctx))
+  } catch (error) {
+    if (isToolError(error) && error.code === "not_found") throw rulesetNotFound(repo, id, error)
+    throw error
   }
 }
 

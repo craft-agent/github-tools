@@ -135,6 +135,55 @@ export const milestoneRest = (overrides: Extra = {}) => ({
   ...overrides,
 })
 
+/** A ruleset of `octo/hello` as GitHub's REST API returns it, defined by the repository itself. */
+export const rawRuleset = (extra: Extra = {}) => ({
+  id: 7,
+  name: "Protect main",
+  target: "branch",
+  enforcement: "active",
+  source_type: "Repository",
+  source: "octo/hello",
+  conditions: { ref_name: { include: ["refs/heads/main"], exclude: [] } },
+  rules: [{ type: "deletion" }, { type: "pull_request", parameters: { required_approving_review_count: 1 } }],
+  bypass_actors: [{ actor_id: 5, actor_type: "RepositoryRole", bypass_mode: "pull_request" }],
+  created_at: "2026-11-03T12:44:43.508+08:00",
+  updated_at: "2026-11-04T14:20:32.084+08:00",
+  _links: { html: { href: "https://github.com/octo/hello/rules/7" } },
+  ...extra,
+})
+
+/** `rawRuleset()` as the ruleset tools report it, with `extra` laid over. */
+export const rulesetView = (extra: Extra = {}) => ({
+  id: 7,
+  name: "Protect main",
+  target: "branch",
+  enforcement: "active",
+  source_type: "Repository",
+  source: "octo/hello",
+  conditions: { ref_name: { include: ["refs/heads/main"], exclude: [] } },
+  rules: [
+    { type: "deletion", parameters: null },
+    { type: "pull_request", parameters: { required_approving_review_count: 1 } },
+  ],
+  bypass_actors: [{ actor_id: 5, actor_type: "RepositoryRole", bypass_mode: "pull_request" }],
+  created_at: "2026-11-03T12:44:43.508+08:00",
+  updated_at: "2026-11-04T14:20:32.084+08:00",
+  url: "https://github.com/octo/hello/rules/7",
+  ...extra,
+})
+
+/** The list of the repository's own rulesets (the read that checks names), one page holding `rulesets`. */
+export const rulesetListRule = (...rulesets: unknown[]): GhRule => ({
+  match: "rulesets\\?includes_parents=false",
+  stdout: JSON.stringify([rulesets]),
+})
+
+/** The read of the ruleset with `raw`'s id, answering `raw`. */
+export const rulesetGetRule = (raw: { id: number }): GhRule => ({
+  match: `rulesets/${raw.id}$`,
+  stdout: JSON.stringify(raw),
+})
+
 /** The REST mutations with their JSON request bodies, in order. */
 export function writeLog(installed: FakeGh): { args: string[]; body: unknown }[] {
   const stdins = installed.stdins()
