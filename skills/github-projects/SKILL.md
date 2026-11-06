@@ -48,11 +48,13 @@ if GitHub reports missing scopes, the user runs `gh auth refresh -s project`.
 
 - **`view`** returns the board, its fields (with single-select options and
   iterations) and its views. Read it before setting values you are unsure of:
-  field and option names come from there.
+  field and option names come from there. A field with `issue_field: true`
+  mirrors one of the organization's issue fields (see Field values).
 - **`list`** returns an `owner`'s boards, or the boards linked to `repo`;
   closed ones only with `include_closed`.
 - **`item_list`** returns a board's items with their field values by field
-  name and their content (issue, pull request or draft). Filter with `status`
+  name and their content (issue, pull request or draft); a column that
+  mirrors an issue field shows the issue's value. Filter with `status`
   (`"Todo,In Progress"`, or `"-Done"` to leave one out), `content_type`,
   `content_repo`, `search` (part of the title) and `include_archived`.
   `truncated: true` means more matched than `limit` (default 100, at most
