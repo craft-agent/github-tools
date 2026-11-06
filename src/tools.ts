@@ -32,6 +32,7 @@ import { stackUnlink } from "./core/pull-requests/stack-unlink"
 import { labelRead } from "./core/repos/label-read"
 import { milestoneRead } from "./core/repos/milestone-read"
 import { repoRead } from "./core/repos/repo-read"
+import { rulesetRead } from "./core/repos/ruleset-read"
 
 /** Every tool spec of the package; entry points register their tools from this list. */
 export const ALL_TOOLS: ToolSpec[] = [
@@ -70,4 +71,5 @@ export const ALL_TOOLS: ToolSpec[] = [
   repoRead,
   labelRead,
   milestoneRead,
+  rulesetRead,
 ]
