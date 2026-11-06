@@ -1,7 +1,8 @@
 import { z } from "zod"
 import { ToolError, isToolError } from "../errors"
-import { graphql, paginate, type Page, type Vars } from "../gh"
-import type { RefContext, RepoName } from "../refs"
+import { gh, ghJson, graphql, paginate, type Page, type Vars } from "../gh"
+import { parseRepo, type RefContext, type RepoName } from "../refs"
+import { refusalAsInvalid } from "./refusal"
 import { repositoryNotFound } from "./repository"
 
 const TOPIC_LIMIT = 20
@@ -105,6 +106,15 @@ const REPOSITORY_QUERY = `query($owner:String!,$name:String!){
 }`
 
 const ROW_FIELDS = "nameWithOwner url description visibility isArchived isFork defaultBranchRef{name} pushedAt"
+
+const OWNER_QUERY = "query($owner:String!){ viewer{login} repositoryOwner(login:$owner){__typename login} }"
+const FACTS_QUERY =
+  "query($owner:String!,$name:String!){ repository(owner:$owner,name:$name){ nameWithOwner isTemplate } }"
+
+/** The `not_found` for a user or organization that does not exist or that the viewer cannot see. */
+function ownerNotFound(owner: string, cause?: unknown): ToolError {
+  return new ToolError("not_found", `Owner ${owner} was not found, or the viewer cannot see it.`, { cause })
+}
 
 /**
  * The repository's own part of a GraphQL reply to `query`, which takes `$owner`
@@ -241,8 +251,7 @@ export async function listRepositories(
   options: RepositoryListOptions,
   ctx: RefContext,
 ): Promise<{ owner: string; repositories: RepositoryRow[]; truncated: boolean }> {
-  const notFound = (cause?: unknown) =>
-    new ToolError("not_found", `Owner ${owner ?? "@me"} was not found, or the viewer cannot see it.`, { cause })
+  const notFound = (cause?: unknown) => ownerNotFound(owner ?? "@me", cause)
   let login = owner ?? ""
   let result: { items: RawRepositoryRow[]; truncated: boolean }
   try {
@@ -261,4 +270,94 @@ export async function listRepositories(
     throw error
   }
   return { owner: login, repositories: result.items.map(toRow), truncated: result.truncated }
+}
+
+/** Throws `forbidden` unless the viewer administers the repository, so a settings write fails before it changes anything. */
+export function assertAdmin(repository: Repository): void {
+  if (repository.permission === "admin") return
+  throw new ToolError(
+    "forbidden",
+    `No admin permission on ${repository.repo} (the viewer's permission there is ${repository.permission ?? "none"}). Ask an administrator of the repository, or use one the viewer administers.`,
+  )
+}
+
+/** The repository's settings and facts once the viewer is known to administer it, with the name GitHub knows it by. */
+export async function readAdministeredRepository(
+  repo: RepoName,
+  ctx: RefContext,
+): Promise<{ view: Repository; target: RepoName }> {
+  const view = await readRepositoryView(repo, ctx)
+  assertAdmin(view)
+  return { view, target: parseRepo(view.repo) }
+}
+
+/** Who a repository can be created for: the viewer, an organization, or another user (which the viewer cannot create for). */
+export type RepositoryOwner = { login: string; kind: "viewer" | "organization" | "user" }
+
+/** Reads the user or organization `login` and whether it is the viewer; one that does not exist is `not_found`. */
+export async function readRepositoryOwner(login: string, ctx: RefContext): Promise<RepositoryOwner> {
+  let data: {
+    viewer?: { login?: string } | null
+    repositoryOwner?: { __typename: string; login: string } | null
+  } | null
+  try {
+    data = await graphql(OWNER_QUERY, { owner: login }, ctx)
+  } catch (error) {
+    if (isToolError(error) && error.code === "not_found") throw ownerNotFound(login, error)
+    throw error
+  }
+  const owner = data?.repositoryOwner
+  if (!owner) throw ownerNotFound(login)
+  if (owner.login.toLowerCase() === data?.viewer?.login?.toLowerCase()) return { login: owner.login, kind: "viewer" }
+  return { login: owner.login, kind: owner.__typename === "Organization" ? "organization" : "user" }
+}
+
+/** Whether the repository exists (for the viewer) and is a template, or `null` when it does not exist or cannot be seen. */
+export async function findRepository(repo: RepoName, ctx: RefContext): Promise<{ is_template: boolean } | null> {
+  try {
+    const found = await readRepositoryData<{ isTemplate: boolean }>(repo, FACTS_QUERY, {}, ctx)
+    return { is_template: found.isTemplate }
+  } catch (error) {
+    if (isToolError(error) && error.code === "not_found") return null
+    throw error
+  }
+}
+
+/** Sends `PATCH repos/{owner}/{name}` with `body`: the settings, archive state and visibility share this one endpoint. */
+export async function patchRepository(repo: RepoName, body: Record<string, unknown>, ctx: RefContext): Promise<void> {
+  await refusalAsInvalid(() =>
+    gh(["api", "-X", "PATCH", `repos/${repo.full}`, "--input", "-"], { ...ctx, stdin: JSON.stringify(body) }),
+  )
+}
+
+/** Replaces the repository's topics with `names`. */
+export async function replaceTopics(repo: RepoName, names: string[], ctx: RefContext): Promise<void> {
+  await refusalAsInvalid(() =>
+    gh(["api", "-X", "PUT", `repos/${repo.full}/topics`, "--input", "-"], {
+      ...ctx,
+      stdin: JSON.stringify({ names }),
+    }),
+  )
+}
+
+/**
+ * Sends the create (or generate-from-template) request to `endpoint` and
+ * returns the repository GitHub made; `visibility` is `undefined` when the reply
+ * names none GitHub's vocabulary knows.
+ */
+export async function createRepository(
+  endpoint: string,
+  body: Record<string, unknown>,
+  ctx: RefContext,
+): Promise<{ repo: string; url: string; visibility: Visibility | undefined }> {
+  const raw = await refusalAsInvalid(() =>
+    ghJson<{ full_name?: string; html_url?: string; visibility?: string }>(
+      ["api", "-X", "POST", endpoint, "--input", "-"],
+      { ...ctx, stdin: JSON.stringify(body) },
+    ),
+  )
+  if (!raw?.full_name || !raw.html_url) {
+    throw new ToolError("github_error", "GitHub did not return the repository it created.")
+  }
+  return { repo: raw.full_name, url: raw.html_url, visibility: visibilitySchema.safeParse(raw.visibility).data }
 }

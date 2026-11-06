@@ -1,44 +1,21 @@
 import { describe, expect, test } from "bun:test"
 import { gqlErrors } from "../../testing/gql"
 import { failure } from "../../testing/issue-fixtures"
-import { graphqlCalls, graphqlRule, page, repositoryReply } from "../../testing/repos-fixtures"
+import {
+  REPOSITORY_VIEW,
+  graphqlCalls,
+  graphqlRule,
+  page,
+  rawRepository,
+  repositoryReply,
+} from "../../testing/repos-fixtures"
 import { writeHarness } from "../../testing/write-harness"
 import { repoRead } from "./repo-read"
 
 const { use, run } = writeHarness(repoRead)
 
-const VIEW = "homepageUrl"
+const VIEW = REPOSITORY_VIEW
 const LIST = "repositories\\("
-
-const rawRepository = (extra: Record<string, unknown> = {}) => ({
-  nameWithOwner: "octo/hello",
-  url: "https://github.com/octo/hello",
-  description: "Says hello",
-  homepageUrl: "https://hello.example",
-  visibility: "PUBLIC",
-  isArchived: false,
-  isTemplate: false,
-  isFork: false,
-  defaultBranchRef: { name: "main" },
-  viewerPermission: "ADMIN",
-  owner: { __typename: "Organization", login: "octo" },
-  hasIssuesEnabled: true,
-  hasWikiEnabled: false,
-  hasProjectsEnabled: true,
-  hasDiscussionsEnabled: false,
-  mergeCommitAllowed: true,
-  squashMergeAllowed: true,
-  rebaseMergeAllowed: false,
-  autoMergeAllowed: true,
-  deleteBranchOnMerge: true,
-  allowUpdateBranch: false,
-  repositoryTopics: { nodes: [{ topic: { name: "cli" } }, { topic: { name: "git" } }] },
-  licenseInfo: { spdxId: "MIT" },
-  templateRepository: null,
-  parent: null,
-  pushedAt: "2026-11-06T16:33:14Z",
-  ...extra,
-})
 
 const rawRow = (name: string, extra: Record<string, unknown> = {}) => ({
   nameWithOwner: `octo/${name}`,

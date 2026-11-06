@@ -51,6 +51,62 @@ export const restFailure = (match: string, status: string, body: Extra = {}): Gh
   code: 1,
 })
 
+/** A token only the repository view query holds. */
+export const REPOSITORY_VIEW = "homepageUrl"
+
+/** The view query's repository as GraphQL returns it: an organization's public `octo/hello`, administered by the viewer. */
+export const rawRepository = (extra: Extra = {}) => ({
+  nameWithOwner: "octo/hello",
+  url: "https://github.com/octo/hello",
+  description: "Says hello",
+  homepageUrl: "https://hello.example",
+  visibility: "PUBLIC",
+  isArchived: false,
+  isTemplate: false,
+  isFork: false,
+  defaultBranchRef: { name: "main" },
+  viewerPermission: "ADMIN",
+  owner: { __typename: "Organization", login: "octo" },
+  hasIssuesEnabled: true,
+  hasWikiEnabled: false,
+  hasProjectsEnabled: true,
+  hasDiscussionsEnabled: false,
+  mergeCommitAllowed: true,
+  squashMergeAllowed: true,
+  rebaseMergeAllowed: false,
+  autoMergeAllowed: true,
+  deleteBranchOnMerge: true,
+  allowUpdateBranch: false,
+  repositoryTopics: { nodes: [{ topic: { name: "cli" } }, { topic: { name: "git" } }] },
+  licenseInfo: { spdxId: "MIT" },
+  templateRepository: null,
+  parent: null,
+  pushedAt: "2026-11-06T16:33:14Z",
+  ...extra,
+})
+
+/** The view query answering with `rawRepository(extra)`. */
+export const repositoryViewRule = (extra: Extra = {}): GhRule =>
+  graphqlRule(REPOSITORY_VIEW, { repository: rawRepository(extra) })
+
+/** The owner query answering for `owner`: the viewer `viewer`, and the owner as a `type` (null: no such owner). */
+export const repositoryOwnerRule = (
+  owner: string,
+  options: { viewer?: string; type?: "User" | "Organization" | null } = {},
+): GhRule =>
+  graphqlRule("repositoryOwner\\(login:", {
+    viewer: { login: options.viewer ?? "alice" },
+    repositoryOwner: options.type === null ? null : { __typename: options.type ?? "User", login: owner },
+  })
+
+/** The repository-facts query for `owner/name`: it does not exist (`null`), or is a template or not. */
+export const repositoryFactsRule = (full: string, facts: { isTemplate: boolean } | null): GhRule => {
+  const [owner, name] = full.split("/")
+  return graphqlRule(`nameWithOwner isTemplate.* owner=${owner} -f name=${name}$`, {
+    repository: facts && { nameWithOwner: full, ...facts },
+  })
+}
+
 export const labelPages = (labels: unknown[], next: string | null = null, times?: number): GhRule =>
   graphqlRule("labels\\(first:100", { repository: { labels: page(labels, next) } }, times)
 
@@ -85,7 +141,7 @@ export function writeLog(installed: FakeGh): { args: string[]; body: unknown }[]
   return installed
     .calls()
     .flatMap((args, index) =>
-      args[0] === "api" && args.some((arg) => ["POST", "PATCH", "DELETE"].includes(arg))
+      args[0] === "api" && args.some((arg) => ["POST", "PATCH", "PUT", "DELETE"].includes(arg))
         ? [{ args, body: stdins[index] ? JSON.parse(stdins[index]!) : null }]
         : [],
     )
