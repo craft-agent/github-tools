@@ -42,6 +42,7 @@ import { repoEdit } from "./core/repos/repo-edit"
 import { repoRead } from "./core/repos/repo-read"
 import { repoUnarchive } from "./core/repos/repo-unarchive"
 import { rulesetCreate } from "./core/repos/ruleset-create"
+import { rulesetEdit } from "./core/repos/ruleset-edit"
 import { repoVisibility } from "./core/repos/repo-visibility"
 import { rulesetRead } from "./core/repos/ruleset-read"
 
@@ -94,4 +95,5 @@ export const ALL_TOOLS: ToolSpec[] = [
   repoArchive,
   repoUnarchive,
   rulesetCreate,
+  rulesetEdit,
 ]
