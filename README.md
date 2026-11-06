@@ -220,6 +220,9 @@ after `github_project_create` set the Roadmap view's "Date fields" to Start and
 Target in the web UI. A column that mirrors an organization's issue field is
 read like any other, but its value is the issue's own: the board tools refuse
 to set or clear it, and `github_issue_edit` does both.
+`github_project_field_ensure` with `issue_field: true` adds such a column, and
+`github_project_create` with `dates: "issue_fields"` uses the issue fields Start
+date and Target date as an organization board's dates.
 
 ## Reads and writes
 

@@ -1,8 +1,20 @@
 import { z } from "zod"
-import { STATUS_FIELD, ensureField } from "../github/board-field-setup"
+import {
+  ensureField,
+  ensureIssueFieldColumn,
+  readOwnerIssueFields,
+  requireIssueField,
+} from "../github/board-field-setup"
 import { readBoardFields, readBoardViewNodes, type BoardViewNode } from "../github/board-fields"
-import { ViewColumnsError, createView, deleteView, viewFieldReaders } from "../github/board-view-setup"
+import {
+  ViewColumnsError,
+  createView,
+  deleteView,
+  viewFieldReaders,
+  type ViewRequest,
+} from "../github/board-view-setup"
 import { assertSameOwner, copyBoard, createBoard, isLinked, readBoardOwner, setLinked } from "../github/board-setup"
+import type { IssueFieldDefinition } from "../github/issue-fields"
 import {
   CURRENT_USER,
   DEFAULT_BOARD_TITLE,
@@ -20,7 +32,15 @@ import { writableContext, invalid } from "../issues/write-support"
 import { parseRepo, type RefContext } from "../refs"
 import { StepErrors, defineTool } from "../tool"
 import { PROJECT_SCOPE_NOTE, boardSummary, boardSummarySchema } from "./support"
-import { DEFAULT_VIEW_NAME, ROADMAP_NOTE, STANDARD_FIELDS, STANDARD_VIEWS } from "./template"
+import {
+  BOARD_DATE_FIELDS,
+  DATE_MODES,
+  DEFAULT_VIEW_NAME,
+  ISSUE_DATE_FIELDS,
+  STATUS_REQUEST,
+  standardTemplate,
+  type DateMode,
+} from "./template"
 
 const input = z.object({
   owner: z.string().describe('The user or organization login that owns the board, or "@me".'),
@@ -35,6 +55,12 @@ const input = z.object({
     .boolean()
     .optional()
     .describe("Bring the board to the standard template: its fields and views (default true)."),
+  dates: z
+    .enum(DATE_MODES)
+    .optional()
+    .describe(
+      '"board" (default) makes the board\'s own date fields Start and Target; "issue_fields" uses the organization\'s issue fields Start date and Target date instead, so an issue carries the same dates on every board and they are set with the issue tools (a pull request or draft has none). Organization boards only.',
+    ),
   link_repo: z.string().optional().describe("owner/name of a repository to link the board to; needs write permission."),
 })
 
@@ -86,30 +112,59 @@ function openBoardTitled(boards: readonly Board[], title: string): Board | undef
 }
 
 /** The standard fields; a board this call made gets exactly the standard Status options, any other only the ones it lacks. */
-async function applyFields(board: Board, fresh: boolean, report: Created["fields"], ctx: RefContext): Promise<void> {
+async function applyFields(
+  board: Board,
+  fresh: boolean,
+  mode: DateMode,
+  dates: { start: string; target: string },
+  definitions: readonly IssueFieldDefinition[] | null,
+  report: Created["fields"],
+  ctx: RefContext,
+): Promise<void> {
   const fields = await readBoardFields(board.id, ctx)
-  for (const request of STANDARD_FIELDS) {
-    const { field, created, added_options, updated_options } = await ensureField(
-      board,
-      fields,
-      request,
-      fresh && request.name === STATUS_FIELD ? "replace" : "append",
-      ctx,
-    )
-    report.push({ field: field.name, created, added_options, updated_options })
+  const status = await ensureField(board, fields, STATUS_REQUEST, fresh ? "replace" : "append", ctx)
+  report.push({
+    field: status.field.name,
+    created: status.created,
+    added_options: status.added_options,
+    updated_options: status.updated_options,
+  })
+
+  if (mode === "issue_fields") {
+    for (const name of [dates.start, dates.target]) {
+      const outcome = await ensureIssueFieldColumn(board, fields, definitions, { name, type: "date" }, ctx)
+      report.push({
+        field: outcome.field.name,
+        created: outcome.created,
+        added_options: outcome.added_options,
+        updated_options: outcome.updated_options,
+      })
+    }
+  } else {
+    for (const name of [dates.start, dates.target]) {
+      const outcome = await ensureField(board, fields, { name, type: "date", options: [] }, "append", ctx)
+      report.push({
+        field: outcome.field.name,
+        created: outcome.created,
+        added_options: outcome.added_options,
+        updated_options: outcome.updated_options,
+      })
+    }
   }
 }
 
 /** The standard views the board lacks, in order; returns the views the board had before. */
 async function applyViews(
   board: Board,
+  templateViews: readonly ViewRequest[],
+  roadmapNote: string,
   report: Created["views"],
   notes: string[],
   ctx: RefContext,
 ): Promise<BoardViewNode[]> {
   const before = await readBoardViewNodes(board.id, ctx)
   const readers = viewFieldReaders(board, ctx)
-  for (const request of STANDARD_VIEWS) {
+  for (const request of templateViews) {
     if (before.some((view) => sameTitle(view.name, request.name))) {
       report.push({ view: request.name, created: false })
       continue
@@ -122,7 +177,7 @@ async function applyViews(
       throw error
     }
     report.push({ view: request.name, created: true })
-    if (request.layout === "roadmap") notes.push(ROADMAP_NOTE)
+    if (request.layout === "roadmap") notes.push(roadmapNote)
   }
   return before
 }
@@ -133,6 +188,7 @@ export const projectCreate = defineTool({
   description: [
     `Create a project board for a user or organization, or reuse the open board of that owner and exact title (case-insensitive; several are invalid_argument), and bring it to the standard template. The title defaults to ${DEFAULT_BOARD_TITLE}. A board that has to be made is empty, or a copy of template without its draft items.`,
     "With standard (the default): the fields Status (Todo, In Progress, Waiting, Done, Cancelled, each with a color and a description), Start and Target (dates), and the views Roadmap, Kanban and Backlog. On a board this call made, Status gets exactly those options, keeping the ids of GitHub's own Todo, In Progress and Done, and GitHub's default view View 1 is deleted once the three views exist. On a reused or copied board only the missing fields, options and views are added, and nothing is deleted. A reused board must be one the viewer may update.",
+    "dates: \"issue_fields\" uses the organization's issue fields Start date and Target date as the board's dates, refused before the board is made when the owner is a user or lacks them.",
     "link_repo links the board to a repository (needs write permission there) unless it is already linked. GitHub links only boards of the repository's own owner, so a repository of another owner is invalid_argument, before the board is made.",
     "Once the board exists, a failed step does not fail the call: it is listed in errors and the board is still returned.",
     `notes lists what the API cannot do, such as setting the Roadmap view's date fields. ${PROJECT_SCOPE_NOTE}`,
@@ -159,6 +215,26 @@ export const projectCreate = defineTool({
     }
 
     const owner = await readBoardOwner(login, ctx)
+
+    const dateMode = args.dates ?? "board"
+    let dateNames: { start: string; target: string } = BOARD_DATE_FIELDS
+    let definitions: IssueFieldDefinition[] | null = null
+    if (dateMode === "issue_fields") {
+      if (!standard) throw invalid("dates applies only with standard.")
+      definitions = await readOwnerIssueFields({ owner: owner.login, owner_type: owner.type }, ctx)
+      const startDef = requireIssueField({ owner: owner.login, owner_type: owner.type }, definitions, {
+        name: ISSUE_DATE_FIELDS.start,
+        type: "date",
+      })
+      const targetDef = requireIssueField({ owner: owner.login, owner_type: owner.type }, definitions, {
+        name: ISSUE_DATE_FIELDS.target,
+        type: "date",
+      })
+      dateNames = { start: startDef.name, target: targetDef.name }
+    }
+
+    const template = standardTemplate(dateNames)
+
     const reused = openBoardTitled((await ownerBoards(owner.login, ctx, owner.type)).boards, title)
     if (reused) assertBoardWritable(reused)
     const source =
@@ -175,8 +251,10 @@ export const projectCreate = defineTool({
     const notes: string[] = []
     let deletedDefaultView = false
     if (standard) {
-      await steps.record("fields", () => applyFields(board, fresh, fields, ctx))
-      const before = await steps.record("views", () => applyViews(board, views, notes, ctx))
+      await steps.record("fields", () => applyFields(board, fresh, dateMode, dateNames, definitions, fields, ctx))
+      const before = await steps.record("views", () =>
+        applyViews(board, template.views, template.roadmapNote, views, notes, ctx),
+      )
       const defaultView = fresh ? before?.find((view) => view.name === DEFAULT_VIEW_NAME) : undefined
       if (defaultView) {
         deletedDefaultView =

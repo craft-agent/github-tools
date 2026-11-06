@@ -17,8 +17,10 @@ import {
   graphqlFieldNodes,
   mutationRule,
   mutationsSent,
+  organizationIssueFieldsRule,
   queryOf,
   rawField,
+  rawIssueFieldDate,
   rawOption,
   restFieldsRule,
   restViewRule,
@@ -505,5 +507,233 @@ describe("the arguments", () => {
       targets: { owner: "owner", link_repo: "repo" },
     })
     expect(projectCreate.description).toContain("gh auth refresh -s project")
+  })
+})
+
+describe("dates: issue_fields", () => {
+  const START_NODE = { __typename: "IssueFieldDate", id: "IF_start", name: "Start date", dataType: "DATE" }
+  const TARGET_NODE = { __typename: "IssueFieldDate", id: "IF_target", name: "Target date", dataType: "DATE" }
+  const ISSUE_FIELD_NODES = [START_NODE, TARGET_NODE]
+  const definitionsRule = organizationIssueFieldsRule("octo", ISSUE_FIELD_NODES)
+
+  const ADD_ISSUE_FIELD = "createProjectV2IssueField"
+  const addIssueFieldRule = (field: unknown) => ({
+    ...mutationRule(ADD_ISSUE_FIELD, { [ADD_ISSUE_FIELD]: { projectV2Field: field } }),
+    times: 1,
+  })
+
+  const ISSUE_REST_FIELDS = [
+    "Title",
+    "Assignees",
+    "Repository",
+    "Milestone",
+    "Parent issue",
+    "Sub-issues progress",
+    "Linked pull requests",
+    "Status",
+    "Start date",
+    "Target date",
+  ]
+  const ISSUE_BODIES = [
+    { name: "Roadmap", layout: "roadmap", filter: "-status:Cancelled", sort_by: [[9, "asc"]] },
+    {
+      name: "Kanban",
+      layout: "board",
+      filter: "-status:Done -status:Cancelled",
+      visible_fields: [1, 2, 3, 5, 10],
+      sort_by: [[10, "asc"]],
+      vertical_group_by: [8],
+    },
+    {
+      name: "Backlog",
+      layout: "table",
+      filter: "-status:Done -status:Cancelled",
+      visible_fields: [1, 8, 2, 3, 4, 5, 6, 9, 10, 7],
+      sort_by: [[10, "asc"]],
+      group_by: [8],
+    },
+  ]
+
+  const freshIssueRules = (...more: GhRule[]) => [
+    ...more,
+    boardOwnerRule("octo", "Organization"),
+    definitionsRule,
+    ownerBoardsRule("organization", "octo", []),
+    CREATE,
+    { ...fieldsRule([TITLE, DEFAULT_STATUS]), times: 1 },
+    fieldsRule(graphqlFieldNodes(ISSUE_REST_FIELDS)),
+    UPDATE_STATUS,
+    addIssueFieldRule(rawIssueFieldDate("F_start_date", "Start date")),
+    addIssueFieldRule(rawIssueFieldDate("F_target_date", "Target date")),
+    viewsRule([VIEW(1, "View 1")]),
+    restFieldsRule("orgs", "octo", 9, ISSUE_REST_FIELDS),
+    restViewRule("orgs/octo/projectsV2/9/views"),
+    updateViewRule(),
+    DELETE_VIEW,
+  ]
+
+  test("on a fresh org board: adds mirrored issue columns and standard views reference them", async () => {
+    const installed = use(freshIssueRules())
+    const result = await run({ ...OWNER, dates: "issue_fields" })
+    expect(result).toEqual({
+      project: SUMMARY(9),
+      created: true,
+      copied_from: null,
+      fields: [
+        {
+          field: "Status",
+          created: false,
+          added_options: ["Waiting", "Cancelled"],
+          updated_options: ["Todo", "In Progress", "Done"],
+        },
+        { field: "Start date", created: true, added_options: [], updated_options: [] },
+        { field: "Target date", created: true, added_options: [], updated_options: [] },
+      ],
+      views: [
+        { view: "Roadmap", created: true },
+        { view: "Kanban", created: true },
+        { view: "Backlog", created: true },
+      ],
+      deleted_default_view: true,
+      linked: null,
+      notes: [
+        "Set the Roadmap view's date fields to Start date and Target date in the web UI; the API cannot set them.",
+      ],
+      errors: {},
+    })
+
+    const issueFieldMutations = mutationsSent(installed).filter((args) =>
+      queryOf(args).includes("createProjectV2IssueField(input"),
+    )
+    expect(issueFieldMutations).toHaveLength(2)
+    expect(issueFieldMutations[0]).toEqual(expect.arrayContaining(["field=IF_start", "project=PVT_9"]))
+    expect(issueFieldMutations[1]).toEqual(expect.arrayContaining(["field=IF_target", "project=PVT_9"]))
+
+    const dateFieldMutations = mutationsSent(installed).filter((args) =>
+      queryOf(args).includes("createProjectV2Field(input"),
+    )
+    expect(dateFieldMutations).toHaveLength(0)
+
+    expect(restWrites(installed).map((write) => write.body)).toEqual(ISSUE_BODIES)
+  })
+
+  describe("refusals before createProjectV2", () => {
+    test("a user owner is refused", async () => {
+      const installed = use([boardOwnerRule("alice", "User", "U_1"), CREATE])
+      const error = await failure(run({ owner: "alice", dates: "issue_fields" }))
+      expect(error.code).toBe("invalid_argument")
+      expect(error.message).toBe("Issue fields belong to an organization; alice is a user.")
+      expect(writeLog(installed)).toEqual([])
+    })
+
+    test("an org without Start date is refused, listing the org's issue fields", async () => {
+      const installed = use([
+        boardOwnerRule("octo", "Organization"),
+        organizationIssueFieldsRule("octo", [
+          { __typename: "IssueFieldNumber", id: "IF_effort", name: "Effort", dataType: "NUMBER" },
+          TARGET_NODE,
+        ]),
+        CREATE,
+      ])
+      const error = await failure(run({ ...OWNER, dates: "issue_fields" }))
+      expect(error.code).toBe("invalid_argument")
+      expect(error.message).toBe('octo has no issue field "Start date". Issue fields: "Effort", "Target date".')
+      expect(writeLog(installed)).toEqual([])
+    })
+
+    test("a Target date that is not a date is refused", async () => {
+      const installed = use([
+        boardOwnerRule("octo", "Organization"),
+        organizationIssueFieldsRule("octo", [
+          START_NODE,
+          { __typename: "IssueFieldText", id: "IF_target", name: "Target date", dataType: "TEXT" },
+        ]),
+        CREATE,
+      ])
+      const error = await failure(run({ ...OWNER, dates: "issue_fields" }))
+      expect(error.code).toBe("invalid_argument")
+      expect(error.message).toBe('"Target date" is text, not date.')
+      expect(writeLog(installed)).toEqual([])
+    })
+
+    test("a GitHub without issue fields is refused", async () => {
+      const installed = use([boardOwnerRule("octo", "Organization"), organizationIssueFieldsRule("octo", null), CREATE])
+      const error = await failure(run({ ...OWNER, dates: "issue_fields" }))
+      expect(error.code).toBe("invalid_argument")
+      expect(error.message).toBe("This GitHub has no issue fields.")
+      expect(writeLog(installed)).toEqual([])
+    })
+
+    test("standard: false with dates: issue_fields is refused", async () => {
+      const installed = use([boardOwnerRule("octo", "Organization"), CREATE])
+      const error = await failure(run({ ...OWNER, dates: "issue_fields", standard: false }))
+      expect(error.code).toBe("invalid_argument")
+      expect(error.message).toBe("dates applies only with standard.")
+      expect(writeLog(installed)).toEqual([])
+    })
+  })
+
+  test("a reused board that already has the mirrored columns is created: false with no mutations for them", async () => {
+    const status = rawField("F1", "Status", "SINGLE_SELECT", [
+      rawOption("o1", "Todo", "GREEN", "Mine"),
+      rawOption("o2", "Done", "PURPLE"),
+    ])
+    const installed = use([
+      boardOwnerRule("octo", "Organization"),
+      definitionsRule,
+      ownerBoardsRule("organization", "octo", [rawBoard(4)]),
+      {
+        ...fieldsRule([
+          TITLE,
+          status,
+          rawIssueFieldDate("F_start", "Start date"),
+          rawIssueFieldDate("F_target", "Target date"),
+        ]),
+        times: 1,
+      },
+      fieldsRule(graphqlFieldNodes(ISSUE_REST_FIELDS)),
+      fieldMutationRule("updateProjectV2Field", rawField("F1", "Status", "SINGLE_SELECT", [])),
+      viewsRule([VIEW(1, "View 1"), VIEW(2, "Roadmap"), VIEW(3, "Kanban"), VIEW(4, "Backlog")]),
+      DELETE_VIEW,
+      CREATE,
+    ])
+    const result = await run({ ...OWNER, dates: "issue_fields" })
+    expect(result.created).toBe(false)
+    expect(result.fields).toEqual([
+      {
+        field: "Status",
+        created: false,
+        added_options: ["In Progress", "Waiting", "Cancelled"],
+        updated_options: [],
+      },
+      { field: "Start date", created: false, added_options: [], updated_options: [] },
+      { field: "Target date", created: false, added_options: [], updated_options: [] },
+    ])
+    expect(writeLog(installed)).toEqual(["updateProjectV2Field"])
+  })
+
+  test("a reused board with its own Target date field sets errors.fields and still returns the board", async () => {
+    const status = rawField("F1", "Status", "SINGLE_SELECT", [
+      rawOption("o1", "Todo", "GREEN", "Mine"),
+      rawOption("o2", "Done", "PURPLE"),
+    ])
+    const installed = use([
+      boardOwnerRule("octo", "Organization"),
+      definitionsRule,
+      ownerBoardsRule("organization", "octo", [rawBoard(4)]),
+      {
+        ...fieldsRule([TITLE, status, rawField("F_target", "Target date", "DATE")]),
+        times: 1,
+      },
+      fieldMutationRule("updateProjectV2Field", rawField("F1", "Status", "SINGLE_SELECT", [])),
+      addIssueFieldRule(rawIssueFieldDate("F_start_date", "Start date")),
+      viewsRule([VIEW(1, "View 1"), VIEW(2, "Roadmap"), VIEW(3, "Kanban"), VIEW(4, "Backlog")]),
+      CREATE,
+    ])
+    const result = await run({ ...OWNER, dates: "issue_fields" })
+    expect(result.project).toEqual(SUMMARY(4))
+    expect(result.created).toBe(false)
+    expect(Object.keys(result.errors)).toEqual(["fields"])
+    expect(result.errors.fields).toContain('The board has its own field "Target date"')
   })
 })

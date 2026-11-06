@@ -1,15 +1,19 @@
 import { describe, expect, test } from "bun:test"
 import { failure } from "../../testing/issue-fixtures"
-import { fieldsRule, octoBoardRules } from "../../testing/project-fixtures"
+import { gqlErrors } from "../../testing/gql"
+import { fieldsRule, namedBoardRule, octoBoardRules, ownerTypeRule, rawUserBoard } from "../../testing/project-fixtures"
 import {
   fieldMutationRule,
+  mutationRule,
   mutationsSent,
+  organizationIssueFieldsRule,
   queryOf,
   rawField,
+  rawIssueFieldDate,
   rawIssueFieldSingleSelect,
   rawOption,
 } from "../../testing/setup-fixtures"
-import { sent } from "../../testing/write-fixtures"
+import { ISSUE_FIELD_DEFINITIONS, ISSUE_FIELD_NODES, sent } from "../../testing/write-fixtures"
 import { writeHarness } from "../../testing/write-harness"
 import { projectFieldEnsure } from "./field-ensure"
 
@@ -137,6 +141,149 @@ describe("an existing field", () => {
       field: { id: "F_priority", name: "Priority", type: "single_select", issue_field: true },
     })
     expect(mutationsSent(installed)).toEqual([])
+  })
+})
+
+describe("an issue field column", () => {
+  const TARGET_DATE = rawField("F7", "Target date", "DATE")
+  const ADD = "createProjectV2IssueField"
+  const addRule = (field: unknown) => mutationRule(ADD, { [ADD]: { projectV2Field: field } })
+  const definitionsRule = organizationIssueFieldsRule("octo", ISSUE_FIELD_NODES)
+  const read = (installed: ReturnType<typeof use>) => sent(installed).map((args) => queryOf(args))
+
+  test("is added with the issue field's id; its name, type and options are the organization's", async () => {
+    const installed = use([
+      ...octoBoardRules(3),
+      fieldsRule([rawField("F1", "Title", "TITLE")]),
+      definitionsRule,
+      addRule(rawIssueFieldDate("F_target_date", "Target date")),
+    ])
+    expect(await run({ ...BOARD, name: " target DATE ", issue_field: true })).toEqual({
+      project: SUMMARY,
+      field: { id: "F_target_date", name: "Target date", type: "date", issue_field: true },
+      created: true,
+      added_options: [],
+    })
+    const [call, ...others] = mutationsSent(installed)
+    expect(others).toEqual([])
+    expect(queryOf(call!)).toContain(`${ADD}(input:{projectId:$project,issueFieldId:$field})`)
+    expect(queryOf(call!)).toContain("isIssueField")
+    expect(call).toContain("field=IF_target")
+    expect(call).toContain("project=PVT_3")
+  })
+
+  test("a single select reports the organization's options, and a type that matches is accepted", async () => {
+    const created = rawIssueFieldSingleSelect("F_priority", "Priority", [rawOption("IFO_high", "High")])
+    const installed = use([...octoBoardRules(3), fieldsRule([]), definitionsRule, addRule(created)])
+    const result = await run({ ...BOARD, name: "Priority", type: "single_select", issue_field: true })
+    expect(result).toMatchObject({
+      created: true,
+      added_options: [],
+      field: { issue_field: true, type: "single_select", options: [{ id: "IFO_high", name: "High" }] },
+    })
+    expect(mutationsSent(installed)[0]).toContain("field=IF_priority")
+  })
+
+  test("already on the board: returned as it is, and nothing is written", async () => {
+    const installed = use([
+      ...octoBoardRules(3),
+      fieldsRule([rawIssueFieldDate("F_target_date", "Target date")]),
+      definitionsRule,
+    ])
+    expect(await run({ ...BOARD, name: "TARGET date", issue_field: true })).toMatchObject({
+      created: false,
+      added_options: [],
+      field: { id: "F_target_date", issue_field: true },
+    })
+    expect(mutationsSent(installed)).toEqual([])
+  })
+
+  test("a field of the board's own with that name is refused before anything is written", async () => {
+    const installed = use([...octoBoardRules(3), fieldsRule([TARGET_DATE]), definitionsRule])
+    const error = await failure(run({ ...BOARD, name: "Target date", issue_field: true }))
+    expect(error.code).toBe("invalid_argument")
+    expect(error.message).toBe(
+      "The board has its own field \"Target date\"; an issue field column cannot take the same name. Rename or delete the board's field in the web UI, or use the board's field.",
+    )
+    expect(mutationsSent(installed)).toEqual([])
+  })
+
+  test("a name the organization has no issue field of is refused, listing the ones it has", async () => {
+    const installed = use([...octoBoardRules(3), fieldsRule([]), definitionsRule])
+    const error = await failure(run({ ...BOARD, name: "Start date", issue_field: true }))
+    expect(error.code).toBe("invalid_argument")
+    expect(error.message).toBe(
+      'octo has no issue field "Start date". Issue fields: "Priority", "Effort", "Target date", "Sprint", "Components".',
+    )
+    expect(mutationsSent(installed)).toEqual([])
+  })
+
+  test("a type that is not the issue field's is refused", async () => {
+    const installed = use([...octoBoardRules(3), fieldsRule([]), definitionsRule])
+    const error = await failure(run({ ...BOARD, name: "Priority", type: "date", issue_field: true }))
+    expect(error.code).toBe("invalid_argument")
+    expect(error.message).toBe('"Priority" is single_select, not date.')
+    expect(mutationsSent(installed)).toEqual([])
+  })
+
+  test("a user's board is refused without reading issue fields", async () => {
+    const installed = use([
+      ownerTypeRule("alice", "User"),
+      namedBoardRule("user", "alice", 3, rawUserBoard(3)),
+      fieldsRule([]),
+    ])
+    const error = await failure(run({ project: "alice/3", name: "Target date", issue_field: true }))
+    expect(error.code).toBe("invalid_argument")
+    expect(error.message).toBe("Issue fields belong to an organization; alice is a user.")
+    expect(read(installed).some((query) => query.includes("issueFields"))).toBe(false)
+    expect(mutationsSent(installed)).toEqual([])
+  })
+
+  test("a GitHub without issue fields is refused", async () => {
+    const message = "Field 'issueFields' doesn't exist on type 'Organization'"
+    const installed = use([
+      ...octoBoardRules(3),
+      fieldsRule([]),
+      { match: ISSUE_FIELD_DEFINITIONS, stdout: gqlErrors([{ type: "undefinedField", message }]) },
+    ])
+    const error = await failure(run({ ...BOARD, name: "Target date", issue_field: true }))
+    expect(error.code).toBe("invalid_argument")
+    expect(error.message).toBe("This GitHub has no issue fields.")
+    expect(mutationsSent(installed)).toEqual([])
+  })
+
+  test("options are the organization's: giving some is refused before GitHub is asked", async () => {
+    const installed = use([])
+    const error = await failure(run({ ...BOARD, name: "Priority", issue_field: true, options: ["Urgent"] }))
+    expect(error.code).toBe("invalid_argument")
+    expect(error.message).toContain("options are the organization's")
+    expect(sent(installed)).toEqual([])
+  })
+
+  test("a blank name is refused before GitHub is asked", async () => {
+    const installed = use([])
+    expect((await failure(run({ ...BOARD, name: " ", issue_field: true }))).code).toBe("invalid_argument")
+    expect(sent(installed)).toEqual([])
+  })
+
+  test("without issue_field the type is required, before GitHub is asked", async () => {
+    const installed = use([])
+    for (const args of [{ name: "Estimate" }, { name: "Estimate", issue_field: false }]) {
+      const error = await failure(run({ ...BOARD, ...args }))
+      expect(error.code).toBe("invalid_argument")
+      expect(error.message).toBe("type is required unless issue_field is true.")
+    }
+    expect(sent(installed)).toEqual([])
+  })
+
+  test("issue_field false keeps the board's own field path", async () => {
+    const installed = use([
+      ...octoBoardRules(3),
+      fieldsRule([]),
+      fieldMutationRule("createProjectV2Field", rawField("F9", "Estimate", "NUMBER")),
+    ])
+    await run({ ...BOARD, name: "Estimate", type: "number", issue_field: false })
+    expect(queryOf(mutationsSent(installed)[0]!)).toContain("createProjectV2Field(")
   })
 })
 
