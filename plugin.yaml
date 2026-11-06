@@ -41,6 +41,7 @@ provides_tools:
   - github_project_unlink
   - github_project_view_ensure
   - github_repo_create
+  - github_repo_edit
   - github_repo_read
   - github_ruleset_read
   - github_stack_link

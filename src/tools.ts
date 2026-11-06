@@ -37,6 +37,7 @@ import { milestoneCreate } from "./core/repos/milestone-create"
 import { milestoneEdit } from "./core/repos/milestone-edit"
 import { milestoneRead } from "./core/repos/milestone-read"
 import { repoCreate } from "./core/repos/repo-create"
+import { repoEdit } from "./core/repos/repo-edit"
 import { repoRead } from "./core/repos/repo-read"
 import { rulesetRead } from "./core/repos/ruleset-read"
 
@@ -84,4 +85,5 @@ export const ALL_TOOLS: ToolSpec[] = [
   milestoneCreate,
   milestoneEdit,
   repoCreate,
+  repoEdit,
 ]

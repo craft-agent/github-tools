@@ -12,6 +12,7 @@ const PR_TARGETS: Record<string, TargetKind> = { pr: "pull", repo: "repo" }
  */
 const EXPECTED_TARGETS: Record<string, Record<string, TargetKind>> = {
   github_repo_create: { repo: "repo" },
+  github_repo_edit: { repo: "repo" },
   github_label_create: { repo: "repo" },
   github_label_edit: { repo: "repo" },
   github_label_delete: { repo: "repo" },
@@ -66,6 +67,7 @@ const NOT_TARGETS: Record<string, Record<string, string>> = {
     clear_issue_fields: "field names of the issue it edits",
   },
   github_issue_relate: { remove_parent: "a flag; the parent is read from the issue" },
+  github_repo_edit: { has_issues: "a flag that turns the repository's issues on or off" },
   github_project_field_ensure: {
     repo: "where the board lookup starts; nothing is written to it",
     issue_field: "a flag; the column is added to the board, no issue is written",
