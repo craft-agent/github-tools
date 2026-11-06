@@ -36,9 +36,12 @@ import { labelDelete } from "./core/repos/label-delete"
 import { milestoneCreate } from "./core/repos/milestone-create"
 import { milestoneEdit } from "./core/repos/milestone-edit"
 import { milestoneRead } from "./core/repos/milestone-read"
+import { repoArchive } from "./core/repos/repo-archive"
 import { repoCreate } from "./core/repos/repo-create"
 import { repoEdit } from "./core/repos/repo-edit"
 import { repoRead } from "./core/repos/repo-read"
+import { repoUnarchive } from "./core/repos/repo-unarchive"
+import { repoVisibility } from "./core/repos/repo-visibility"
 import { rulesetRead } from "./core/repos/ruleset-read"
 
 /** Every tool spec of the package; entry points register their tools from this list. */
@@ -86,4 +89,7 @@ export const ALL_TOOLS: ToolSpec[] = [
   milestoneEdit,
   repoCreate,
   repoEdit,
+  repoVisibility,
+  repoArchive,
+  repoUnarchive,
 ]
