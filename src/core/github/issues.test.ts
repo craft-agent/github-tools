@@ -237,6 +237,57 @@ describe("readIssue", () => {
     useFake([detailRule(null)])
     expect((await failure(readIssue({ ...REF, number: 99 }, { comments: 5 }, CTX))).code).toBe("not_found")
   })
+
+  test("the detail query sent includes the issueFieldValues fragment", async () => {
+    const installed = useFake([detailRule(), dependenciesRule()])
+    await readIssue(REF, { comments: 5 }, CTX)
+    const detailCall = apiCalls(installed).find((args) => args.join(" ").includes(DETAIL))
+    expect(variable(detailCall!, "query")).toContain("issueFieldValues(first:25)")
+  })
+
+  test("returns the issue fields mapped by field name", async () => {
+    useFake([
+      detailRule(
+        rawIssue({
+          issueFieldValues: {
+            nodes: [
+              {
+                __typename: "IssueFieldSingleSelectValue",
+                field: { name: "Priority" },
+                name: "High",
+              },
+              {
+                __typename: "IssueFieldNumberValue",
+                field: { name: "Effort" },
+                value: 8,
+              },
+            ],
+          },
+        }),
+      ),
+      dependenciesRule(),
+    ])
+    const issue = await readIssue(REF, { comments: 5 }, CTX)
+    expect(issue.issue_fields).toEqual({ Priority: "High", Effort: 8 })
+  })
+
+  test("a schema error on issueFieldValues re-runs without the fragment and returns issue_fields: null", async () => {
+    const installed = useFake([
+      {
+        match: DETAIL,
+        stdout: gqlErrors([{ message: "Field 'issueFieldValues' doesn't exist on type 'Issue'" }]),
+        times: 1,
+      },
+      detailRule(rawIssue()),
+      dependenciesRule(),
+    ])
+    const issue = await readIssue(REF, { comments: 5 }, CTX)
+    expect(issue.issue_fields).toBeNull()
+    const calls = apiCalls(installed).filter((args) => args.join(" ").includes(DETAIL))
+    expect(calls).toHaveLength(2)
+    expect(variable(calls[0]!, "query")).toContain("issueFieldValues(first:25)")
+    expect(variable(calls[1]!, "query")).not.toContain("issueFieldValues(first:25)")
+  })
 })
 
 describe("searchIssues", () => {
@@ -315,6 +366,30 @@ describe("searchIssues", () => {
     useFake([{ match: SEARCH, stdout: gqlErrors([{ message: "The listed users cannot be searched" }]) }])
     expect((await failure(searchIssues(QUERY, 30, CTX))).message).toContain("cannot be searched")
   })
+
+  test("the search query sent includes the issueFieldValues fragment", async () => {
+    const installed = useFake([searchRule()])
+    await searchIssues(QUERY, 30, CTX)
+    const call = apiCalls(installed).find((args) => args.join(" ").includes("search(type:ISSUE"))
+    expect(variable(call!, "query")).toContain("issueFieldValues(first:25)")
+  })
+
+  test("a schema error on issueFieldValues re-runs without the fragment and returns issue_fields: null on rows", async () => {
+    const installed = useFake([
+      {
+        match: SEARCH,
+        stdout: gqlErrors([{ message: "Field 'issueFieldValues' doesn't exist on type 'Issue'" }]),
+        times: 1,
+      },
+      searchRule([rawRow(1)]),
+    ])
+    const { issues } = await searchIssues(QUERY, 30, CTX)
+    expect(issues[0]?.issue_fields).toBeNull()
+    const calls = apiCalls(installed).filter((args) => args.join(" ").includes("search(type:ISSUE"))
+    expect(calls).toHaveLength(2)
+    expect(variable(calls[0]!, "query")).toContain("issueFieldValues(first:25)")
+    expect(variable(calls[1]!, "query")).not.toContain("issueFieldValues(first:25)")
+  })
 })
 
 describe("readSubIssues", () => {
@@ -341,6 +416,30 @@ describe("readSubIssues", () => {
     expect(error.code).toBe("not_found")
     expect(error.message).toContain("octo/hello#12")
   })
+
+  test("the sub-issues query sent includes the issueFieldValues fragment", async () => {
+    const installed = useFake([subIssuesRule([rawRow(1)])])
+    await readSubIssues(REF, CTX)
+    const call = apiCalls(installed).find((args) => new RegExp(SUB_ISSUES).test(args.join(" ")))
+    expect(variable(call!, "query")).toContain("issueFieldValues(first:25)")
+  })
+
+  test("a schema error on issueFieldValues re-runs without the fragment and returns issue_fields: null on rows", async () => {
+    const installed = useFake([
+      {
+        match: SUB_ISSUES,
+        stdout: gqlErrors([{ message: "Field 'issueFieldValues' doesn't exist on type 'Issue'" }]),
+        times: 1,
+      },
+      subIssuesRule([rawRow(4)]),
+    ])
+    const read = await readSubIssues(REF, CTX)
+    expect(read.issues[0]?.issue_fields).toBeNull()
+    const calls = apiCalls(installed).filter((args) => new RegExp(SUB_ISSUES).test(args.join(" ")))
+    expect(calls).toHaveLength(2)
+    expect(variable(calls[0]!, "query")).toContain("issueFieldValues(first:25)")
+    expect(variable(calls[1]!, "query")).not.toContain("issueFieldValues(first:25)")
+  })
 })
 
 describe("stateWord", () => {
@@ -353,11 +452,18 @@ describe("stateWord", () => {
 })
 
 describe("readIssueFields", () => {
-  test("reads the state, the reason, the body and the labels in one query", async () => {
+  test("reads the id, the state, the reason, the body and the labels in one query", async () => {
     const installed = useFake([
-      issueFieldsRule({ state: "CLOSED", stateReason: "NOT_PLANNED", body: "Text", labels: ["bug", "type:bug"] }),
+      issueFieldsRule({
+        id: "I_7",
+        state: "CLOSED",
+        stateReason: "NOT_PLANNED",
+        body: "Text",
+        labels: ["bug", "type:bug"],
+      }),
     ])
     expect(await readIssueFields(REF, CTX)).toEqual({
+      id: "I_7",
       state: "closed",
       state_reason: "not_planned",
       body: "Text",
@@ -374,9 +480,18 @@ describe("readIssueFields", () => {
 
   test("a missing body is empty and a missing reason is null", async () => {
     useFake([
-      { match: FIELDS, stdout: gqlReply({ repository: { issue: { state: "OPEN", body: null, labels: null } } }) },
+      {
+        match: FIELDS,
+        stdout: gqlReply({ repository: { issue: { id: "I_1", state: "OPEN", body: null, labels: null } } }),
+      },
     ])
-    expect(await readIssueFields(REF, CTX)).toEqual({ state: "open", state_reason: null, body: "", labels: [] })
+    expect(await readIssueFields(REF, CTX)).toEqual({
+      id: "I_1",
+      state: "open",
+      state_reason: null,
+      body: "",
+      labels: [],
+    })
   })
 
   test("an issue that does not exist is not_found", async () => {

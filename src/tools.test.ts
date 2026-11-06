@@ -11,7 +11,7 @@ const PR_TARGETS: Record<string, TargetKind> = { pr: "pull", repo: "repo" }
  * on purpose: an undeclared one would be written to without being asked for.
  */
 const EXPECTED_TARGETS: Record<string, Record<string, TargetKind>> = {
-  github_issue_create: { repo: "repo", parent: "issue", blocked_by: "issues" },
+  github_issue_create: { repo: "repo", parent: "issue", blocked_by: "issues", project: "optional_board" },
   github_issue_edit: { issue: "issue", repo: "repo" },
   github_issue_comment: { issue: "issue", repo: "repo" },
   github_issue_close: { issue: "issue", repo: "repo" },
@@ -54,6 +54,11 @@ const EXPECTED_TARGETS: Record<string, Record<string, TargetKind>> = {
 /** Arguments that look like they name a repository but do not make the call write to one, and why. */
 const NOT_TARGETS: Record<string, Record<string, string>> = {
   github_issue_close: { duplicate_of: "closing as a duplicate writes nothing to the original's repository" },
+  github_issue_create: { issue_fields: "field values of the issue it creates" },
+  github_issue_edit: {
+    issue_fields: "field values of the issue it edits",
+    clear_issue_fields: "field names of the issue it edits",
+  },
   github_issue_relate: { remove_parent: "a flag; the parent is read from the issue" },
   github_project_field_ensure: { repo: "where the board lookup starts; nothing is written to it" },
   github_project_view_ensure: { repo: "where the board lookup starts; nothing is written to it" },

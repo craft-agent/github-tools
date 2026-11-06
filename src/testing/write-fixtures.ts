@@ -5,6 +5,9 @@ import { gqlReply } from "./gql"
 
 export const ORIGIN = "https://github.com/octo/hello.git"
 
+/** The node id `issueFieldsRule` gives the issue unless it is told another. */
+export const ISSUE_ID = "I_12"
+
 /** Each is a token only one of the queries holds, so a fake `gh` rule can pick it. */
 export const REPOSITORY = "viewerPermission"
 export const ISSUE_TYPES = "issueTypes\\(first"
@@ -12,6 +15,9 @@ export const LABEL = "label\\(name:"
 export const MILESTONES = "milestones\\?state=all"
 export const MILESTONE_CREATE = "-X POST"
 export const FIELDS = "labels\\(first:100\\)"
+export const ISSUE_FIELD_DEFINITIONS = "issueFields\\(first"
+export const ISSUE_FIELD_VALUES = "issueFieldValues\\(first"
+export const ISSUE_FIELD_MUTATION = "setIssueFieldValue"
 
 /** The repository query's reply: `octo/hello` unless `repo` says otherwise, owned by the viewer unless `viewer` does. */
 export function repositoryRule(options: { repo?: string; permission?: string | null; viewer?: string } = {}): GhRule {
@@ -75,14 +81,15 @@ export const writeRules = (...rules: GhRule[]): GhRule[] => [
   { match: "^issue edit" },
 ]
 
-/** The state, body and labels of the issue, as the fields query returns them. */
+/** The node id, state, body and labels of the issue, as the fields query returns them. */
 export const issueFieldsRule = (
-  fields: { state?: string; stateReason?: string | null; body?: string; labels?: string[] } = {},
+  fields: { id?: string; state?: string; stateReason?: string | null; body?: string; labels?: string[] } = {},
 ): GhRule => ({
   match: FIELDS,
   stdout: gqlReply({
     repository: {
       issue: {
+        id: fields.id ?? ISSUE_ID,
         state: fields.state ?? "OPEN",
         stateReason: fields.stateReason ?? null,
         body: fields.body ?? "",
@@ -90,6 +97,51 @@ export const issueFieldsRule = (
       },
     },
   }),
+})
+
+/** An organization's issue fields as the definitions query returns them: one of each type. */
+export const ISSUE_FIELD_NODES = [
+  {
+    __typename: "IssueFieldSingleSelect",
+    id: "IF_priority",
+    name: "Priority",
+    dataType: "SINGLE_SELECT",
+    options: [
+      { id: "IFO_high", name: "High" },
+      { id: "IFO_low", name: "Low" },
+    ],
+  },
+  { __typename: "IssueFieldNumber", id: "IF_effort", name: "Effort", dataType: "NUMBER" },
+  { __typename: "IssueFieldDate", id: "IF_target", name: "Target date", dataType: "DATE" },
+  { __typename: "IssueFieldText", id: "IF_sprint", name: "Sprint", dataType: "TEXT" },
+  {
+    __typename: "IssueFieldMultiSelect",
+    id: "IF_components",
+    name: "Components",
+    dataType: "MULTI_SELECT",
+    options: [
+      { id: "IFO_ui", name: "UI" },
+      { id: "IFO_api", name: "API" },
+    ],
+  },
+]
+
+/** The repository's issue fields: these definitions, or none (`null`, as a personal account's repository answers). */
+export const issueFieldDefinitionsRule = (nodes: unknown[] | null = ISSUE_FIELD_NODES): GhRule => ({
+  match: ISSUE_FIELD_DEFINITIONS,
+  stdout: gqlReply({ repository: { issueFields: nodes === null ? null : { nodes } } }),
+})
+
+/** The mutation that sets and clears issue fields succeeding. */
+export const issueFieldsSetRule = (): GhRule => ({
+  match: ISSUE_FIELD_MUTATION,
+  stdout: gqlReply({ setIssueFieldValue: { issueFieldValues: [] } }),
+})
+
+/** The values of the issue's fields as the read after a write returns them. */
+export const issueFieldValuesRule = (nodes: unknown[]): GhRule => ({
+  match: ISSUE_FIELD_VALUES,
+  stdout: gqlReply({ node: { issueFieldValues: { nodes } } }),
 })
 
 /** What `gh issue create` prints: the new issue's URL. */

@@ -1,6 +1,6 @@
 ---
 name: github-issues
-description: "Use when reading or changing GitHub issues through the github_issue_* tools: view or list issues, search a repository's issues, create, edit, comment on, close or reopen an issue, set its kind (an Issue Type or a type: label), labels, assignees or milestone, relate issues (parent, sub-issues, blocked by, blocking), or link a development branch to an issue. Covers issue references, what each tool reports, partial failures and error codes. Not for pull requests, project boards, or how to plan work."
+description: "Use when reading or changing GitHub issues through the github_issue_* tools: view or list issues, search a repository's issues, create, edit, comment on, close or reopen an issue, set its kind (an Issue Type or a type: label), labels, assignees, milestone or organization issue fields (Priority, Effort, Start date, Target date), put a new issue on a board, relate issues (parent, sub-issues, blocked by, blocking), or link a development branch to an issue. Covers issue references, what each tool reports, partial failures and error codes. Not for pull requests, managing project boards and their items, or how to plan work."
 ---
 
 # GitHub issues
@@ -9,16 +9,16 @@ Eight tools work on GitHub issues. Some hosts show a tool under a longer name
 (a server or plugin prefix before it); the part ending in `github_issue_…` is
 the tool meant here.
 
-| Tool                   | Does                                                       | Writes                       |
-| ---------------------- | ---------------------------------------------------------- | ---------------------------- |
-| `github_issue_read`    | `method: "view"` one issue in full, `"list"` many          | no                           |
-| `github_issue_create`  | a new issue with its kind, labels, milestone and relations | adds                         |
-| `github_issue_edit`    | title, body, kind, labels, assignees, milestone            | overwrites                   |
-| `github_issue_comment` | a comment                                                  | adds                         |
-| `github_issue_close`   | closes with a reason                                       | overwrites                   |
-| `github_issue_reopen`  | reopens                                                    | overwrites                   |
-| `github_issue_relate`  | parent, sub-issues, blocked by, blocking                   | changes only what differs    |
-| `github_issue_develop` | a branch on GitHub linked to the issue                     | creates once, then reuses it |
+| Tool                   | Does                                                                            | Writes                       |
+| ---------------------- | ------------------------------------------------------------------------------- | ---------------------------- |
+| `github_issue_read`    | `method: "view"` one issue in full, `"list"` many                               | no                           |
+| `github_issue_create`  | a new issue with its kind, labels, milestone, relations, issue fields and board | adds                         |
+| `github_issue_edit`    | title, body, kind, labels, assignees, milestone, issue fields                   | overwrites                   |
+| `github_issue_comment` | a comment                                                                       | adds                         |
+| `github_issue_close`   | closes with a reason                                                            | overwrites                   |
+| `github_issue_reopen`  | reopens                                                                         | overwrites                   |
+| `github_issue_relate`  | parent, sub-issues, blocked by, blocking                                        | changes only what differs    |
+| `github_issue_develop` | a branch on GitHub linked to the issue                                          | creates once, then reuses it |
 
 A write usually waits for the host's approval, and a comment, a close, a
 reopen or a new assignee notifies people. Read before you write when the
@@ -40,7 +40,7 @@ An issue is `12`, `#12`, `owner/repo#12` or its URL.
 ## Reading
 
 - **`view`** returns the issue with its body, kind, labels, assignees,
-  milestone, parent, sub-issues and their progress, blocked-by and blocking,
+  milestone, issue fields, parent, sub-issues and their progress, blocked-by and blocking,
   linked branches, closing pull requests, boards and the latest `comments`
   (default 5, at most 50; `comment_count` is the total).
   `dependencies_error` set means blocked-by and blocking could not be read
@@ -49,7 +49,10 @@ An issue is `12`, `#12`, `owner/repo#12` or its URL.
   `milestone` (`"none"` for none), `label`, `assignee` (`"@me"`, `"none"`) and
   extra search words in `query` (`sort:updated-desc`, `in:title crash`). It
   never reaches another repository: `repo:`, `org:` and `user:` are refused
-  in `query`; list each repository in its own call.
+  in `query`; list each repository in its own call. `field.<name>:<value>` in
+  `query` filters by an issue field (`field.priority:high`,
+  `field."target date":>=2026-12-01`), and each row carries its
+  `issue_fields`.
 - **`list` with `parent`** returns that issue's sub-issues instead, filtered
   by `state`; the search filters cannot be combined with it.
 - `truncated: true` means more matched than `limit` (default 30, at most
@@ -69,19 +72,45 @@ repository lacks it. The result's `kind.via` says which (`type` or `label`).
 On an edit, a label kind replaces the issue's other `type:` labels. `list`
 with `kind` matches the same way.
 
+## Issue fields
+
+Issue fields (Priority, Effort, Start date, Target date, and any others) are
+defined by the organization, so only its repositories have them; a personal
+account's repository refuses them. A read reports them as `issue_fields`, the
+fields that have a value by name (`{}` when none is set, `null` on a GitHub
+that has no issue fields).
+
+- `issue_fields` on create and edit takes `{"Priority": "High", "Target date":
+"2026-12-01"}`: a text, a number, a date as `YYYY-MM-DD`, an option name, or
+  a list of option names for a multi-select field. Names and options match
+  without regard to case.
+- `clear_issue_fields` on edit takes the names to clear.
+- Every name, option and value is checked before anything is written; a
+  refusal lists the fields or options there are. Read an issue with `view`
+  to see which fields its organization uses before guessing a name.
+- They are the issue's own fields, not a board's: on a board, set the board's
+  fields (Status, Start, Target, …) with `fields`.
+
 ## Creating
 
 `github_issue_create` settles the issue's place in the same call: `kind`,
-`labels` (they must exist), `assignees`, `milestone`, `parent` and
-`blocked_by`.
+`labels` (they must exist), `assignees`, `milestone`, `parent`,
+`blocked_by`, `issue_fields`, and a board with `project` and its `fields`.
 
-- A `milestone` that does not exist fails before anything is written, unless
-  `create_milestone: true`.
-- Kind, parent and blocked-by are set after the issue exists. If one of them
-  fails, the call still succeeds: the issue is returned and the failed steps
-  are listed in `errors`. **Do not create the issue again.** Fix the failed
-  step on the issue that exists, with `github_issue_edit` (kind) or
-  `github_issue_relate` (parent, blocked by).
+- Everything that can fail is checked before the issue is made: a
+  `milestone` that does not exist (unless `create_milestone: true`), an issue
+  field, option or value, and the board and its values.
+- `project` is found as the board tools find one (a number, `owner/number`,
+  its URL or title, default `Roadmap`). The issue starts as Todo there, or
+  Waiting when an issue in `blocked_by` is open and the board has Waiting; a
+  `Status` in `fields` replaces that.
+- Kind, parent, blocked-by, issue fields and the board are set after the
+  issue exists. If one of them fails, the call still succeeds: the issue is
+  returned and the failed steps are listed in `errors` (`kind`, `parent`,
+  `blocked_by`, `issue_fields`, `project`, `fields.<Name>`). **Do not create
+  the issue again.** Fix the failed step on the issue that exists, with
+  `github_issue_edit` (kind, issue fields), `github_issue_relate` (parent,
+  blocked by) or the board tools (board, board fields).
 
 ## Editing
 
@@ -91,6 +120,10 @@ with `kind` matches the same way.
 - Labels and assignees are added or removed by list (`add_labels`,
   `remove_assignees`, …); nothing else on the issue changes.
 - `milestone` sets one, `remove_milestone: true` takes the issue out of it.
+- `issue_fields` sets and `clear_issue_fields` clears issue fields; the
+  result's `issue_fields` is what the issue holds afterwards. They are written
+  after the other changes: if that write fails, the message names the changes
+  already applied, so fix the cause and call again with the issue fields only.
 - `changed` lists what the call applied. A call with nothing to change is an
   error, not a no-op.
 

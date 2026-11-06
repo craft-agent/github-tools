@@ -27,6 +27,8 @@ describe("creating", () => {
       kind: null,
       milestone: null,
       relations: { parent: null, blocked_by: [] },
+      issue_fields: null,
+      project: null,
       foreign: false,
       errors: {},
     })

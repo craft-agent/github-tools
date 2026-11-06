@@ -2,6 +2,14 @@ import { z } from "zod"
 import { ToolError, isToolError, type ErrorCode } from "../errors"
 import { graphql, paginate, type Vars } from "../gh"
 import type { RefContext, RepoName } from "../refs"
+import {
+  ISSUE_FIELD_VALUES_FRAGMENT,
+  isIssueFieldsMissingError,
+  issueFieldValues,
+  issueFieldValuesSchema,
+  type IssueFieldValues,
+  type RawIssueFieldValue,
+} from "./issue-fields"
 import { readKind } from "./kind"
 
 /** Issue reads shared by the issue tools: one issue in full, a search over a repository and a parent's sub-issues. */
@@ -61,6 +69,11 @@ export const issueDetailSchema = z.object({
   assignees: z.array(z.string()),
   labels: z.array(z.string()),
   milestone: z.object({ number: z.number().int(), title: z.string(), due_on: z.string().nullable() }).nullable(),
+  issue_fields: issueFieldValuesSchema
+    .nullable()
+    .describe(
+      "The organization's issue fields that have a value, by field name: text, number, date (YYYY-MM-DD), an option name, or a list of option names; {} when none is set; null when this GitHub has no issue fields.",
+    ),
   kind: z.string().nullable(),
   issue_type: z.string().nullable(),
   parent: issueBriefSchema.nullable(),
@@ -110,11 +123,17 @@ export const issueRowSchema = z.object({
   labels: z.array(z.string()),
   assignees: z.array(z.string()),
   milestone: z.string().nullable(),
+  issue_fields: issueFieldValuesSchema
+    .nullable()
+    .describe(
+      "The organization's issue fields that have a value, by field name: text, number, date (YYYY-MM-DD), an option name, or a list of option names; {} when none is set; null when this GitHub has no issue fields.",
+    ),
   parent: issueBriefSchema.nullable(),
   sub_issue_progress: subIssueProgressSchema.nullable(),
   updated_at: z.string(),
 })
 
+export { issueFieldValuesSchema, type IssueFieldValues }
 export type IssueBrief = z.output<typeof issueBriefSchema>
 export type IssueDetail = z.output<typeof issueDetailSchema>
 export type IssueRow = z.output<typeof issueRowSchema>
@@ -139,6 +158,7 @@ type RawRow = RawBrief & {
   labels?: Connection<{ name: string }>
   assignees?: Connection<{ login: string }>
   milestone?: { title: string } | null
+  issueFieldValues?: Connection<RawIssueFieldValue>
   parent?: RawBrief | null
   subIssuesSummary?: RawSummary | null
 }
@@ -153,6 +173,7 @@ type RawIssue = RawBrief & {
   assignees?: Connection<{ login: string }>
   labels?: Connection<{ name: string }>
   milestone?: { number: number; title: string; dueOn?: string | null } | null
+  issueFieldValues?: Connection<RawIssueFieldValue>
   issueType?: { name?: string } | null
   parent?: RawBrief | null
   subIssues?: Connection<RawBrief>
@@ -179,12 +200,15 @@ type RawIssue = RawBrief & {
 
 const BRIEF_FIELDS = "number title url state repository{nameWithOwner}"
 const SUMMARY_FIELDS = "subIssuesSummary{total completed percentCompleted}"
-const ROW_FIELDS = `${BRIEF_FIELDS} updatedAt issueType{name} labels(first:${ROW_LABELS}){nodes{name}} assignees(first:${ROW_ASSIGNEES}){nodes{login}} milestone{title} parent{${BRIEF_FIELDS}} ${SUMMARY_FIELDS}`
+const rowFields = (withFields: boolean) =>
+  `${BRIEF_FIELDS} updatedAt issueType{name} labels(first:${ROW_LABELS}){nodes{name}} assignees(first:${ROW_ASSIGNEES}){nodes{login}} milestone{title} ${withFields ? `${ISSUE_FIELD_VALUES_FRAGMENT} ` : ""}parent{${BRIEF_FIELDS}} ${SUMMARY_FIELDS}`
+const ROW_FIELDS = rowFields(true)
 
-const DETAIL_QUERY = `query($owner:String!,$name:String!,$n:Int!,$comments:Int!,$withComments:Boolean!){repository(owner:$owner,name:$name){issue(number:$n){
+const detailQuery = (withFields: boolean) =>
+  `query($owner:String!,$name:String!,$n:Int!,$comments:Int!,$withComments:Boolean!){repository(owner:$owner,name:$name){issue(number:$n){
   id ${BRIEF_FIELDS} stateReason body createdAt updatedAt author{login}
   assignees(first:${PREVIEW_ASSIGNEES}){nodes{login}} labels(first:${PREVIEW_LABELS}){nodes{name}}
-  milestone{number title dueOn} issueType{name}
+  milestone{number title dueOn} ${withFields ? `${ISSUE_FIELD_VALUES_FRAGMENT} ` : ""}issueType{name}
   parent{${BRIEF_FIELDS}}
   subIssues(first:${MAX_SUB_ISSUES}){nodes{${BRIEF_FIELDS}}} ${SUMMARY_FIELDS}
   linkedBranches(first:${MAX_LINKED}){nodes{ref{name}}}
@@ -193,19 +217,26 @@ const DETAIL_QUERY = `query($owner:String!,$name:String!,$n:Int!,$comments:Int!,
   comments(last:$comments){totalCount nodes @include(if:$withComments){author{login} createdAt body url}}
 }}}`
 
+const DETAIL_QUERY = detailQuery(true)
+const DETAIL_QUERY_WITHOUT_FIELDS = detailQuery(false)
+
 const DEPENDENCIES_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){issue(number:$n){blockedBy(first:${MAX_DEPENDENCIES}){nodes{${BRIEF_FIELDS}}} blocking(first:${MAX_DEPENDENCIES}){nodes{${BRIEF_FIELDS}}}}}}`
 
-const SUB_ISSUES_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){issue(number:$n){
+const subIssuesQuery = (withFields: boolean) =>
+  `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){issue(number:$n){
   ${BRIEF_FIELDS}
-  subIssues(first:${MAX_SUB_ISSUES}){pageInfo{hasNextPage} nodes{${ROW_FIELDS}}}
+  subIssues(first:${MAX_SUB_ISSUES}){pageInfo{hasNextPage} nodes{${rowFields(withFields)}}}
 }}}`
+
+const SUB_ISSUES_QUERY = subIssuesQuery(true)
+const SUB_ISSUES_QUERY_WITHOUT_FIELDS = subIssuesQuery(false)
 
 const LINKED_BRANCHES_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){issue(number:$n){id linkedBranches(first:${MAX_LINKED_BRANCHES}){nodes{ref{name repository{nameWithOwner}}}}}}}`
 
 const CREATE_LINKED_BRANCH_MUTATION = `mutation($issueId:ID!,$oid:GitObjectID!,$repositoryId:ID!,$name:String){createLinkedBranch(input:{issueId:$issueId,oid:$oid,repositoryId:$repositoryId,name:$name}){linkedBranch{ref{name repository{nameWithOwner}}}}}`
 
 const FIELDS_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){issue(number:$n){
-  state stateReason body labels(first:${MAX_LABELS}){nodes{name}}
+  id state stateReason body labels(first:${MAX_LABELS}){nodes{name}}
 }}}`
 
 /**
@@ -214,7 +245,11 @@ const FIELDS_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(own
  * advanced search reads it as `(repo:a/b x) OR y` and leaves the repository.
  * The issue tools rely on this to keep a caller's words inside one repository.
  */
-const SEARCH_QUERY = `query($q:String!,$first:Int!,$after:String){search(type:ISSUE,query:$q,first:$first,after:$after){pageInfo{hasNextPage endCursor} nodes{... on Issue{${ROW_FIELDS}}}}}`
+const searchQuery = (withFields: boolean) =>
+  `query($q:String!,$first:Int!,$after:String){search(type:ISSUE,query:$q,first:$first,after:$after){pageInfo{hasNextPage endCursor} nodes{... on Issue{${rowFields(withFields)}}}}}`
+
+const SEARCH_QUERY = searchQuery(true)
+const SEARCH_QUERY_WITHOUT_FIELDS = searchQuery(false)
 
 function nodesOf<T>(connection: Connection<T>): T[] {
   return (connection?.nodes ?? []).filter((node): node is T => node != null)
@@ -234,7 +269,7 @@ function progress(summary: RawSummary): SubIssueProgress {
   return { total: summary.total, completed: summary.completed, percent: summary.percentCompleted }
 }
 
-function row(node: RawRow): IssueRow {
+function row(node: RawRow, withFields = true): IssueRow {
   const labels = nodesOf(node.labels).map((label) => label.name)
   return {
     number: node.number,
@@ -245,6 +280,7 @@ function row(node: RawRow): IssueRow {
     labels,
     assignees: nodesOf(node.assignees).map((assignee) => assignee.login),
     milestone: node.milestone?.title ?? null,
+    issue_fields: withFields ? issueFieldValues(node.issueFieldValues) : null,
     parent: node.parent ? brief(node.parent) : null,
     sub_issue_progress: node.subIssuesSummary ? progress(node.subIssuesSummary) : null,
     updated_at: node.updatedAt,
@@ -297,12 +333,16 @@ export async function readIssue(
   options: { comments: number },
   ctx: RefContext,
 ): Promise<IssueDetail> {
-  const issue = await readIssueData<RawIssue>(
-    DETAIL_QUERY,
-    ref,
-    { comments: Math.max(options.comments, 1), withComments: options.comments > 0 },
-    ctx,
-  )
+  const vars = { comments: Math.max(options.comments, 1), withComments: options.comments > 0 }
+  let issue: RawIssue
+  let withFields = true
+  try {
+    issue = await readIssueData<RawIssue>(DETAIL_QUERY, ref, vars, ctx)
+  } catch (error) {
+    if (!isIssueFieldsMissingError(error)) throw error
+    withFields = false
+    issue = await readIssueData<RawIssue>(DETAIL_QUERY_WITHOUT_FIELDS, ref, vars, ctx)
+  }
 
   let dependencies: { blocked_by: IssueBrief[]; blocking: IssueBrief[] } | undefined
   let dependenciesError: string | null = null
@@ -332,6 +372,7 @@ export async function readIssue(
     milestone: issue.milestone
       ? { number: issue.milestone.number, title: issue.milestone.title, due_on: issue.milestone.dueOn ?? null }
       : null,
+    issue_fields: withFields ? issueFieldValues(issue.issueFieldValues) : null,
     kind: readKind(issue.issueType?.name, labels),
     issue_type: issue.issueType?.name ?? null,
     parent: issue.parent ? brief(issue.parent) : null,
@@ -388,29 +429,43 @@ export async function searchIssues(
   limit: number,
   ctx: RefContext,
 ): Promise<{ issues: IssueRow[]; truncated: boolean }> {
-  const { items, truncated } = await paginate<RawRow | Record<string, never> | null>(
-    SEARCH_QUERY,
-    { q: query, first: Math.min(limit, MAX_SEARCH_PAGE) },
-    (data: { search?: { nodes: (RawRow | Record<string, never> | null)[] } | null } | null) => data?.search,
-    { cwd: ctx.cwd, signal: ctx.signal, limit },
-  )
+  const vars = { q: query, first: Math.min(limit, MAX_SEARCH_PAGE) }
+  const pick = (data: { search?: { nodes: (RawRow | Record<string, never> | null)[] } | null } | null) => data?.search
+  const options = { cwd: ctx.cwd, signal: ctx.signal, limit }
+  let items: (RawRow | Record<string, never> | null)[]
+  let truncated: boolean
+  let withFields = true
+  try {
+    const page = await paginate<RawRow | Record<string, never> | null>(SEARCH_QUERY, vars, pick, options)
+    items = page.items
+    truncated = page.truncated
+  } catch (error) {
+    if (!isIssueFieldsMissingError(error)) throw error
+    withFields = false
+    const page = await paginate<RawRow | Record<string, never> | null>(SEARCH_QUERY_WITHOUT_FIELDS, vars, pick, options)
+    items = page.items
+    truncated = page.truncated
+  }
   // A search hit that is not an issue comes back as an empty object.
-  const issues = items.filter((node): node is RawRow => node != null && "number" in node).map(row)
+  const issues = items
+    .filter((node): node is RawRow => node != null && "number" in node)
+    .map((node) => row(node, withFields))
   return { issues, truncated }
 }
 
-/** What a write needs to know about an issue before it changes it: its state and reason (as `stateWord` gives them), body and labels. */
-export type IssueFields = { state: string; state_reason: string | null; body: string; labels: string[] }
+/** What a write needs to know about an issue before it changes it: its node id, state and reason (as `stateWord` gives them), body and labels. */
+export type IssueFields = { id: string; state: string; state_reason: string | null; body: string; labels: string[] }
 
-/** The state, body and labels of one issue, in one small read. */
+/** The node id, state, body and labels of one issue, in one small read. */
 export async function readIssueFields(ref: { repo: RepoName; number: number }, ctx: RefContext): Promise<IssueFields> {
-  const issue = await readIssueData<Pick<RawIssue, "state" | "stateReason" | "body" | "labels">>(
+  const issue = await readIssueData<Pick<RawIssue, "id" | "state" | "stateReason" | "body" | "labels">>(
     FIELDS_QUERY,
     ref,
     {},
     ctx,
   )
   return {
+    id: issue.id,
     state: stateWord(issue.state),
     state_reason: stateWord(issue.stateReason),
     body: issue.body ?? "",
@@ -478,12 +533,21 @@ export async function readSubIssues(
   parent: { repo: RepoName; number: number },
   ctx: RefContext,
 ): Promise<{ parent: IssueBrief; issues: IssueRow[]; more: boolean }> {
-  const issue = await readIssueData<
-    RawBrief & { subIssues?: Connection<RawRow> & { pageInfo?: { hasNextPage?: boolean } } }
-  >(SUB_ISSUES_QUERY, parent, {}, ctx)
+  type SubIssuesPayload = RawBrief & {
+    subIssues?: Connection<RawRow> & { pageInfo?: { hasNextPage?: boolean } }
+  }
+  let issue: SubIssuesPayload
+  let withFields = true
+  try {
+    issue = await readIssueData<SubIssuesPayload>(SUB_ISSUES_QUERY, parent, {}, ctx)
+  } catch (error) {
+    if (!isIssueFieldsMissingError(error)) throw error
+    withFields = false
+    issue = await readIssueData<SubIssuesPayload>(SUB_ISSUES_QUERY_WITHOUT_FIELDS, parent, {}, ctx)
+  }
   return {
     parent: brief(issue),
-    issues: nodesOf(issue.subIssues).map(row),
+    issues: nodesOf(issue.subIssues).map((node) => row(node, withFields)),
     more: Boolean(issue.subIssues?.pageInfo?.hasNextPage),
   }
 }

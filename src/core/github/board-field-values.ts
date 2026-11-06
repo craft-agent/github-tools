@@ -42,7 +42,8 @@ function isSettable(type: string): type is SettableType {
   return (SETTABLE_TYPES as readonly string[]).includes(type)
 }
 
-function listOf(names: readonly string[]): string {
+/** Names quoted and comma-separated for an error message; "none" for an empty list. */
+export function listOf(names: readonly string[]): string {
   return names.length > 0 ? names.map((name) => `"${name}"`).join(", ") : "none"
 }
 
@@ -65,32 +66,35 @@ function settableField(fields: readonly BoardField[], name: string): SettableFie
   return field as SettableField
 }
 
-function textOf(field: BoardField, value: FieldValue, what: string): string {
+/** The text of a value for the field named `field`; a number is refused. `what` says what the field takes. */
+export function textOf(field: string, value: FieldValue, what: string): string {
   if (typeof value !== "string") {
-    throw invalid(`"${field.name}" takes ${what} as text; got the number ${value}. Pass it as a string.`)
+    throw invalid(`"${field}" takes ${what} as text; got the number ${value}. Pass it as a string.`)
   }
   return value
 }
 
-function numberOf(field: BoardField, value: FieldValue): number {
+/** The number of a value for the field named `field`: a number, or a string that is one. */
+export function numberOf(field: string, value: FieldValue): number {
   const text = typeof value === "string" ? value.trim() : undefined
   const number =
     typeof value === "number" ? value : text !== undefined && NUMBER_PATTERN.test(text) ? Number(text) : NaN
-  if (!Number.isFinite(number)) throw invalid(`"${field.name}" takes a number; got ${JSON.stringify(value)}.`)
+  if (!Number.isFinite(number)) throw invalid(`"${field}" takes a number; got ${JSON.stringify(value)}.`)
   return number
 }
 
-function dateOf(field: BoardField, value: FieldValue): string {
+/** The `YYYY-MM-DD` of a value for the field named `field`; a date that does not exist is refused. */
+export function dateOf(field: string, value: FieldValue): string {
   const text = textOf(field, value, "a date").trim()
   const parsed = DATE_PATTERN.test(text) ? new Date(`${text}T00:00:00Z`) : undefined
   if (!parsed || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== text) {
-    throw invalid(`"${field.name}" takes a date as YYYY-MM-DD; got ${JSON.stringify(value)}.`)
+    throw invalid(`"${field}" takes a date as YYYY-MM-DD; got ${JSON.stringify(value)}.`)
   }
   return text
 }
 
 function optionOf(field: BoardField, value: FieldValue): FieldWrite {
-  const name = textOf(field, value, "an option name")
+  const name = textOf(field.name, value, "an option name")
   const options = field.options ?? []
   const option = options.find((candidate) => sameTitle(candidate.name, name))
   if (!option) {
@@ -109,7 +113,7 @@ function currentIteration(iterations: NonNullable<BoardField["iterations"]>, now
 }
 
 function iterationOf(field: BoardField, value: FieldValue, now: Date): FieldWrite {
-  const title = textOf(field, value, "an iteration title").trim()
+  const title = textOf(field.name, value, "an iteration title").trim()
   const iterations = field.iterations ?? []
   const iteration =
     title.toLowerCase() === CURRENT_ITERATION
@@ -127,15 +131,15 @@ function iterationOf(field: BoardField, value: FieldValue, now: Date): FieldWrit
 function planValue(field: SettableField, value: FieldValue, now: Date): FieldWrite {
   switch (field.type) {
     case "text": {
-      const text = textOf(field, value, "text")
+      const text = textOf(field.name, value, "text")
       return { field, kind: "text", sent: text, shown: text }
     }
     case "number": {
-      const number = numberOf(field, value)
+      const number = numberOf(field.name, value)
       return { field, kind: "number", sent: number, shown: number }
     }
     case "date": {
-      const date = dateOf(field, value)
+      const date = dateOf(field.name, value)
       return { field, kind: "date", sent: date, shown: date }
     }
     case "single_select":

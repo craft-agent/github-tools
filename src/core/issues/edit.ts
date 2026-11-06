@@ -1,4 +1,15 @@
 import { z } from "zod"
+import { ToolError, isToolError } from "../errors"
+import {
+  ISSUE_FIELDS_ARGUMENT,
+  issueFieldInputSchema,
+  issueFieldValuesSchema,
+  planIssueFieldWrites,
+  readIssueFieldDefinitions,
+  readIssueFieldValuesById,
+  writeIssueFields,
+  type IssueFieldValues,
+} from "../github/issue-fields"
 import { readIssueFields } from "../github/issues"
 import {
   kindFlags,
@@ -43,6 +54,8 @@ const input = z.object({
   milestone: z.string().optional().describe("A milestone title to set."),
   remove_milestone: z.boolean().optional().describe("Take the issue out of its milestone."),
   create_milestone: z.boolean().optional().describe("Create the milestone when it does not exist; needs milestone."),
+  issue_fields: issueFieldInputSchema.optional().describe(ISSUE_FIELDS_ARGUMENT),
+  clear_issue_fields: z.array(z.string()).optional().describe("Issue fields to clear, by name."),
 })
 
 const output = z.object({
@@ -54,6 +67,11 @@ const output = z.object({
   milestone: milestoneSchema
     .nullable()
     .describe("The milestone that was set; null when none was set or it was removed."),
+  issue_fields: issueFieldValuesSchema
+    .nullable()
+    .describe(
+      "The issue's field values after the edit, by field name; null when issue_fields and clear_issue_fields were not given, or when the values could not be read back.",
+    ),
   foreign: z.boolean(),
 })
 
@@ -72,12 +90,26 @@ type Change = {
   milestone?: string
   removeMilestone: boolean
   createMilestone: boolean
+  issueFields: IssueFieldValues
+  clearIssueFields: string[]
 }
 
-function refuseOverlap(what: string, added: readonly string[], removed: readonly string[]): void {
+/** The names of an issue field list, trimmed and without repeats; a blank name is refused, as the field it would mean cannot be told. */
+function issueFieldNames(argument: string, names: readonly string[]): string[] {
+  const trimmed = names.map((name) => name.trim())
+  if (trimmed.some((name) => !name)) throw invalid(`${argument} has a blank field name; pass the field's name.`)
+  return [...new Set(trimmed)]
+}
+
+function refuseOverlap(
+  what: string,
+  added: readonly string[],
+  removed: readonly string[],
+  verbs = "added and removed",
+): void {
   const removing = new Set(removed.map((name) => name.toLowerCase()))
   const both = added.filter((name) => removing.has(name.toLowerCase()))
-  if (both.length) throw invalid(`${what} ${both.join(", ")} cannot be both added and removed.`)
+  if (both.length) throw invalid(`${what} ${both.join(", ")} cannot be both ${verbs}.`)
 }
 
 /** Refuses what cannot describe one edit, before any call to GitHub. */
@@ -99,6 +131,9 @@ function parseChange(args: Args): Change {
   if (createMilestone && !milestone) throw invalid("create_milestone needs milestone.")
 
   const [kind] = nameList("kind", args.kind === undefined ? [] : [args.kind])
+  const issueFields = args.issue_fields ?? {}
+  const setNames = issueFieldNames("issue_fields", Object.keys(issueFields))
+  const clearIssueFields = issueFieldNames("clear_issue_fields", args.clear_issue_fields ?? [])
   const change: Change = {
     title,
     body: args.body,
@@ -111,12 +146,15 @@ function parseChange(args: Args): Change {
     milestone,
     removeMilestone,
     createMilestone,
+    issueFields,
+    clearIssueFields,
   }
   refuseOverlap("Label", change.addLabels, change.removeLabels)
   refuseOverlap("Assignee", change.addAssignees, change.removeAssignees)
+  refuseOverlap("Issue field", setNames, clearIssueFields, "set and cleared")
   if (changedArguments(change).length === 0) {
     throw invalid(
-      "Nothing to change: pass at least one of title, body, append_body, kind, labels, assignees or milestone.",
+      "Nothing to change: pass at least one of title, body, append_body, kind, labels, assignees, milestone or issue fields.",
     )
   }
   return change
@@ -135,16 +173,30 @@ function changedArguments(change: Change): string[] {
     remove_assignees: change.removeAssignees.length > 0,
     milestone: change.milestone !== undefined,
     remove_milestone: change.removeMilestone,
+    issue_fields: Object.keys(change.issueFields).length > 0,
+    clear_issue_fields: change.clearIssueFields.length > 0,
   }
   return Object.entries(applied).flatMap(([name, isApplied]) => (isApplied ? [name] : []))
+}
+
+const ISSUE_FIELD_ARGUMENTS: readonly string[] = ["issue_fields", "clear_issue_fields"]
+
+/** The error of the issue field write after `applied` was already changed on the issue: the same code, with what stayed applied first. */
+function afterOtherChanges(error: unknown, applied: readonly string[]): unknown {
+  if (applied.length === 0 || !isToolError(error)) return error
+  return new ToolError(
+    error.code,
+    `The other changes (${applied.join(", ")}) were applied, but the issue fields were not: ${error.message}`,
+    { cause: error },
+  )
 }
 
 export const issueEdit = defineTool({
   id: "github_issue_edit",
   title: "Edit a GitHub issue",
   description: [
-    "Change an issue in one call: title, body (body replaces it, append_body adds after a blank line), kind (an Issue Type, else a type:<kind> label that replaces the other type: labels), labels and assignees to add or remove (added assignees are notified), milestone or remove_milestone.",
-    "A milestone that does not exist is an error unless create_milestone is true. Needs write permission on the repository.",
+    "Change an issue in one call: title, body (body replaces it, append_body adds after a blank line), kind (an Issue Type, else a type:<kind> label that replaces the other type: labels), labels and assignees to add or remove (added assignees are notified), milestone or remove_milestone, and organization issue fields to set or clear.",
+    "A milestone that does not exist is an error unless create_milestone is true. Issue fields, their options and values are checked before anything is written; a repository without issue fields refuses them. Needs write permission on the repository.",
     "An issue is 12, #12, owner/repo#12 or its URL; a bare number means the working tree's repository, or repo.",
   ].join(" "),
   toolset: "issues",
@@ -160,8 +212,23 @@ export const issueEdit = defineTool({
     const issue = { repo: target, number: ref.number }
 
     // Reading the issue also proves it exists, which a milestone that may be created must know first.
-    const needsRead = change.appendBody !== undefined || change.kind || (change.milestone && change.createMilestone)
+    // The issue fields need its node id, and their plan must refuse before the milestone is created.
+    const setsFields = changedArguments(change).some((name) => ISSUE_FIELD_ARGUMENTS.includes(name))
+    const needsRead =
+      change.appendBody !== undefined || change.kind || (change.milestone && change.createMilestone) || setsFields
     const current = needsRead ? await readIssueFields(issue, ctx) : undefined
+    const fields =
+      setsFields && current
+        ? {
+            issueId: current.id,
+            writes: planIssueFieldWrites(
+              target,
+              await readIssueFieldDefinitions(target, ctx),
+              change.issueFields,
+              change.clearIssueFields,
+            ),
+          }
+        : undefined
     const body = change.appendBody === undefined ? change.body : appended(current?.body ?? "", change.appendBody)
     const kind = change.kind ? { name: change.kind, placement: await resolveKind(change.kind, target, ctx) } : undefined
     const milestone: MilestoneRef | null = change.milestone
@@ -194,9 +261,26 @@ export const issueEdit = defineTool({
         ctx,
         body,
       )
+    // An edit of issue fields alone has nothing for `gh issue edit`, which refuses to run without a flag.
+    const hasEdit = flags.length > 0 || kind !== undefined
     const applied = kind
       ? await withKindFallback(kind.name, kind.placement, attempt)
-      : { placement: undefined, result: await attempt() }
+      : { placement: undefined, result: hasEdit ? await attempt() : "" }
+
+    let issueFields: IssueFieldValues | null = null
+    if (fields) {
+      try {
+        await writeIssueFields(fields.issueId, fields.writes, ctx)
+      } catch (error) {
+        const others = hasEdit ? changedArguments(change).filter((name) => !ISSUE_FIELD_ARGUMENTS.includes(name)) : []
+        throw afterOtherChanges(error, others)
+      }
+      // The write happened, so a read that fails is no failure of the call.
+      issueFields = await readIssueFieldValuesById(fields.issueId, ctx).catch((error: unknown) => {
+        if (!isToolError(error)) throw error
+        return null
+      })
+    }
 
     return {
       repo: target.full,
@@ -205,6 +289,7 @@ export const issueEdit = defineTool({
       changed: changedArguments(change),
       kind: applied.placement ?? null,
       milestone,
+      issue_fields: issueFields,
       foreign: context.foreign,
     }
   },

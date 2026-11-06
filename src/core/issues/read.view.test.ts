@@ -45,6 +45,31 @@ describe("view", () => {
     expect(variable(apiCalls(installed)[0]!, "comments")).toBe("5")
   })
 
+  test("the query sent includes the issueFieldValues fragment", async () => {
+    const installed = useFake([detailRule(), dependenciesRule()])
+    await read({ method: "view", issue: "12" })
+    const call = apiCalls(installed).find((args) => args.join(" ").includes(DETAIL))
+    expect(variable(call!, "query")).toContain("issueFieldValues(first:25)")
+  })
+
+  test("a schema error on issueFieldValues re-runs without the fragment and gives issue_fields: null", async () => {
+    const installed = useFake([
+      {
+        match: DETAIL,
+        stdout: gqlErrors([{ message: "Field 'issueFieldValues' doesn't exist on type 'Issue'" }]),
+        times: 1,
+      },
+      detailRule(),
+      dependenciesRule(),
+    ])
+    const result = await read({ method: "view", issue: "12" })
+    expect(result.issue?.issue_fields).toBeNull()
+    const calls = apiCalls(installed).filter((args) => args.join(" ").includes(DETAIL))
+    expect(calls).toHaveLength(2)
+    expect(variable(calls[0]!, "query")).toContain("issueFieldValues(first:25)")
+    expect(variable(calls[1]!, "query")).not.toContain("issueFieldValues(first:25)")
+  })
+
   test("an issue that does not exist is not_found", async () => {
     useFake([
       {
