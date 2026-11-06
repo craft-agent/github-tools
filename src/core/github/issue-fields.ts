@@ -14,11 +14,16 @@ export const issueFieldValuesSchema = z.record(z.string(), z.union([z.string(), 
 export type IssueFieldValues = z.output<typeof issueFieldValuesSchema>
 
 /**
+ * Selection of an issue field's value across its possible types.
+ */
+export const ISSUE_FIELD_VALUE_SELECTION =
+  "__typename ... on IssueFieldTextValue{value} ... on IssueFieldNumberValue{value} ... on IssueFieldDateValue{value} ... on IssueFieldSingleSelectValue{name} ... on IssueFieldMultiSelectValue{options{name}}"
+
+/**
  * GraphQL fragment reading an issue's organization issue fields.
  * An organization has at most 25 fields, so `first:25` reads them all.
  */
-export const ISSUE_FIELD_VALUES_FRAGMENT =
-  "issueFieldValues(first:25){nodes{__typename ... on IssueFieldValueCommon{field{... on IssueFieldCommon{name}}} ... on IssueFieldTextValue{value} ... on IssueFieldNumberValue{value} ... on IssueFieldDateValue{value} ... on IssueFieldSingleSelectValue{name} ... on IssueFieldMultiSelectValue{options{name}}}}"
+export const ISSUE_FIELD_VALUES_FRAGMENT = `issueFieldValues(first:25){nodes{... on IssueFieldValueCommon{field{... on IssueFieldCommon{name}}} ${ISSUE_FIELD_VALUE_SELECTION}}}`
 
 export type RawIssueFieldValue = {
   __typename?: string
@@ -29,6 +34,34 @@ export type RawIssueFieldValue = {
 }
 
 type IssueFieldValueConnection = { nodes?: (RawIssueFieldValue | null)[] | null } | null | undefined
+
+/**
+ * Turns one issue field value node from GraphQL into its plain value: text string, number, date
+ * string, single select option name, or multi select array of option names.
+ * Returns `undefined` when the node has no value, an unknown typename, or an empty multi-select.
+ */
+export function issueFieldValueOf(node: RawIssueFieldValue | null | undefined): string | number | string[] | undefined {
+  if (!node) return undefined
+
+  switch (node.__typename) {
+    case "IssueFieldTextValue":
+      return typeof node.value === "string" ? node.value : undefined
+    case "IssueFieldNumberValue":
+      return typeof node.value === "number" && !Number.isNaN(node.value) ? node.value : undefined
+    case "IssueFieldDateValue":
+      return typeof node.value === "string" ? node.value : undefined
+    case "IssueFieldSingleSelectValue":
+      return typeof node.name === "string" ? node.name : undefined
+    case "IssueFieldMultiSelectValue": {
+      const options = (node.options ?? [])
+        .map((opt) => opt?.name)
+        .filter((name): name is string => typeof name === "string")
+      return options.length > 0 ? options : undefined
+    }
+    default:
+      return undefined
+  }
+}
 
 /**
  * Turns an issue's GraphQL `issueFieldValues` connection into a record of field name to value.
@@ -43,27 +76,8 @@ export function issueFieldValues(connection: IssueFieldValueConnection): IssueFi
     const fieldName = node.field?.name?.trim()
     if (!fieldName) continue
 
-    switch (node.__typename) {
-      case "IssueFieldTextValue":
-        if (typeof node.value === "string") values[fieldName] = node.value
-        break
-      case "IssueFieldNumberValue":
-        if (typeof node.value === "number" && !Number.isNaN(node.value)) values[fieldName] = node.value
-        break
-      case "IssueFieldDateValue":
-        if (typeof node.value === "string") values[fieldName] = node.value
-        break
-      case "IssueFieldSingleSelectValue":
-        if (typeof node.name === "string") values[fieldName] = node.name
-        break
-      case "IssueFieldMultiSelectValue": {
-        const options = (node.options ?? [])
-          .map((opt) => opt?.name)
-          .filter((name): name is string => typeof name === "string")
-        if (options.length > 0) values[fieldName] = options
-        break
-      }
-    }
+    const val = issueFieldValueOf(node)
+    if (val !== undefined) values[fieldName] = val
   }
   return values
 }
@@ -71,6 +85,8 @@ export function issueFieldValues(connection: IssueFieldValueConnection): IssueFi
 const SCHEMA_ERROR_PATTERNS = [
   /issueFieldValues.*(?:doesn['’]t exist on type|is not defined on type).*['"`]?Issue['"`]?/i,
   /issueFields.*(?:doesn['’]t exist on type|is not defined on type).*['"`]?Repository['"`]?/i,
+  /(?:isIssueField|issueField).*(?:doesn['’]t exist on type|is not defined on type).*['"`]?ProjectV2/i,
+  /(?:No such type\s+['"`]?(?:ProjectV2ItemIssueFieldValue|ProjectV2IssueFieldValues)['"`]?|(?:ProjectV2ItemIssueFieldValue|ProjectV2IssueFieldValues).*(?:doesn['’]t exist|is not defined))/i,
 ]
 
 function matchesSchemaError(text: string): boolean {
@@ -79,7 +95,8 @@ function matchesSchemaError(text: string): boolean {
 
 /**
  * Whether a GraphQL error indicates that GitHub's schema lacks issue fields: `issueFieldValues` on
- * `Issue` or `issueFields` on `Repository` (such as GitHub Enterprise Server older than 3.23).
+ * `Issue`, `issueFields` on `Repository`, `isIssueField` on `ProjectV2Field`, or `ProjectV2ItemIssueFieldValue` /
+ * `ProjectV2IssueFieldValues` on board items (such as GitHub Enterprise Server older than 3.23).
  */
 export function isIssueFieldsMissingError(error: unknown): boolean {
   if (!isToolError(error)) return false

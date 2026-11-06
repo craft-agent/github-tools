@@ -21,7 +21,12 @@ const input = z.object({
   item: itemArgument,
   ...ITEM_BOARD_SELECTION,
   fields: fieldValuesArgument,
-  clear_fields: z.array(z.string()).optional().describe("Names of the fields to empty."),
+  clear_fields: z
+    .array(z.string())
+    .optional()
+    .describe(
+      "Names of the fields to empty. A column that mirrors an issue field is cleared with clear_issue_fields in github_issue_edit, not here.",
+    ),
   title: z.string().optional().describe("Drafts only: the new title."),
   body: z.string().optional().describe("Drafts only: the new body, which replaces the whole old one; empty clears it."),
   append_body: z

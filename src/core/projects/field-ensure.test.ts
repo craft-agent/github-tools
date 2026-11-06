@@ -1,7 +1,14 @@
 import { describe, expect, test } from "bun:test"
 import { failure } from "../../testing/issue-fixtures"
 import { fieldsRule, octoBoardRules } from "../../testing/project-fixtures"
-import { fieldMutationRule, mutationsSent, queryOf, rawField, rawOption } from "../../testing/setup-fixtures"
+import {
+  fieldMutationRule,
+  mutationsSent,
+  queryOf,
+  rawField,
+  rawIssueFieldSingleSelect,
+  rawOption,
+} from "../../testing/setup-fixtures"
 import { sent } from "../../testing/write-fixtures"
 import { writeHarness } from "../../testing/write-harness"
 import { projectFieldEnsure } from "./field-ensure"
@@ -24,7 +31,7 @@ describe("a missing field", () => {
     ])
     expect(await run({ ...BOARD, name: " Estimate ", type: "number" })).toEqual({
       project: SUMMARY,
-      field: { id: "F9", name: "Estimate", type: "number" },
+      field: { id: "F9", name: "Estimate", type: "number", issue_field: false },
       created: true,
       added_options: [],
     })
@@ -100,6 +107,35 @@ describe("an existing field", () => {
     const error = await failure(run({ ...BOARD, name: "Status", type: "text" }))
     expect(error.code).toBe("invalid_argument")
     expect(error.message).toContain("single_select, not text")
+    expect(mutationsSent(installed)).toEqual([])
+  })
+
+  test("refuses changing options of a mirrored issue field column", async () => {
+    const priority = rawIssueFieldSingleSelect("F_priority", "Priority", [
+      rawOption("p1", "High"),
+      rawOption("p2", "Low"),
+    ])
+    const installed = use([...octoBoardRules(3), fieldsRule([priority])])
+    const error = await failure(run({ ...BOARD, name: "Priority", type: "single_select", options: ["Urgent"] }))
+    expect(error.code).toBe("invalid_argument")
+    expect(error.message).toBe(
+      "\"Priority\" mirrors the organization's issue field; its options are the organization's and cannot be changed on a board.",
+    )
+    expect(mutationsSent(installed)).toEqual([])
+  })
+
+  test("a mirrored issue field column without option changes returns unchanged without writing", async () => {
+    const priority = rawIssueFieldSingleSelect("F_priority", "Priority", [
+      rawOption("p1", "High"),
+      rawOption("p2", "Low"),
+    ])
+    const installed = use([...octoBoardRules(3), fieldsRule([priority])])
+    const result = await run({ ...BOARD, name: "Priority", type: "single_select", options: ["HIGH"] })
+    expect(result).toMatchObject({
+      created: false,
+      added_options: [],
+      field: { id: "F_priority", name: "Priority", type: "single_select", issue_field: true },
+    })
     expect(mutationsSent(installed)).toEqual([])
   })
 })

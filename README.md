@@ -217,7 +217,9 @@ none is given), and found among the boards linked to the repository, then its
 organization's, then the viewer's. The token needs the `project` scope
 (`gh auth refresh -s project`). No API sets a roadmap view's date fields, so
 after `github_project_create` set the Roadmap view's "Date fields" to Start and
-Target in the web UI.
+Target in the web UI. A column that mirrors an organization's issue field is
+read like any other, but its value is the issue's own: the board tools refuse
+to set or clear it, and `github_issue_edit` does both.
 
 ## Reads and writes
 

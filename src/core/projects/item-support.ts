@@ -33,14 +33,14 @@ export const ITEM_NOTE =
   "An item is named by its node ID (PVTI_…), which also tells its board (a project given beside it must be that board), or by an issue or pull request (12, #12, owner/repo#12 or its URL) that is on the board the lookup finds. A draft can only be named by its ID."
 
 export const FIELDS_NOTE =
-  "Field values are set by field name and option or iteration name, matched without regard to case: text as a string, number as a number or numeric string, date as YYYY-MM-DD, single select as an option name, iteration as an iteration title or @current (the iteration containing today, UTC). Only text, number, date, single select and iteration fields can be set; GitHub's own (Title, Assignees, Labels, Milestone, Repository, Linked pull requests, …) are set on the issue, and github_issue_edit sets assignees, labels and milestone. Every field and value is checked before anything is written."
+  "Field values are set by field name and option or iteration name, matched without regard to case: text as a string, number as a number or numeric string, date as YYYY-MM-DD, single select as an option name, iteration as an iteration title or @current (the iteration containing today, UTC). Only text, number, date, single select and iteration fields can be set; a column that mirrors an issue field is set with the issue tools' issue_fields, not here. GitHub's own (Title, Assignees, Labels, Milestone, Repository, Linked pull requests, …) are set on the issue, and github_issue_edit sets assignees, labels and milestone. Every field and value is checked before anything is written."
 
 export const fieldValuesSchema = z.record(z.string(), z.union([z.string(), z.number()]))
 
 export const fieldValuesArgument = fieldValuesSchema
   .optional()
   .describe(
-    'Field values to set, by field name: {"Status": "Todo", "Target": "2026-12-01"}. Values are text, a number, a YYYY-MM-DD date, an option name or an iteration title (@current is the one containing today).',
+    'Field values to set, by field name: {"Status": "Todo", "Target": "2026-12-01"}. Values are text, a number, a YYYY-MM-DD date, an option name or an iteration title (@current is the one containing today). A column that mirrors an issue field is set with the issue tools\' issue_fields, not here.',
   )
 
 export const fieldsResultSchema = fieldValuesSchema.describe(

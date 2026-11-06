@@ -4,6 +4,7 @@ import { tempRepo, type TempRepo } from "../../testing/git-repo"
 import { apiCalls, failure } from "../../testing/issue-fixtures"
 import {
   ITEMS,
+  issueFieldValue,
   itemsPage,
   itemsRule,
   rawDraftContent,
@@ -158,6 +159,19 @@ describe("item_list: the items", () => {
       Labels: ["a", "b"],
       Assignees: ["bob", "carol"],
       "Linked pull requests": [7, 9],
+    })
+  })
+
+  test("shows values of columns mirroring organization issue fields", async () => {
+    const values = [
+      issueFieldValue("Target date", { __typename: "IssueFieldDateValue", value: "2026-11-30" }),
+      issueFieldValue("Severity", { __typename: "IssueFieldSingleSelectValue", name: "Critical" }),
+    ]
+    useFake([...octoBoardRules(3), itemsRule([rawItem("PVTI_1", null, values)])])
+    const result = await list()
+    expect(result.items![0]!.fields).toEqual({
+      "Target date": "2026-11-30",
+      Severity: "Critical",
     })
   })
 

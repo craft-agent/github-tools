@@ -56,16 +56,59 @@ describe("view", () => {
       route: "named",
       considered: [{ route: "named", outcome: 'octo/projects/3 "Roadmap"' }],
       fields: [
-        { id: "F1", name: "Title", type: "title" },
+        { id: "F1", name: "Title", type: "title", issue_field: false },
         {
           id: "F2",
           name: "Status",
           type: "single_select",
+          issue_field: false,
           options: [{ id: "o1", name: "Todo", color: "BLUE", description: "Ready to start" }],
         },
       ],
       views: [{ number: 1, name: "Backlog", layout: "table", filter: "-status:Done" }],
     })
+  })
+
+  test("shows issue_field and the issue field's options for mirrored columns", async () => {
+    const mirroredFields = [
+      {
+        __typename: "ProjectV2SingleSelectField",
+        id: "F_priority",
+        name: "Priority",
+        dataType: "SINGLE_SELECT",
+        options: [],
+        isIssueField: true,
+        issueField: {
+          __typename: "IssueFieldSingleSelect",
+          options: [{ id: "opt_1", name: "High", color: "RED", description: "Urgent" }],
+        },
+      },
+      {
+        __typename: "ProjectV2Field",
+        id: "F_target_date",
+        name: "Target date",
+        dataType: "DATE",
+        isIssueField: true,
+        issueField: { __typename: "IssueFieldDate" },
+      },
+    ]
+    useFake([...octoBoardRules(3), fieldsRule(mirroredFields), viewsRule(VIEWS)])
+    const result = await read({ method: "view", project: "octo/3" })
+    expect(result.fields).toEqual([
+      {
+        id: "F_priority",
+        name: "Priority",
+        type: "single_select",
+        issue_field: true,
+        options: [{ id: "opt_1", name: "High", color: "RED", description: "Urgent" }],
+      },
+      {
+        id: "F_target_date",
+        name: "Target date",
+        type: "date",
+        issue_field: true,
+      },
+    ])
   })
 
   test("without project, looks the board up by title and says which route found it", async () => {

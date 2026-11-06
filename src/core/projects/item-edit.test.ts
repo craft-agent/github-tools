@@ -151,6 +151,16 @@ describe("an edit that cannot be made", () => {
     ["a bad date", { fields: { Estimate: 9, Target: "soon" } }, "YYYY-MM-DD"],
     ["a field of GitHub's own", { fields: { Estimate: 9, Title: "x" } }, "GitHub's own"],
     ["clearing a field of GitHub's own", { fields: { Estimate: 9 }, clear_fields: ["Assignees"] }, "GitHub's own"],
+    [
+      "setting an issue field",
+      { fields: { Priority: "High" } },
+      "\"Priority\" mirrors the organization's issue field; its value is the issue's own and cannot be set on a board. Set it with issue_fields in github_issue_edit or github_issue_create.",
+    ],
+    [
+      "clearing an issue field",
+      { clear_fields: ["Priority"] },
+      "\"Priority\" mirrors the organization's issue field; its value is the issue's own and cannot be cleared on a board. Clear it with clear_issue_fields in github_issue_edit.",
+    ],
   ])("%s is invalid_argument before the first write", async (_, args, expected) => {
     const installed = use([
       ON_BOARD,

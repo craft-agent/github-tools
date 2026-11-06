@@ -30,6 +30,36 @@ export const rawOption = (id: string, name: string, color = "GRAY", description 
   description,
 })
 
+/** A field column that mirrors an organization's single-select issue field. */
+export const rawIssueFieldSingleSelect = (
+  id: string,
+  name: string,
+  options: { id: string; name: string; color?: string; description?: string | null }[],
+) => ({
+  __typename: "ProjectV2SingleSelectField",
+  id,
+  name,
+  dataType: "SINGLE_SELECT",
+  options: [],
+  isIssueField: true,
+  issueField: {
+    __typename: "IssueFieldSingleSelect",
+    options,
+  },
+})
+
+/** A field column that mirrors an organization's date issue field. */
+export const rawIssueFieldDate = (id: string, name: string) => ({
+  __typename: "ProjectV2Field",
+  id,
+  name,
+  dataType: "DATE",
+  isIssueField: true,
+  issueField: {
+    __typename: "IssueFieldDate",
+  },
+})
+
 /** The reply of creating (or changing) a field, which the tool reports as made; `named` picks the call that makes the field of that name. */
 export const fieldMutationRule = (
   name: "createProjectV2Field" | "updateProjectV2Field",

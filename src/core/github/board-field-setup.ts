@@ -122,6 +122,11 @@ export async function ensureField(
 
   const merge = (policy === "replace" ? replaceOptions : appendOptions)(existing.options ?? [], request.options)
   if (!merge.changed) return unchanged
+  if (existing.issue_field) {
+    throw invalid(
+      `"${existing.name}" mirrors the organization's issue field; its options are the organization's and cannot be changed on a board.`,
+    )
+  }
   const data = await graphql<{ updateProjectV2Field?: FieldReply } | null>(
     updateOptionsMutation(optionsLiteral(merge.options)),
     { field: existing.id },

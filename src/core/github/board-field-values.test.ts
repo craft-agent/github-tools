@@ -74,6 +74,23 @@ describe("planFieldValues", () => {
     expect(text).toContain(`"${name}" is one of GitHub's own fields`)
     expect(text.includes("github_issue_edit sets assignees, labels and milestone")).toBe(hintsIssueEdit)
   })
+
+  test.each([
+    ["Priority", "High"],
+    ["Target date", "2026-12-01"],
+  ])("refuses setting issue field %s with instructions pointing to issue tools", (name, value) => {
+    const text = message(() => planFieldValues(FIELDS, { [name]: value }))
+    expect(text).toBe(
+      `"${name}" mirrors the organization's issue field; its value is the issue's own and cannot be set on a board. Set it with issue_fields in github_issue_edit or github_issue_create. Fields that can be set: "Status", "Notes", "Estimate", "Target", "Sprint".`,
+    )
+  })
+
+  test("unknown field error leaves out issue_field columns from fields that can be set", () => {
+    const text = message(() => planFieldValues(FIELDS, { Unknown: "val" }))
+    expect(text).toBe(
+      'The board has no field "Unknown". Fields that can be set: "Status", "Notes", "Estimate", "Target", "Sprint".',
+    )
+  })
 })
 
 describe("planClears", () => {
@@ -82,6 +99,16 @@ describe("planClears", () => {
     expect(message(() => planClears(FIELDS, ["Title"]))).toContain("GitHub's own")
     expect(message(() => planClears(FIELDS, ["Nope"]))).toContain('no field "Nope"')
   })
+
+  test.each(["Priority", "Target date"])(
+    "refuses clearing issue field %s with instructions pointing to github_issue_edit",
+    (name) => {
+      const text = message(() => planClears(FIELDS, [name]))
+      expect(text).toBe(
+        `"${name}" mirrors the organization's issue field; its value is the issue's own and cannot be cleared on a board. Clear it with clear_issue_fields in github_issue_edit. Fields that can be set: "Status", "Notes", "Estimate", "Target", "Sprint".`,
+      )
+    },
+  )
 })
 
 describe("comparing with what an item holds", () => {
