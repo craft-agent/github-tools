@@ -233,11 +233,11 @@ Every entry point takes the same settings:
   own authentication passed through. Nothing waits on a prompt, and output
   parses the same everywhere.
 - **Every variable the tools read besides the settings is named in
-  `toolVariables` in `src/project.ts`**, whether a tool reads it itself or
-  passes it through to a program. Codex gives a plugin's server only a few
+  `TOOL_VARIABLES` in `src/entry/settings.ts`**, whether a tool reads it itself
+  or passes it through to a program. Codex gives a plugin's server only a few
   basic variables (`PATH`, `HOME` and the like) and those its manifest names,
   and `pnpm run manifests` writes that list from the settings and
-  `toolVariables`: a variable left out is set everywhere but in Codex.
+  `TOOL_VARIABLES`: a variable left out is set everywhere but in Codex.
 - **Every call has a time limit** (120 s by default), and a call that is
   stopped, by that limit or by cancellation, has its child process killed:
   `SIGTERM`, then `SIGKILL` after two seconds. A hung `gh` neither holds a
