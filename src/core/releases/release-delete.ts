@@ -1,5 +1,6 @@
 import { z } from "zod"
-import { deleteRelease, findRelease, releaseNotFound, releaseTagInput, tagCommit } from "../github/releases"
+import { tagCommit } from "../github/branches"
+import { deleteRelease, findRelease, releaseNotFound, releaseTagInput } from "../github/releases"
 import { REPO_DESCRIPTION, writableContext } from "../write-support"
 import { resolveRepo } from "../refs"
 import { confirmWrite, defineTool } from "../tool"
