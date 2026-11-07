@@ -10,7 +10,7 @@ import {
   updateRelease,
   type ReleaseBody,
 } from "../github/releases"
-import { REPO_DESCRIPTION, given, invalid, writableContext } from "../issues/write-support"
+import { REPO_DESCRIPTION, given, invalid, writableContext } from "../write-support"
 import { resolveRepo, SHA_PATTERN, shortSha } from "../refs"
 import { confirmWrite, defineTool } from "../tool"
 

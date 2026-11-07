@@ -2,7 +2,7 @@ import { z } from "zod"
 import { readAdministeredRepository } from "../github/repos"
 import { repositoryContext } from "../github/repository"
 import { createRuleset, rulesetSchema } from "../github/rulesets"
-import { invalid } from "../issues/write-support"
+import { invalid } from "../write-support"
 import { resolveRepo } from "../refs"
 import { confirmWrite, defineTool } from "../tool"
 import {

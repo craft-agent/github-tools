@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { readStack, stackOfPull, stackSchema, unstack } from "../github/stacks"
-import { REPO_DESCRIPTION, invalid, writableContext } from "../issues/write-support"
+import { REPO_DESCRIPTION, invalid, writableContext } from "../write-support"
 import { parseNumberRef, resolveRepo } from "../refs"
 import { given } from "../search"
 import { defineTool } from "../tool"

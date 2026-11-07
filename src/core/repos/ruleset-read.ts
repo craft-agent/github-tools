@@ -7,7 +7,7 @@ import {
   rulesetRowSchema,
   rulesetSchema,
 } from "../github/rulesets"
-import { invalid } from "../issues/write-support"
+import { invalid } from "../write-support"
 import { resolveRepo } from "../refs"
 import { defineTool, type ToolContext } from "../tool"
 import { REPO_DESCRIPTION, refuseOtherMethod } from "./support"

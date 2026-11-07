@@ -4,7 +4,7 @@ import { isEmptyValue, isHeld, planClears, planFieldValues, type FieldValue } fr
 import { readBoardFields } from "../github/board-fields"
 import { clearFieldValue, setFieldValue, updateDraft } from "../github/board-item-write"
 import { assertBoardWritable, given, sameTitle } from "../github/projects"
-import { appended, invalid } from "../issues/write-support"
+import { appended, invalid } from "../write-support"
 import { defineTool } from "../tool"
 import { resolveBoardItem } from "./item-resolve"
 import {

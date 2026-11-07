@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { patchRepository, readAdministeredRepository, visibilitySchema, type Visibility } from "../github/repos"
-import { REPO_DESCRIPTION, invalid } from "../issues/write-support"
+import { REPO_DESCRIPTION, invalid } from "../write-support"
 import { resolveRepo } from "../refs"
 import { confirmWrite, defineTool } from "../tool"
 

@@ -22,18 +22,8 @@ import {
 import { milestoneSchema, resolveMilestone, type MilestoneRef } from "../github/milestones"
 import { parseNumberRef } from "../refs"
 import { defineTool } from "../tool"
-import {
-  ISSUE_DESCRIPTION,
-  ISSUE_TARGETS,
-  REPO_DESCRIPTION,
-  appended,
-  editIssue,
-  given,
-  invalid,
-  lastUrl,
-  nameList,
-  writableContext,
-} from "./write-support"
+import { ISSUE_DESCRIPTION, ISSUE_TARGETS, editIssue } from "./write-support"
+import { REPO_DESCRIPTION, appended, given, invalid, lastUrl, nameList, writableContext } from "../write-support"
 
 const input = z.object({
   issue: z.string().describe(ISSUE_DESCRIPTION),

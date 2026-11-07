@@ -1,7 +1,7 @@
 import { z } from "zod"
 import { ToolError } from "../errors"
 import { parseRunRef, readRun, rerunRun } from "../github/workflow-runs"
-import { REPO_DESCRIPTION, invalid, writableContext } from "../issues/write-support"
+import { REPO_DESCRIPTION, invalid, writableContext } from "../write-support"
 import { shortSha } from "../refs"
 import { confirmWrite, defineTool } from "../tool"
 

@@ -7,7 +7,7 @@ import {
   workflowRowSchema,
   workflowSchema,
 } from "../github/workflows"
-import { given, invalid } from "../issues/write-support"
+import { given, invalid } from "../write-support"
 import { resolveRepo } from "../refs"
 import { REPO_DESCRIPTION, refuseOtherMethod } from "../repos/support"
 import { defineTool, type ToolContext } from "../tool"

@@ -12,7 +12,7 @@ import {
   runRowSchema,
   type RunDetail,
 } from "../github/workflow-runs"
-import { given, invalid } from "../issues/write-support"
+import { given, invalid } from "../write-support"
 import { DEFAULT_WAIT_SECONDS, MAX_WAIT_SECONDS, pollUntil } from "../poll"
 import { resolveRepo } from "../refs"
 import { MAX_LIST_LIMIT, REPO_DESCRIPTION, refuseOtherMethod } from "../repos/support"

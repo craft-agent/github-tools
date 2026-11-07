@@ -3,7 +3,7 @@ import { planFieldValues } from "../github/board-field-values"
 import { readBoardFields } from "../github/board-fields"
 import { addDraftToBoard } from "../github/board-item-write"
 import { assertBoardWritable, given, resolveBoard } from "../github/projects"
-import { invalid } from "../issues/write-support"
+import { invalid } from "../write-support"
 import { StepErrors, defineTool } from "../tool"
 import {
   FIELDS_NOTE,

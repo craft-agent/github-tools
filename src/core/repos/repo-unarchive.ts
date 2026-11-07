@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { patchRepository, readAdministeredRepository } from "../github/repos"
-import { REPO_DESCRIPTION } from "../issues/write-support"
+import { REPO_DESCRIPTION } from "../write-support"
 import { resolveRepo } from "../refs"
 import { defineTool } from "../tool"
 

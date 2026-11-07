@@ -15,7 +15,7 @@ import { branchHead, defaultBranch } from "../github/branches"
 import { milestoneSchema, resolveMilestone, type MilestoneRef } from "../github/milestones"
 import { closingIssueSchema, readPullRequestState, type PullRequestState } from "../github/pull-requests"
 import { assertBoardWritable, resolveBoard } from "../github/projects"
-import { REPO_DESCRIPTION, given, invalid, lastUrl, nameList, writableContext } from "../issues/write-support"
+import { REPO_DESCRIPTION, given, invalid, lastUrl, nameList, writableContext } from "../write-support"
 import {
   FIELDS_NOTE,
   applyFieldWrites,
