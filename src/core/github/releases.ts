@@ -1,14 +1,13 @@
 import { z } from "zod"
 import { ToolError, isToolError } from "../errors"
 import { gh, ghJson } from "../gh"
-import type { RefContext, RepoName } from "../refs"
+import { SHA_PATTERN, type RefContext, type RepoName } from "../refs"
 import { branchHead, encodePathSegments } from "./branches"
 import { refusalAsInvalid } from "./refusal"
 import { repositoryNotFound } from "./repository"
 
 /** Release reads and writes of one repository. */
 
-export const SHA_PATTERN = /^[0-9a-f]{40}$/i
 /** Error message when attempting to mark a prerelease as the latest release. */
 export const PRERELEASE_CANNOT_BE_LATEST = "A prerelease cannot be the latest release."
 /** The most releases GitHub returns in one page. */

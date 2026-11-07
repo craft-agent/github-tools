@@ -4,12 +4,11 @@ import { ghJson } from "../gh"
 import { viewerLogin } from "../github/projects"
 import { readPullRequestState } from "../github/pull-requests"
 import { REPO_DESCRIPTION, given, invalid, writableContext } from "../issues/write-support"
-import { parseNumberRef } from "../refs"
+import { parseNumberRef, SHA_PATTERN } from "../refs"
 import { defineTool } from "../tool"
 import { PR_DESCRIPTION, PR_TARGETS } from "./write-support"
 
 const OPEN = "open"
-const SHA_PATTERN = /^[0-9a-f]{40}$/i
 const NOT_IN_DIFF =
   /could not be resolved|must be part of the diff|pull_request_review_thread\.line|is outside the diff/i
 
