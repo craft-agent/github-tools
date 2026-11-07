@@ -3,6 +3,7 @@ import { ToolError, isToolError, type ErrorCode } from "../errors"
 import { gh, ghJson } from "../gh"
 import { isGitHubHost, parseRepo, resolveRepo, type RefContext, type RepoName } from "../refs"
 import type { FailedJob } from "./pull-requests"
+import { refusalAsInvalid } from "./refusal"
 
 /** Lines from the end of each failed job's log a read returns when the caller does not say. */
 export const DEFAULT_LOG_LINES = 80
@@ -357,4 +358,33 @@ export function failedJobs(run: RunDetail): FailedJob[] {
   return run.jobs
     .filter((job) => isFailed(job.conclusion))
     .map((job) => ({ name: job.name, job: job.id, url: job.url }))
+}
+
+/** Options controlling how a workflow run is re-run. */
+export type RerunOptions = {
+  failedOnly?: boolean
+  job?: number
+  debug?: boolean
+}
+
+/**
+ * Re-runs a workflow run: only failed jobs by default, a specific job, or every job,
+ * optionally with debug logging.
+ */
+export async function rerunRun(repo: RepoName, id: number, options: RerunOptions, ctx: RefContext): Promise<void> {
+  const args = ["run", "rerun", String(id), "--repo", repo.full]
+  if (options.job !== undefined) {
+    args.push("--job", String(options.job))
+  } else if (options.failedOnly) {
+    args.push("--failed")
+  }
+  if (options.debug) {
+    args.push("--debug")
+  }
+  await refusalAsInvalid(() => gh(args, ctx))
+}
+
+/** Cancels a workflow run that is in progress or queued. */
+export async function cancelRun(repo: RepoName, id: number, ctx: RefContext): Promise<void> {
+  await refusalAsInvalid(() => gh(["run", "cancel", String(id), "--repo", repo.full], ctx))
 }
