@@ -1,5 +1,4 @@
 {
-  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "github-tools",
   "version": "0.10.0",
   "description": "GitHub tools for coding agents: issues, project boards, pull requests, repositories, releases and Actions.",
@@ -9,5 +8,20 @@
   },
   "homepage": "https://github.com/craft-agent/github-tools#readme",
   "repository": "https://github.com/craft-agent/github-tools",
-  "license": "MIT"
+  "license": "MIT",
+  "skills": "./skills",
+  "mcpServers": {
+    "github-tools": {
+      "command": "node",
+      "args": ["dist/mcp.js"],
+      "cwd": ".",
+      "env_vars": [
+        "GITHUB_TOOLS_TOOLSETS",
+        "GITHUB_TOOLS_READ_ONLY",
+        "GITHUB_TOOLS_TOOLS",
+        "GITHUB_TOOLS_EXCLUDE_TOOLS",
+        "GITHUB_TOOLS_CONFIRM"
+      ]
+    }
+  }
 }
