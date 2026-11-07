@@ -23,6 +23,11 @@ const OPTIONS: Record<OptionName, Option> = {
   confirm: { flag: "--confirm", env: "GITHUB_TOOLS_CONFIRM" },
 }
 
+/** The environment variables the settings are read from, in the order the settings are listed. */
+export function settingVariables(): string[] {
+  return (Object.keys(OPTIONS) as OptionName[]).map((name) => OPTIONS[name].env)
+}
+
 function readFlags(argv: string[]): Partial<Record<OptionName, string>> {
   const byFlag = new Map(
     (Object.keys(OPTIONS) as OptionName[]).map((name) => [OPTIONS[name].flag, { name, ...OPTIONS[name] }]),

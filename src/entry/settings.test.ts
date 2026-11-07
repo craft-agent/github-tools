@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { isToolError } from "../core"
-import { parseSettings, parseToolSettings, settingsFromOptions } from "./settings"
+import { parseSettings, parseToolSettings, settingsFromOptions, settingVariables } from "./settings"
 
 function failure(run: () => unknown): Error {
   try {
@@ -11,6 +11,18 @@ function failure(run: () => unknown): Error {
   }
   throw new Error("expected the settings to be rejected")
 }
+
+describe("settingVariables", () => {
+  test("names each setting's variable, in the order the settings are listed", () => {
+    expect(settingVariables()).toEqual([
+      "GITHUB_TOOLS_TOOLSETS",
+      "GITHUB_TOOLS_READ_ONLY",
+      "GITHUB_TOOLS_TOOLS",
+      "GITHUB_TOOLS_EXCLUDE_TOOLS",
+      "GITHUB_TOOLS_CONFIRM",
+    ])
+  })
+})
 
 describe("parseSettings", () => {
   test("defaults to the harness confirming and no other setting", () => {
