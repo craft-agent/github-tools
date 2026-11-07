@@ -141,8 +141,7 @@ Add the server to the host's MCP configuration. Flags go in `args`:
 ## Tools and skills
 
 Each toolset comes with a skill that tells an agent how to use its tools. A
-toolset with no tools yet registers none (so far `issues`, `pull_requests` and
-`projects` have tools).
+toolset with no tools yet registers none (so far `releases` and `actions`).
 
 ### Issues (`issues`)
 
@@ -223,6 +222,35 @@ to set or clear it, and `github_issue_edit` does both.
 `github_project_field_ensure` with `issue_field: true` adds such a column, and
 `github_project_create` with `dates: "issue_fields"` uses the issue fields Start
 date and Target date as an organization board's dates.
+
+### Repositories (`repos`)
+
+| Tool                      | What it does                                                                                                            | Class          |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------- | -------------- |
+| `github_repo_read`        | `view` a repository's settings, features, merge settings and the viewer's permission, or `list` an owner's repositories | read           |
+| `github_repo_create`      | create a repository, empty or from a template                                                                           | administrative |
+| `github_repo_edit`        | change the description, homepage, default branch, topics, features or merge settings                                    | overwrite      |
+| `github_repo_visibility`  | make a repository public, private or internal                                                                           | administrative |
+| `github_repo_archive`     | archive a repository                                                                                                    | administrative |
+| `github_repo_unarchive`   | unarchive a repository                                                                                                  | overwrite      |
+| `github_label_read`       | `list` a repository's labels                                                                                            | read           |
+| `github_label_create`     | create a label                                                                                                          | add            |
+| `github_label_edit`       | rename, recolor or redescribe a label                                                                                   | overwrite      |
+| `github_label_delete`     | delete a label, removing it from every issue and pull request                                                           | administrative |
+| `github_milestone_read`   | `list` a repository's milestones, with progress                                                                         | read           |
+| `github_milestone_create` | create a milestone                                                                                                      | add            |
+| `github_milestone_edit`   | change a milestone's title, due date or description, or close or reopen it                                              | overwrite      |
+| `github_ruleset_read`     | `list` the rulesets and classic branch protection, or `view` one ruleset                                                | read           |
+| `github_ruleset_create`   | create a ruleset with its refs, rules and bypass actors                                                                 | administrative |
+| `github_ruleset_edit`     | replace parts of a ruleset, stopping as `stale` when it changed since it was read                                       | administrative |
+| `github_ruleset_delete`   | delete a ruleset                                                                                                        | administrative |
+
+The toolset is off by default: add `repos` to `toolsets`. The skill is
+[`github-repos`](skills/github-repos/SKILL.md), shown as
+`github-tools:github-repos` in Claude Code and `github-tools:repos` in Hermes.
+Most settings changes need admin permission on the repository, and rulesets on
+a private repository need a paid plan. Deleting, renaming, transferring or
+forking a repository is left to the user.
 
 ## Reads and writes
 

@@ -29,6 +29,23 @@ import { prReview } from "./core/pull-requests/review"
 import { stackLink } from "./core/pull-requests/stack-link"
 import { stackRead } from "./core/pull-requests/stack-read"
 import { stackUnlink } from "./core/pull-requests/stack-unlink"
+import { labelRead } from "./core/repos/label-read"
+import { labelCreate } from "./core/repos/label-create"
+import { labelEdit } from "./core/repos/label-edit"
+import { labelDelete } from "./core/repos/label-delete"
+import { milestoneCreate } from "./core/repos/milestone-create"
+import { milestoneEdit } from "./core/repos/milestone-edit"
+import { milestoneRead } from "./core/repos/milestone-read"
+import { repoArchive } from "./core/repos/repo-archive"
+import { repoCreate } from "./core/repos/repo-create"
+import { repoEdit } from "./core/repos/repo-edit"
+import { repoRead } from "./core/repos/repo-read"
+import { repoUnarchive } from "./core/repos/repo-unarchive"
+import { repoVisibility } from "./core/repos/repo-visibility"
+import { rulesetCreate } from "./core/repos/ruleset-create"
+import { rulesetDelete } from "./core/repos/ruleset-delete"
+import { rulesetEdit } from "./core/repos/ruleset-edit"
+import { rulesetRead } from "./core/repos/ruleset-read"
 
 /** Every tool spec of the package; entry points register their tools from this list. */
 export const ALL_TOOLS: ToolSpec[] = [
@@ -64,4 +81,21 @@ export const ALL_TOOLS: ToolSpec[] = [
   projectItemArchive,
   projectItemUnarchive,
   projectItemConvert,
+  repoRead,
+  labelRead,
+  milestoneRead,
+  rulesetRead,
+  labelCreate,
+  labelEdit,
+  labelDelete,
+  milestoneCreate,
+  milestoneEdit,
+  repoCreate,
+  repoEdit,
+  repoVisibility,
+  repoArchive,
+  repoUnarchive,
+  rulesetCreate,
+  rulesetEdit,
+  rulesetDelete,
 ]

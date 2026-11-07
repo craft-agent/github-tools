@@ -44,7 +44,8 @@ type RepositoryReply = {
   } | null
 }
 
-function notFound(full: string, cause?: unknown): ToolError {
+/** The `not_found` for a repository that does not exist or that the viewer cannot see. */
+export function repositoryNotFound(full: string, cause?: unknown): ToolError {
   return new ToolError("not_found", `Repository ${full} was not found, or the viewer cannot see it.`, { cause })
 }
 
@@ -77,11 +78,11 @@ export async function repositoryContext(repo: RepoName, ctx: RefContext): Promis
   try {
     data = await graphql<RepositoryReply | null>(REPOSITORY_QUERY, { owner: repo.owner, name: repo.name }, ctx)
   } catch (error) {
-    if (isToolError(error) && error.code === "not_found") throw notFound(repo.full, error)
+    if (isToolError(error) && error.code === "not_found") throw repositoryNotFound(repo.full, error)
     throw error
   }
   const found = data?.repository
-  if (!found) throw notFound(repo.full)
+  if (!found) throw repositoryNotFound(repo.full)
 
   const viewer = data?.viewer?.login ?? ""
   const ownerType: OwnerType = found.owner.__typename === "Organization" ? "Organization" : "User"

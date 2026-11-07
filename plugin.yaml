@@ -12,6 +12,13 @@ provides_tools:
   - github_issue_read
   - github_issue_relate
   - github_issue_reopen
+  - github_label_create
+  - github_label_delete
+  - github_label_edit
+  - github_label_read
+  - github_milestone_create
+  - github_milestone_edit
+  - github_milestone_read
   - github_pr_close
   - github_pr_comment
   - github_pr_create
@@ -33,6 +40,16 @@ provides_tools:
   - github_project_read
   - github_project_unlink
   - github_project_view_ensure
+  - github_repo_archive
+  - github_repo_create
+  - github_repo_edit
+  - github_repo_read
+  - github_repo_unarchive
+  - github_repo_visibility
+  - github_ruleset_create
+  - github_ruleset_delete
+  - github_ruleset_edit
+  - github_ruleset_read
   - github_stack_link
   - github_stack_read
   - github_stack_unlink
