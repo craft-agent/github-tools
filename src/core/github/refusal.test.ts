@@ -17,6 +17,18 @@ describe("refusalAsInvalid", () => {
     ["gh failed (exit 1): HTTP 422: type is invalid", "GitHub refused it: type is invalid."],
     ["gh failed (exit 1): gh: Unprocessable Entity (HTTP 422).", "GitHub refused it: Unprocessable Entity."],
     ["gh failed (exit 1): gh: (HTTP 422)", "GitHub refused it."],
+    [
+      'gh failed (exit 1): could not create workflow dispatch event: HTTP 422: Unexpected inputs provided: ["bogus"] (https://api.github.com/repos/o/r/actions/workflows/410216561/dispatches)',
+      'GitHub refused it: Unexpected inputs provided: ["bogus"].',
+    ],
+    [
+      "gh failed (exit 1): failed to rerun: HTTP 422: This workflow run cannot be retried (https://api.github.com/repos/o/r/actions/runs/123/rerun-failed-jobs)",
+      "GitHub refused it: This workflow run cannot be retried.",
+    ],
+    [
+      "gh failed (exit 1): failed to rerun: HTTP 422: Validation Failed: run is too old (https://ghe.example.com/api/v3/repos/o/r/actions/runs/1/rerun)",
+      "GitHub refused it: Validation Failed: run is too old.",
+    ],
   ])("maps %p to invalid_argument", async (message, expected) => {
     const cause = new ToolError("github_error", message)
     const error = await refusalAsInvalid(failing(cause)).catch((thrown: unknown) => thrown)
