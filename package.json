@@ -1,6 +1,6 @@
 {
   "name": "@craftsamo/github-tools",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "GitHub tools for coding agents: issues, project boards, pull requests, repositories, releases and Actions.",
   "author": "craftsamo",
   "license": "MIT",
