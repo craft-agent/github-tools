@@ -1,10 +1,38 @@
 import { z } from "zod"
-import { isToolError, type ErrorCode, type ToolError } from "../errors"
+import { ToolError, isToolError, type ErrorCode } from "../errors"
 import { gh, ghJson } from "../gh"
-import type { RefContext, RepoName } from "../refs"
+import { isGitHubHost, parseRepo, resolveRepo, type RefContext, type RepoName } from "../refs"
 import type { FailedJob } from "./pull-requests"
 
+/** Lines from the end of each failed job's log a read returns when the caller does not say. */
+export const DEFAULT_LOG_LINES = 80
+/** The most lines from the end of a log a read may ask for. */
+export const MAX_LOG_LINES = 500
 const MAX_LOG_JOBS = 3
+/** What `gh` prints as the time of a job that has not started. */
+const UNSET_TIME_PREFIX = "0001-01-01"
+const RUN_ID_PATTERN = /^\d+$/
+const RUN_REF_ERROR = "run must be a workflow run id or its URL"
+/** The conclusions of a job or a step that count as a failure. */
+const FAILED_CONCLUSIONS: readonly string[] = ["failure", "timed_out"]
+const RUN_FIELDS = [
+  "attempt",
+  "conclusion",
+  "createdAt",
+  "databaseId",
+  "displayTitle",
+  "event",
+  "headBranch",
+  "headSha",
+  "name",
+  "number",
+  "startedAt",
+  "status",
+  "updatedAt",
+  "url",
+  "workflowDatabaseId",
+  "workflowName",
+].join(",")
 const MAX_ERROR_LINES = 10
 const ERROR_MARKER = "##[error]"
 const LOG_FIELD_SEPARATOR = "\t"
@@ -101,4 +129,226 @@ export async function hasWorkflowRun(repo: RepoName, branch: string, ctx: RefCon
     softFailure(error)
     return undefined
   }
+}
+
+function invalid(message: string): ToolError {
+  return new ToolError("invalid_argument", message)
+}
+
+/** The repository and id a run URL names (`/job/…`, `/attempts/…`, a query or a fragment after the id are ignored), or `undefined` for text that is no such URL. */
+function parseRunUrl(value: string): { repo: RepoName; run: number } | undefined {
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    return undefined
+  }
+  if (url.protocol !== "https:" || !isGitHubHost(url.hostname)) return undefined
+  const [owner, name, actions, runs, id] = url.pathname.split("/").filter(Boolean)
+  if (!owner || !name || actions !== "actions" || runs !== "runs" || !id || !RUN_ID_PATTERN.test(id)) return undefined
+  const run = Number.parseInt(id, 10)
+  return Number.isSafeInteger(run) && run >= 1 ? { repo: parseRepo(`${owner}/${name}`), run } : undefined
+}
+
+/**
+ * Accepts a workflow run id (`123`; its repository is `repoArg`, else the
+ * working tree's) and a run URL `https://<github host>/owner/name/actions/runs/123`
+ * with anything after the id. A URL names its own repository, which must agree
+ * with `repoArg` when both are given.
+ */
+export async function parseRunRef(
+  value: string,
+  repoArg: string | undefined,
+  ctx: RefContext,
+): Promise<{ repo: RepoName; run: number }> {
+  const text = value.trim()
+  const fromUrl = parseRunUrl(text)
+  if (fromUrl) {
+    if (repoArg !== undefined && repoArg.trim() !== "") {
+      const other = parseRepo(repoArg)
+      if (other.full.toLowerCase() !== fromUrl.repo.full.toLowerCase()) {
+        throw invalid(`"${value}" is in ${fromUrl.repo.full}, but repo is ${other.full}; pass one repository.`)
+      }
+    }
+    return fromUrl
+  }
+  const run = Number.parseInt(text, 10)
+  if (!RUN_ID_PATTERN.test(text) || !Number.isSafeInteger(run) || run < 1) throw invalid(RUN_REF_ERROR)
+  return { repo: await resolveRepo(repoArg, ctx), run }
+}
+
+/** A workflow run as a list reports it. */
+export const runRowSchema = z.object({
+  id: z.number().int().describe("The workflow run id."),
+  workflow: z.string().describe("The name of the workflow."),
+  workflow_id: z.number().int().nullable().describe("The workflow's id; null when GitHub does not report one."),
+  title: z.string().describe("The run's title: the commit message, or the pull request title."),
+  number: z.number().int().describe("The run's number within its workflow."),
+  attempt: z.number().int().describe("Which attempt this is; 1 for a run never re-run."),
+  status: z.string().describe("queued, in_progress, waiting, completed, …"),
+  conclusion: z.string().nullable().describe("success, failure, cancelled, …; null until the run completes."),
+  event: z.string().describe("The event that started the run, such as push or pull_request."),
+  branch: z.string().describe("The branch or tag the run is for."),
+  head_sha: z.string().describe("The commit the run is for."),
+  created_at: z.string(),
+  started_at: z.string().nullable(),
+  updated_at: z.string(),
+  url: z.string().describe("The run's page on GitHub."),
+})
+
+export type RunRow = z.output<typeof runRowSchema>
+
+export const runJobSchema = z.object({
+  id: z.number().int().describe("The job id."),
+  name: z.string(),
+  status: z.string(),
+  conclusion: z.string().nullable(),
+  started_at: z.string().nullable(),
+  completed_at: z.string().nullable(),
+  url: z.string().nullable(),
+  failed_steps: z.array(z.string()).describe("The names of the steps that failed or timed out."),
+})
+
+export type RunJob = z.output<typeof runJobSchema>
+
+/** One workflow run with its jobs. */
+export const runDetailSchema = runRowSchema.extend({
+  jobs: z.array(runJobSchema),
+})
+
+export type RunDetail = z.output<typeof runDetailSchema>
+
+type RawRun = {
+  attempt?: number
+  conclusion?: string | null
+  createdAt: string
+  databaseId: number
+  displayTitle?: string
+  event: string
+  headBranch: string
+  headSha: string
+  name?: string
+  number: number
+  startedAt?: string | null
+  status: string
+  updatedAt: string
+  url: string
+  workflowDatabaseId?: number | null
+  workflowName?: string
+  jobs?: {
+    databaseId: number
+    name: string
+    status: string
+    conclusion?: string | null
+    startedAt?: string | null
+    completedAt?: string | null
+    url?: string | null
+    steps?: { name: string; conclusion?: string | null }[]
+  }[]
+}
+
+/** A time `gh` prints, or `null` for none and for the zero time it prints for a job that has not started. */
+function timeOrNull(value: string | null | undefined): string | null {
+  return value && !value.startsWith(UNSET_TIME_PREFIX) ? value : null
+}
+
+function toRunRow(raw: RawRun): RunRow {
+  return {
+    id: raw.databaseId,
+    workflow: raw.workflowName || raw.name || "",
+    workflow_id: raw.workflowDatabaseId ?? null,
+    title: raw.displayTitle ?? "",
+    number: raw.number,
+    attempt: raw.attempt ?? 1,
+    status: raw.status,
+    conclusion: raw.conclusion || null,
+    event: raw.event,
+    branch: raw.headBranch,
+    head_sha: raw.headSha,
+    created_at: raw.createdAt,
+    started_at: timeOrNull(raw.startedAt),
+    updated_at: raw.updatedAt,
+    url: raw.url,
+  }
+}
+
+function toRunJob(raw: NonNullable<RawRun["jobs"]>[number]): RunJob {
+  return {
+    id: raw.databaseId,
+    name: raw.name,
+    status: raw.status,
+    conclusion: raw.conclusion || null,
+    started_at: timeOrNull(raw.startedAt),
+    completed_at: timeOrNull(raw.completedAt),
+    url: raw.url || null,
+    failed_steps: (raw.steps ?? []).filter((step) => isFailed(step.conclusion)).map((step) => step.name),
+  }
+}
+
+function isFailed(conclusion: string | null | undefined): boolean {
+  return conclusion !== null && conclusion !== undefined && FAILED_CONCLUSIONS.includes(conclusion)
+}
+
+export type RunFilters = {
+  branch?: string
+  /** A workflow's name, file name or id. */
+  workflow?: string
+  status?: string
+  event?: string
+  /** A commit SHA. */
+  commit?: string
+}
+
+/**
+ * The repository's latest workflow runs, newest first, narrowed by `filters`.
+ * `truncated` is true when more than `limit` matched. A filter on a workflow
+ * also finds the runs of a disabled one.
+ */
+export async function listRuns(
+  repo: RepoName,
+  filters: RunFilters & { limit: number },
+  ctx: RefContext,
+): Promise<{ runs: RunRow[]; truncated: boolean }> {
+  const args = ["run", "list", "--repo", repo.full, "--limit", String(filters.limit + 1), "--json", RUN_FIELDS]
+  if (filters.branch) args.push("--branch", filters.branch)
+  if (filters.workflow) args.push("--workflow", filters.workflow, "--all")
+  if (filters.status) args.push("--status", filters.status)
+  if (filters.event) args.push("--event", filters.event)
+  if (filters.commit) args.push("--commit", filters.commit)
+  const raw = (await ghJson<RawRun[]>(args, ctx)) ?? []
+  return { runs: raw.slice(0, filters.limit).map(toRunRow), truncated: raw.length > filters.limit }
+}
+
+/** One workflow run with its jobs, at `attempt` or the latest one. A run that does not exist is `not_found`. */
+export async function readRun(
+  repo: RepoName,
+  id: number,
+  attempt: number | undefined,
+  ctx: RefContext,
+): Promise<RunDetail> {
+  const args = ["run", "view", String(id), "--repo", repo.full, "--json", `${RUN_FIELDS},jobs`]
+  if (attempt !== undefined) args.push("--attempt", String(attempt))
+  let raw: RawRun | null
+  try {
+    raw = await ghJson<RawRun>(args, ctx)
+  } catch (error) {
+    if (isToolError(error) && error.code === "not_found") {
+      const which = attempt === undefined ? "" : ` (attempt ${attempt})`
+      throw new ToolError(
+        "not_found",
+        `Workflow run ${id}${which} was not found in ${repo.full}, or the viewer cannot see it.`,
+        { cause: error },
+      )
+    }
+    throw error
+  }
+  if (!raw) throw new ToolError("github_error", `gh returned nothing for workflow run ${id} of ${repo.full}.`)
+  return { ...toRunRow(raw), jobs: (raw.jobs ?? []).map(toRunJob) }
+}
+
+/** The jobs of a run that failed or timed out, as `readFailedLogs` takes them. */
+export function failedJobs(run: RunDetail): FailedJob[] {
+  return run.jobs
+    .filter((job) => isFailed(job.conclusion))
+    .map((job) => ({ name: job.name, job: job.id, url: job.url }))
 }
