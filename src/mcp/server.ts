@@ -15,9 +15,11 @@ import {
   selectTools,
   toolMeta,
   type ErrorCode,
+  type ErrorDetails,
   type ToolContext,
   type ToolSpec,
 } from "../core"
+import { errorBody } from "../entry/errors"
 import type { EntrySettings } from "../entry/settings"
 import { elicitationConfirm } from "./confirm"
 import { createWorkingDirResolver } from "./roots"
@@ -36,8 +38,11 @@ export type ServerOptions = {
   log?: (entry: string) => void
 }
 
-function errorResult(code: ErrorCode, message: string): CallToolResult {
-  return { isError: true, content: [{ type: "text", text: JSON.stringify({ error: { code, message } }) }] }
+function errorResult(code: ErrorCode, message: string, details?: Readonly<ErrorDetails>): CallToolResult {
+  return {
+    isError: true,
+    content: [{ type: "text", text: JSON.stringify({ error: errorBody(code, message, details) }) }],
+  }
 }
 
 function describeTool(spec: ToolSpec): Tool {
@@ -86,7 +91,7 @@ export function createServer(specs: ToolSpec[], settings: EntrySettings, options
       return { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result }
     } catch (error) {
       if (isAbortError(error)) throw error
-      if (isToolError(error)) return errorResult(error.code, error.message)
+      if (isToolError(error)) return errorResult(error.code, error.message, error.details)
       log(
         `Unexpected error while running ${spec.id}: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`,
       )
