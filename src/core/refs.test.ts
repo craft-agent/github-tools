@@ -13,7 +13,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { tempRepo, type TempRepo } from "../testing/git-repo"
 import { isToolError } from "./errors"
-import { parseNumberRef, parseRepo, repoFromOrigin, resolveRepo } from "./refs"
+import { parseNumberRef, parseRepo, repoFromOrigin, resolveRepo, SHA_PATTERN, shortSha } from "./refs"
 
 const repos: TempRepo[] = []
 const scratchDirs: string[] = []
@@ -419,5 +419,21 @@ describe("parseNumberRef", () => {
     "99999999999999999999",
   ])("rejects %p", async (ref) => {
     await invalidArgument(parseNumberRef(ref, undefined, { cwd: process.cwd() }))
+  })
+})
+
+describe("SHA_PATTERN and shortSha", () => {
+  const sha = "0123456789abcdef0123456789abcdef01234567"
+
+  test.each([sha, sha.toUpperCase()])("accepts 40-digit hex SHA %p", (value) => {
+    expect(SHA_PATTERN.test(value)).toBe(true)
+  })
+
+  test.each([sha.slice(0, -1), `${sha}8`, `${sha.slice(0, -1)}g`])("rejects %p", (value) => {
+    expect(SHA_PATTERN.test(value)).toBe(false)
+  })
+
+  test("shortSha returns the first 12 characters", () => {
+    expect(shortSha(sha)).toBe("0123456789ab")
   })
 })
