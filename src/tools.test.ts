@@ -29,6 +29,7 @@ const EXPECTED_TARGETS: Record<string, Record<string, TargetKind>> = {
   github_release_delete: { repo: "repo" },
   github_release_publish: { repo: "repo" },
   github_run_rerun: { run: "run", repo: "repo" },
+  github_run_cancel: { run: "run", repo: "repo" },
   github_issue_create: { repo: "repo", parent: "issue", blocked_by: "issues", project: "optional_board" },
   github_issue_edit: { issue: "issue", repo: "repo" },
   github_issue_comment: { issue: "issue", repo: "repo" },

@@ -51,6 +51,7 @@ import { releaseDelete } from "./core/releases/release-delete"
 import { releaseEdit } from "./core/releases/release-edit"
 import { releasePublish } from "./core/releases/release-publish"
 import { releaseRead } from "./core/releases/release-read"
+import { runCancel } from "./core/runs/run-cancel"
 import { runRead } from "./core/runs/run-read"
 import { runRerun } from "./core/runs/run-rerun"
 import { workflowRead } from "./core/workflows/workflow-read"
@@ -113,5 +114,6 @@ export const ALL_TOOLS: ToolSpec[] = [
   releasePublish,
   runRead,
   runRerun,
+  runCancel,
   workflowRead,
 ]
