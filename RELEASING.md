@@ -26,8 +26,9 @@ consumers from the Releases page.
    names the tag's version, and that the tarball holds `dist/mcp.js`,
    `dist/cli.js` and `dist/opencode.js`. It authenticates with npm trusted
    publishing, so no token is stored, and the package carries a provenance
-   statement. A version npm already holds is skipped, so a re-run reaches the
-   registry job.
+   statement. A version npm already publishes is skipped, so a re-run reaches
+   the registry job; one npm still holds as staged is waited for, up to five
+   minutes, until `npm view` shows it.
 3. **`mcp-registry`** runs after `npm`. It checks out the tag, writes
    `server.json` from `package.json` (`scripts/server-json.mjs`; the file is not
    committed), and publishes it with `mcp-publisher`, authenticating with the
@@ -57,10 +58,11 @@ A tool ID change also changes `provides_tools` in `plugin.yaml`; run
   published by hand from the tag with
   `npm publish --access public --ignore-scripts --provenance=false`, since
   `publishConfig.provenance` is true and a local publish cannot make provenance;
-  then add the trusted publisher. Right after a manual publish, `npm view` may
-  still answer E404 for a minute; the release workflow treats npm's refusal to
-  overwrite the version as already published, so the job may then be re-run, or
-  it passes on its own.
+  then add the trusted publisher. Right after a manual publish, npm holds the
+  version as staged while it validates it: `npm view` answers E404 and another
+  publish is refused as staged. The release workflow then waits for `npm view`
+  to show the version, so the job may be run at once; if npm still holds it
+  after five minutes, the job fails and may be re-run.
 - **MCP Registry.** Nothing beyond the workflow's OIDC token: the GitHub login
   proves the `io.github.craft-agent/*` namespace, and `mcpName` in `package.json`
   proves that the npm package belongs to the entry.
