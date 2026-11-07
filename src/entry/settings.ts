@@ -28,6 +28,14 @@ export function settingVariables(): string[] {
   return (Object.keys(OPTIONS) as OptionName[]).map((name) => OPTIONS[name].env)
 }
 
+/** The environment variables the tools read besides the settings, which Codex forwards to the server after them. */
+export const TOOL_VARIABLES: readonly string[] = []
+
+/** The environment variables a harness that forwards only named variables must pass the server: the settings' variables, then `TOOL_VARIABLES`. */
+export function forwardedVariables(toolVariables: readonly string[] = TOOL_VARIABLES): string[] {
+  return [...settingVariables(), ...toolVariables]
+}
+
 function readFlags(argv: string[]): Partial<Record<OptionName, string>> {
   const byFlag = new Map(
     (Object.keys(OPTIONS) as OptionName[]).map((name) => [OPTIONS[name].flag, { name, ...OPTIONS[name] }]),

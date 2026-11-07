@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test"
 import { isToolError } from "../core"
-import { parseSettings, parseToolSettings, settingsFromOptions, settingVariables } from "./settings"
+import {
+  forwardedVariables,
+  parseSettings,
+  parseToolSettings,
+  settingsFromOptions,
+  settingVariables,
+  TOOL_VARIABLES,
+} from "./settings"
 
 function failure(run: () => unknown): Error {
   try {
@@ -21,6 +28,16 @@ describe("settingVariables", () => {
       "GITHUB_TOOLS_EXCLUDE_TOOLS",
       "GITHUB_TOOLS_CONFIRM",
     ])
+  })
+})
+
+describe("forwardedVariables", () => {
+  test("lists the settings' variables, then the tool variables", () => {
+    expect(forwardedVariables(["XDG_STATE_HOME"])).toEqual([...settingVariables(), "XDG_STATE_HOME"])
+  })
+
+  test("uses the tool variables by default", () => {
+    expect(forwardedVariables()).toEqual([...settingVariables(), ...TOOL_VARIABLES])
   })
 })
 
