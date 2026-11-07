@@ -8,10 +8,10 @@ import {
   type PullRequestState,
 } from "../github/pull-requests"
 import { given, lastUrl } from "../issues/write-support"
+import { pause } from "../poll"
 import type { RepoName } from "../refs"
 import type { StepErrors, TargetKind, ToolContext } from "../tool"
 import { issueKey } from "./closes"
-import { pause } from "./wait"
 
 /** What the pull request write tools share: their reference argument, `gh pr edit` and the notes about closing issues. */
 

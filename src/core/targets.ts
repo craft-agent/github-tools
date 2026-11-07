@@ -12,6 +12,7 @@ import {
   viewerLogin,
   type BoardSelector,
 } from "./github/projects"
+import { isBareRunId, parseRunUrl } from "./github/workflow-runs"
 import {
   isBareNumber,
   parseNumberRef,
@@ -67,10 +68,10 @@ function argumentRepository(args: Args, ctx: RefContext): OwnRepository {
 }
 
 /**
- * The call's own repository: that of the `issue` argument (declared `"issue"`)
- * or the `pr` argument (declared `"pull"`) when it names one, else `repo`,
- * else the working tree's `origin`. The origin is read on the first call that
- * needs it, and the answer is kept.
+ * The call's own repository: that of the `issue` argument (declared `"issue"`),
+ * the `pr` argument (declared `"pull"`) or the `run` argument (declared `"run"`)
+ * when it names one, else `repo`, else the working tree's `origin`. The origin
+ * is read on the first call that needs it, and the answer is kept.
  */
 function ownRepository(
   spec: Pick<ToolSpec, "targets">,
@@ -85,6 +86,11 @@ function ownRepository(
         const named = await attempt(() => parseNumberRef(value, undefined, ctx, { accept }))
         if (named) return named.repo
       }
+    }
+    const runValue = args.run
+    if (spec.targets?.run === "run" && typeof runValue === "string") {
+      const named = parseRunUrl(runValue)
+      if (named) return named.repo
     }
     return fromArguments()
   })
@@ -169,6 +175,15 @@ async function referenceRepository(
   return attempt(async () => (await parseNumberRef(value, repoArg, ctx, { accept })).repo)
 }
 
+/** The repository a workflow run reference names: its own for a run URL, the call's for a bare id. */
+async function runRepository(value: unknown, own: OwnRepository): Promise<RepoName | undefined> {
+  if (typeof value !== "string") return undefined
+  const fromUrl = parseRunUrl(value)
+  if (fromUrl) return fromUrl.repo
+  if (isBareRunId(value)) return own()
+  return undefined
+}
+
 /** The repository one value of a declared argument names, or `undefined` when it cannot be told. */
 async function targetRepository(
   kind: TargetKind,
@@ -176,6 +191,7 @@ async function targetRepository(
   own: OwnRepository,
   ctx: RefContext,
 ): Promise<RepoName | undefined> {
+  if (kind === "run") return runRepository(value, own)
   if (kind !== "repo") return referenceRepository(value, kind === "pull" ? "pull" : "issue", own, ctx)
   return typeof value === "string" ? attempt(() => parseRepo(value)) : undefined
 }
@@ -183,13 +199,15 @@ async function targetRepository(
 /**
  * What a call writes to, as the permission rule of an entry point names it:
  * the call's own repository (`owner/name`), and each repository the arguments
- * declared in `spec.targets` name. A bare issue or pull request number means
- * the call's own repository: that of the qualified `issue` (`"issue"`) or `pr`
- * (`"pull"`) argument, else `repo`, else the working tree's. A `"pull"` target
- * takes a pull request reference and refuses an issue URL (`*`). Anything that
- * cannot be told (an invalid or non-string value, a working tree without a
- * GitHub `origin`) is `*`. A spec without `targets` has just its own
- * repository.
+ * declared in `spec.targets` name. A bare issue or pull request number, or
+ * workflow run id, means the call's own repository: that of the qualified
+ * `issue` (`"issue"`), `pr` (`"pull"`) or `run` (`"run"`) argument, else `repo`,
+ * else the working tree's. A `"pull"` target takes a pull request reference and
+ * refuses an issue URL (`*`). A `"run"` target takes a workflow run id or a run
+ * URL, and names the URL's repository or for a bare id the call's own repository
+ * (`*` for anything else). Anything that cannot be told (an invalid or non-string
+ * value, a working tree without a GitHub `origin`) is `*`. A spec without
+ * `targets` has just its own repository.
  *
  * A spec with a `"board"`, `"item"` or `"owner"` target names no own repository:
  * it writes to a board (`owner/projects/N`), and to a repository only through a
