@@ -8,7 +8,9 @@ import { repositoryNotFound } from "./repository"
 
 /** Release reads and writes of one repository. */
 
-const SHA_PATTERN = /^[0-9a-f]{40}$/i
+export const SHA_PATTERN = /^[0-9a-f]{40}$/i
+/** Error message when attempting to mark a prerelease as the latest release. */
+export const PRERELEASE_CANNOT_BE_LATEST = "A prerelease cannot be the latest release."
 /** The most releases GitHub returns in one page. */
 const PAGE_SIZE = 100
 /** The most releases scanned when searching for a draft release. */
@@ -220,6 +222,31 @@ export async function findRelease(repo: RepoName, tag: string, ctx: RefContext):
 }
 
 /**
+ * Resolves the commit a release's tag names when it exists, or the commit
+ * publishing would tag based on target_commitish (SHA or branch head). Returns
+ * commit as null if the tag does not exist and the target branch is gone.
+ */
+export async function publishCommit(
+  repo: RepoName,
+  raw: RestRelease,
+  ctx: RefContext,
+): Promise<{ commit: string | null; tagExists: boolean }> {
+  const tagCommitSha = await tagCommit(repo, raw.tag_name, ctx)
+  const tagExists = tagCommitSha !== null
+
+  let commit: string | null = null
+  if (tagExists) {
+    commit = tagCommitSha
+  } else if (SHA_PATTERN.test(raw.target_commitish)) {
+    commit = raw.target_commitish
+  } else {
+    commit = await branchHead(repo, raw.target_commitish, ctx)
+  }
+
+  return { commit, tagExists }
+}
+
+/**
  * Reads one release by tag (published or draft). A missing release throws
  * `not_found`.
  */
@@ -230,17 +257,7 @@ export async function readRelease(repo: RepoName, tag: string, ctx: RefContext):
   }
 
   const latestId = await latestReleaseId(repo, ctx)
-  const tagCommitSha = await tagCommit(repo, raw.tag_name, ctx)
-  const tagExists = tagCommitSha !== null
-
-  let commitSha: string | null = null
-  if (tagExists) {
-    commitSha = tagCommitSha
-  } else if (SHA_PATTERN.test(raw.target_commitish)) {
-    commitSha = raw.target_commitish
-  } else {
-    commitSha = await branchHead(repo, raw.target_commitish, ctx)
-  }
+  const { commit: commitSha, tagExists } = await publishCommit(repo, raw, ctx)
 
   return {
     ...toRow(raw, latestId),

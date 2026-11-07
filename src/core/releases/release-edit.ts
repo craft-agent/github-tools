@@ -1,5 +1,6 @@
 import { z } from "zod"
 import {
+  PRERELEASE_CANNOT_BE_LATEST,
   findRelease,
   latestReleaseId,
   releaseNotFound,
@@ -53,7 +54,7 @@ export const releaseEdit = defineTool({
       throw invalid("Pass at least one of title, notes, prerelease, latest or target to change the release.")
     }
     if (args.prerelease === true && args.latest === true) {
-      throw invalid("A prerelease cannot be the latest release.")
+      throw invalid(PRERELEASE_CANNOT_BE_LATEST)
     }
 
     const context = await writableContext(await resolveRepo(args.repo, ctx), ctx)
@@ -69,7 +70,7 @@ export const releaseEdit = defineTool({
       )
     }
     if (args.latest === true && (args.prerelease ?? current.prerelease)) {
-      throw invalid("A prerelease cannot be the latest release.")
+      throw invalid(PRERELEASE_CANNOT_BE_LATEST)
     }
 
     if (args.target !== undefined) {
