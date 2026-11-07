@@ -43,6 +43,7 @@ provides_tools:
   - github_release_create
   - github_release_delete
   - github_release_edit
+  - github_release_publish
   - github_release_read
   - github_repo_archive
   - github_repo_create
