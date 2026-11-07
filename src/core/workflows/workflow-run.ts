@@ -1,7 +1,6 @@
 import { z } from "zod"
 import { ToolError } from "../errors"
-import { branchHead, defaultBranch } from "../github/branches"
-import { tagCommit } from "../github/releases"
+import { branchHead, defaultBranch, tagCommit } from "../github/branches"
 import { parseRunUrl, readRun, softFailure } from "../github/workflow-runs"
 import { dispatchWorkflow, resolveWorkflow } from "../github/workflows"
 import { REPO_DESCRIPTION, given, invalid, writableContext } from "../write-support"

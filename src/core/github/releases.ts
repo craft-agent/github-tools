@@ -2,7 +2,7 @@ import { z } from "zod"
 import { ToolError, isToolError } from "../errors"
 import { gh, ghJson } from "../gh"
 import { SHA_PATTERN, type RefContext, type RepoName } from "../refs"
-import { branchHead, encodePathSegments } from "./branches"
+import { branchHead, encodePathSegments, tagCommit } from "./branches"
 import { refusalAsInvalid } from "./refusal"
 import { repositoryNotFound } from "./repository"
 
@@ -96,41 +96,6 @@ function toAsset(raw: RestAsset): ReleaseAsset {
     download_count: raw.download_count,
     url: raw.browser_download_url,
   }
-}
-
-type GitObjectReply = { object?: { sha?: string; type?: string } }
-
-/**
- * Returns the commit a git tag points to, peeling annotated tags until a commit
- * is reached, or `null` when the tag does not exist.
- */
-export async function tagCommit(repo: RepoName, tag: string, ctx: RefContext): Promise<string | null> {
-  const path = encodePathSegments(tag)
-  let reply: GitObjectReply | null
-  try {
-    reply = await ghJson<GitObjectReply>(["api", `repos/${repo.owner}/${repo.name}/git/ref/tags/${path}`], ctx)
-  } catch (error) {
-    if (isToolError(error) && error.code === "not_found") return null
-    throw error
-  }
-  const initialSha = reply?.object?.sha
-  let type = reply?.object?.type
-  if (!initialSha || !type) {
-    throw new ToolError("github_error", `GitHub returned no ref object for tag ${tag} of ${repo.full}.`)
-  }
-  let sha = initialSha
-  while (type === "tag") {
-    const peeled: GitObjectReply | null = await ghJson<GitObjectReply>(
-      ["api", `repos/${repo.owner}/${repo.name}/git/tags/${sha}`],
-      ctx,
-    )
-    if (!peeled?.object?.sha || !peeled.object.type) {
-      throw new ToolError("github_error", `GitHub returned no object for annotated tag ${sha} of ${repo.full}.`)
-    }
-    sha = peeled.object.sha
-    type = peeled.object.type
-  }
-  return sha
 }
 
 export async function latestReleaseId(repo: RepoName, ctx: RefContext): Promise<number | null> {
