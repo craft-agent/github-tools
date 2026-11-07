@@ -22,6 +22,7 @@ const ADMIN_ID = "github_release_publish"
 const MISSING_ID = "github_issue_close"
 const BROKEN_ID = "github_issue_reopen"
 const SLOW_ID = "github_issue_lock"
+const DETAILED_ID = "github_issue_validate"
 
 function fixture(id: string, toolset: ToolSpec["toolset"], writeClass: ToolSpec["class"]): ToolSpec {
   return defineTool({
@@ -66,6 +67,11 @@ const specs: ToolSpec[] = [
     return new Promise((_resolve, reject) => {
       if (signal?.aborted) reject(abortError(signal))
       signal?.addEventListener("abort", () => reject(abortError(signal)))
+    })
+  }),
+  failingWith(DETAILED_ID, "overwrite", async () => {
+    throw new ToolError("invalid_argument", "The thing has problems.", {
+      details: { problems: [{ field: "name", reason: "empty" }] },
     })
   }),
 ]
@@ -128,8 +134,9 @@ describe("list", () => {
       MISSING_ID,
       BROKEN_ID,
       SLOW_ID,
+      DETAILED_ID,
     ])
-    expect(await ids("--exclude-tools", `${READ_ID},${ADD_ID}`)).toEqual([MISSING_ID, BROKEN_ID, SLOW_ID])
+    expect(await ids("--exclude-tools", `${READ_ID},${ADD_ID}`)).toEqual([MISSING_ID, BROKEN_ID, SLOW_ID, DETAILED_ID])
   })
 
   test("reads the environment behind the flags", async () => {
@@ -170,6 +177,18 @@ describe("run", () => {
     const run = await cli(["run", MISSING_ID, "--cwd", "/x"])
     expect(run.code).toBe(EXIT_FAILED)
     expect(json(run)).toEqual({ error: { code: "not_found", message: "No such issue." } })
+  })
+
+  test("maps a tool failure with details to code, message and details", async () => {
+    const run = await cli(["run", DETAILED_ID, "--cwd", "/x"])
+    expect(run.code).toBe(EXIT_FAILED)
+    expect(json(run)).toEqual({
+      error: {
+        code: "invalid_argument",
+        message: "The thing has problems.",
+        details: { problems: [{ field: "name", reason: "empty" }] },
+      },
+    })
   })
 
   test("rejects arguments the schema does not accept", async () => {
