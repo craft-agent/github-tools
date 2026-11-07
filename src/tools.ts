@@ -52,6 +52,7 @@ import { releaseEdit } from "./core/releases/release-edit"
 import { releasePublish } from "./core/releases/release-publish"
 import { releaseRead } from "./core/releases/release-read"
 import { runRead } from "./core/runs/run-read"
+import { runRerun } from "./core/runs/run-rerun"
 import { workflowRead } from "./core/workflows/workflow-read"
 
 /** Every tool spec of the package; entry points register their tools from this list. */
@@ -111,5 +112,6 @@ export const ALL_TOOLS: ToolSpec[] = [
   releaseDelete,
   releasePublish,
   runRead,
+  runRerun,
   workflowRead,
 ]

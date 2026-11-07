@@ -1,4 +1,4 @@
-import type { GhRule } from "./fake-gh"
+import type { FakeGh, GhRule } from "./fake-gh"
 
 /** A workflow run as `gh run list/view --json` prints it. */
 export const rawRun = (id: number, extra: Record<string, unknown> = {}) => ({
@@ -61,3 +61,19 @@ export const runViewRule = (run: unknown, times?: number): GhRule => ({
   stdout: JSON.stringify(run),
   times,
 })
+
+/** A rule matching `gh run cancel`. */
+export const cancelRule: GhRule = { match: "^run cancel" }
+
+/** A rule matching `gh run rerun`. */
+export const rerunRule: GhRule = { match: "^run rerun" }
+
+/** The `gh run cancel` calls a fake `gh` saw. */
+export function cancelCalls(fake: FakeGh): string[][] {
+  return fake.calls().filter((c) => c[0] === "run" && c[1] === "cancel")
+}
+
+/** The `gh run rerun` calls a fake `gh` saw. */
+export function rerunCalls(fake: FakeGh): string[][] {
+  return fake.calls().filter((c) => c[0] === "run" && c[1] === "rerun")
+}
