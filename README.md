@@ -141,7 +141,7 @@ Add the server to the host's MCP configuration. Flags go in `args`:
 ## Tools and skills
 
 Each toolset comes with a skill that tells an agent how to use its tools. A
-toolset with no tools yet registers none (so far `releases` and `actions`).
+toolset with no tools yet registers none (so far only `actions`).
 
 ### Issues (`issues`)
 
@@ -251,6 +251,21 @@ The toolset is off by default: add `repos` to `toolsets`. The skill is
 Most settings changes need admin permission on the repository, and rulesets on
 a private repository need a paid plan. Deleting, renaming, transferring or
 forking a repository is left to the user.
+
+### Releases (`releases`)
+
+| Tool                     | What it does                                                                                    | Class          |
+| ------------------------ | ----------------------------------------------------------------------------------------------- | -------------- |
+| `github_release_read`    | `list` a repository's releases, drafts included, or `view` one by tag with its notes and commit | read           |
+| `github_release_create`  | create a draft release, optionally with generated notes                                         | add            |
+| `github_release_edit`    | change the title, notes, prerelease flag, latest status or a draft's target                     | overwrite      |
+| `github_release_publish` | publish a draft, stopping as `stale` when its commit differs from `head_sha`                    | administrative |
+| `github_release_delete`  | delete a release and its assets, keeping its tag                                                | administrative |
+
+The toolset is off by default: add `releases` to `toolsets`. The skill is
+[`github-releases`](skills/github-releases/SKILL.md), shown as
+`github-tools:github-releases` in Claude Code and `github-tools:releases` in
+Hermes. A new release is always a draft; assets are not covered yet.
 
 ## Reads and writes
 

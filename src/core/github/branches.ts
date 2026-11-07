@@ -20,13 +20,18 @@ export async function defaultBranch(repo: RepoName, ctx: RefContext): Promise<st
   return data.repository.defaultBranchRef?.name ?? null
 }
 
+/** Encodes each segment between slashes with `encodeURIComponent`, leaving slashes intact. */
+export function encodePathSegments(value: string): string {
+  return value.split("/").map(encodeURIComponent).join("/")
+}
+
 /**
  * The commit a branch of the repository points at, or `null` when there is no
  * such branch; any failure but GitHub's "not found" is thrown. The slashes of
  * the name stay, the rest of each segment is encoded.
  */
 export async function branchHead(repo: RepoName, branch: string, ctx: RefContext): Promise<string | null> {
-  const path = branch.split("/").map(encodeURIComponent).join("/")
+  const path = encodePathSegments(branch)
   let reply: { commit?: { sha?: string } } | null
   try {
     reply = await ghJson(["api", `repos/${repo.owner}/${repo.name}/branches/${path}`], ctx)

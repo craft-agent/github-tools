@@ -29,12 +29,17 @@ discussion behind them is on
   | `resolve`    | find which board, repository or object a call means          |
   | `ensure`     | create when missing, reuse when present; never a second copy |
   | `visibility` | change who can read a repository                             |
+  | `publish`    | make a draft release public: tag it and notify watchers      |
 
   `visibility` has a tool of its own although the CLI changes it with
   `repo edit`: it is administrative, and folded into `github_repo_edit` it
   would make every description change ask like it. Where a CLI group has no
   write command (milestones, rulesets), the writes take the CLI's usual
   `create`, `edit` and `delete`.
+
+  `publish` has a tool of its own although the CLI publishes a draft with
+  `release edit --draft=false`: it is administrative, and folded into
+  `github_release_edit` it would make every notes edit ask like it.
 
 - **One read tool per domain, one write tool per operation.**
   `github_<domain>_read` takes a `method` argument whose values are the CLI's
@@ -75,7 +80,9 @@ discussion behind them is on
 - **A write that acts on a commit takes `head_sha`.** Opening, reviewing and
   merging a pull request check, when it is given, that the branch on GitHub is
   still at that commit, and stop with `stale` before writing otherwise. The
-  caller pushed or read that commit; anything newer arrived unseen.
+  caller pushed or read that commit; anything newer arrived unseen. Publishing
+  a release checks that the commit its tag would name is the one given, stops
+  with `stale` otherwise, and pins a new tag to the commit it checked.
 - **A read that waits is bounded.** A read that waits for GitHub (checks to
   settle) waits at most `wait` seconds, 45 by default, then returns what it
   has and says to call again. Hosts stop a tool call after about a minute, so a
