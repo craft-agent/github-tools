@@ -47,6 +47,7 @@ import { rulesetDelete } from "./core/repos/ruleset-delete"
 import { rulesetEdit } from "./core/repos/ruleset-edit"
 import { rulesetRead } from "./core/repos/ruleset-read"
 import { releaseCreate } from "./core/releases/release-create"
+import { releaseDelete } from "./core/releases/release-delete"
 import { releaseEdit } from "./core/releases/release-edit"
 import { releaseRead } from "./core/releases/release-read"
 
@@ -104,4 +105,5 @@ export const ALL_TOOLS: ToolSpec[] = [
   releaseRead,
   releaseCreate,
   releaseEdit,
+  releaseDelete,
 ]

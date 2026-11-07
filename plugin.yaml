@@ -41,6 +41,7 @@ provides_tools:
   - github_project_unlink
   - github_project_view_ensure
   - github_release_create
+  - github_release_delete
   - github_release_edit
   - github_release_read
   - github_repo_archive
