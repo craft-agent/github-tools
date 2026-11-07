@@ -143,6 +143,25 @@ says what to do next.
 | `declined`         | the person declined a confirmation the tool asked for                    |
 | `github_error`     | GitHub or `gh` failed for another reason; the message carries their text |
 
+- **Structure the caller needs goes in `details`, not in the message.** When
+  fixing the cause takes more than a sentence (the lint violations, the
+  findings, the output of a hook), the error carries it as `details`: a JSON
+  object with snake_case keys, like a result. A model then reads the fields
+  instead of parsing them back out of prose; the message still says what to
+  do next on its own.
+- **`details` is fixed when the error is made.** `ToolError` keeps a frozen
+  JSON copy, so every entry point renders the same value. The copy is what
+  JSON makes of it (`undefined` is dropped, `NaN` becomes `null`), and a value
+  JSON cannot write at all, such as a cycle or a `BigInt`, fails where it was
+  thrown, as a bug, not where it is rendered.
+- **Each entry point passes `details` on only when it is set**, so an error
+  without it reads as it always did. The MCP server and the command line put
+  it beside the code and the message, as `error.details`. The OpenCode and
+  Hermes plugins, whose errors are text, append it to `<code>: <message>` as
+  JSON on a line of its own.
+- The `errors` of a partial result (`StepErrors`) stay `<code>: <message>`
+  strings.
+
 ## Write classes
 
 Every tool belongs to one class, and the class sets its MCP annotations.
