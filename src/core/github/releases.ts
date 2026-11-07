@@ -1,17 +1,29 @@
 import { z } from "zod"
 import { ToolError, isToolError } from "../errors"
-import { ghJson } from "../gh"
+import { gh, ghJson } from "../gh"
 import type { RefContext, RepoName } from "../refs"
 import { branchHead, encodePathSegments } from "./branches"
+import { refusalAsInvalid } from "./refusal"
 import { repositoryNotFound } from "./repository"
 
-/** Release reads of one repository. */
+/** Release reads and writes of one repository. */
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/i
 /** The most releases GitHub returns in one page. */
 const PAGE_SIZE = 100
 /** The most releases scanned when searching for a draft release. */
 const MAX_DRAFT_SCAN = 1000
+
+/** Pattern for git release tag names: letters, digits and . _ / + -, no '..' or '//', not ending in '.', '/' or '.lock'. */
+export const TAG_PATTERN = /^(?!.*\.\.)(?!.*\/\/)(?!.*\.lock$)(?!.*[./]$)[A-Za-z0-9][A-Za-z0-9._\/+-]{0,99}$/
+
+/** Zod schema validating a release tag argument. */
+export const releaseTagInput = z
+  .string()
+  .trim()
+  .min(1)
+  .regex(TAG_PATTERN, "a tag name: letters, digits and . _ / + -, no '..' or '//', not ending in '.', '/' or '.lock'")
+  .describe("The release's git tag, such as v1.2.0.")
 
 export const releaseAssetSchema = z.object({
   name: z.string().describe("The asset file name."),
@@ -120,7 +132,7 @@ export async function tagCommit(repo: RepoName, tag: string, ctx: RefContext): P
   return sha
 }
 
-async function latestReleaseId(repo: RepoName, ctx: RefContext): Promise<number | null> {
+export async function latestReleaseId(repo: RepoName, ctx: RefContext): Promise<number | null> {
   try {
     const latest = await ghJson<{ id?: number }>(["api", `repos/${repo.owner}/${repo.name}/releases/latest`], ctx)
     return typeof latest?.id === "number" ? latest.id : null
@@ -180,11 +192,15 @@ export async function listReleases(
   }
 }
 
+/** Returns a `not_found` error for a release that does not exist or is invisible to the viewer. */
+export function releaseNotFound(repo: RepoName, tag: string): ToolError {
+  return new ToolError("not_found", `Release ${tag} was not found in ${repo.full}, or the viewer cannot see it.`)
+}
+
 /**
- * Reads one release by tag (published or draft). A missing release throws
- * `not_found`.
+ * Looks up one release by tag (published or draft), returning null when not found.
  */
-export async function readRelease(repo: RepoName, tag: string, ctx: RefContext): Promise<Release> {
+export async function findRelease(repo: RepoName, tag: string, ctx: RefContext): Promise<RestRelease | null> {
   const path = encodePathSegments(tag)
   let raw: RestRelease | null = null
   try {
@@ -200,8 +216,17 @@ export async function readRelease(repo: RepoName, tag: string, ctx: RefContext):
     if (items.length < PAGE_SIZE) break
   }
 
+  return raw
+}
+
+/**
+ * Reads one release by tag (published or draft). A missing release throws
+ * `not_found`.
+ */
+export async function readRelease(repo: RepoName, tag: string, ctx: RefContext): Promise<Release> {
+  const raw = await findRelease(repo, tag, ctx)
   if (!raw) {
-    throw new ToolError("not_found", `Release ${tag} was not found in ${repo.full}, or the viewer cannot see it.`)
+    throw releaseNotFound(repo, tag)
   }
 
   const latestId = await latestReleaseId(repo, ctx)
@@ -229,4 +254,68 @@ export async function readRelease(repo: RepoName, tag: string, ctx: RefContext):
     updated_at: raw.updated_at,
     assets: (raw.assets ?? []).map(toAsset),
   }
+}
+
+function invalid(message: string): ToolError {
+  return new ToolError("invalid_argument", message)
+}
+
+/** Validates that target is a 40-hex commit SHA or an existing branch, returning it unchanged. */
+export async function resolveTarget(repo: RepoName, target: string, ctx: RefContext): Promise<string> {
+  if (SHA_PATTERN.test(target)) return target
+  const head = await branchHead(repo, target, ctx)
+  if (!head) {
+    throw invalid(`${repo.full} has no branch "${target}"; give a branch or a full commit SHA.`)
+  }
+  return target
+}
+
+/** Payload for creating or editing a release via REST. */
+export type ReleaseBody = {
+  tag_name?: string
+  target_commitish?: string
+  name?: string
+  body?: string
+  draft?: boolean
+  prerelease?: boolean
+  generate_release_notes?: boolean
+  make_latest?: "true" | "false"
+}
+
+async function writeRelease(
+  repo: RepoName,
+  method: "POST" | "PATCH",
+  body: ReleaseBody,
+  ctx: RefContext,
+  id?: number,
+): Promise<RestRelease> {
+  const path = `repos/${repo.full}/releases${id === undefined ? "" : `/${id}`}`
+  const raw = await refusalAsInvalid(() =>
+    ghJson<RestRelease>(["api", "-X", method, path, "--input", "-"], {
+      ...ctx,
+      stdin: JSON.stringify(body),
+    }),
+  )
+  if (!raw) throw new ToolError("github_error", "GitHub did not return the release it wrote.")
+  return raw
+}
+
+/** Creates a release in a repository. */
+export async function createRelease(repo: RepoName, body: ReleaseBody, ctx: RefContext): Promise<RestRelease> {
+  return writeRelease(repo, "POST", body, ctx)
+}
+
+/** Updates a release by ID; sends tag_name because GitHub drops a draft's tag when an edit leaves tag_name out. */
+export async function updateRelease(
+  repo: RepoName,
+  release: Pick<RestRelease, "id" | "tag_name">,
+  body: ReleaseBody,
+  ctx: RefContext,
+): Promise<RestRelease> {
+  return writeRelease(repo, "PATCH", { tag_name: release.tag_name, ...body }, ctx, release.id)
+}
+
+/** Deletes a release by ID; GitHub leaves any git tag with the same name. */
+export async function deleteRelease(repo: RepoName, id: number, ctx: RefContext): Promise<void> {
+  await refusalAsInvalid(() => gh(["api", "-X", "DELETE", `repos/${repo.full}/releases/${id}`], ctx))
 }
