@@ -17,10 +17,12 @@ discussion behind them is on
   written once, and an ID is a public interface: renaming one is a breaking
   change.
 - **Verbs are the CLI's**: `view`, `list`, `create`, `edit`, `close`, `reopen`,
-  `comment`, `review`, `ready`, `merge`, `delete`, and `add` for putting an
-  item on a board. Native stacks are `github_stack_*`, after the `gh stack`
-  extension's command group (`link`, and `unlink` for its `unstack`). A verb of
-  our own only where the CLI has no command for the operation:
+  `comment`, `review`, `ready`, `merge`, `delete`, `add` for putting an item
+  on a board, and for Actions `run` (start a workflow, `gh workflow run`),
+  `rerun` and `cancel` (`gh run rerun`, `gh run cancel`). Native stacks are
+  `github_stack_*`, after the `gh stack` extension's command group (`link`,
+  and `unlink` for its `unstack`). A verb of our own only where the CLI has no
+  command for the operation:
 
   | Verb         | Means                                                        |
   | ------------ | ------------------------------------------------------------ |
@@ -67,10 +69,10 @@ discussion behind them is on
   checked against the field definitions before anything is written, and a
   refusal names the choices there are.
 - **References.** An issue or pull request is `12`, `#12`, `owner/repo#12` or
-  its URL; a board is its number, `owner/number`, its URL or its title. A bare
-  number means the working tree's repository (its `origin` on GitHub); `repo`
-  (`owner/name`) names another. A call that needs a repository and finds
-  neither fails, saying so.
+  its URL; a board is its number, `owner/number`, its URL or its title; a
+  workflow run is its id or its URL. A bare number means the working tree's
+  repository (its `origin` on GitHub); `repo` (`owner/name`) names another. A
+  call that needs a repository and finds neither fails, saying so.
 - **A board not named is looked up, never guessed.** By title (the `project`
   argument when it is no reference, default `Roadmap`), in order: the owner
   given, else the boards linked to the repository, the organization that owns
@@ -83,10 +85,14 @@ discussion behind them is on
   caller pushed or read that commit; anything newer arrived unseen. Publishing
   a release checks that the commit its tag would name is the one given, stops
   with `stale` otherwise, and pins a new tag to the commit it checked.
+  Starting a workflow checks the commit its ref names; GitHub starts a
+  workflow by ref, not by commit, so the run's own commit is read afterwards
+  and a difference is reported rather than prevented.
 - **A read that waits is bounded.** A read that waits for GitHub (checks to
-  settle) waits at most `wait` seconds, 45 by default, then returns what it
-  has and says to call again. Hosts stop a tool call after about a minute, so a
-  longer wait would end in a failed call instead of an answer.
+  settle, a workflow run to finish) waits at most `wait` seconds, 45 by
+  default, then returns what it has and says to call again. Hosts stop a tool
+  call after about a minute, so a longer wait would end in a failed call
+  instead of an answer.
 - **The tools' own install directory is never the working tree.** A harness may
   start a tool inside the directory the package is installed in, a checkout of
   this package, whose `origin` is not the caller's project. A bare number there
@@ -142,16 +148,19 @@ says what to do next.
 Every tool belongs to one class, and the class sets its MCP annotations.
 `openWorldHint` is `true` for every tool, since each one reaches GitHub.
 
-| Class             | Examples                               | `readOnlyHint` | `destructiveHint` | `idempotentHint` |
-| ----------------- | -------------------------------------- | -------------- | ----------------- | ---------------- |
-| read              | view, list, resolve                    | `true`         | —                 | `true`           |
-| add               | create, comment, add an item           | `false`        | `false`           | `false`          |
-| idempotent change | ensure, relate, adding a label         | `false`        | `false`           | `true`           |
-| overwrite         | editing a body or title, close, reopen | `false`        | `true`            | `true`           |
-| administrative    | merge, visibility, delete, publishing  | `false`        | `true`            | `false`          |
+| Class             | Examples                                                   | `readOnlyHint` | `destructiveHint` | `idempotentHint` |
+| ----------------- | ---------------------------------------------------------- | -------------- | ----------------- | ---------------- |
+| read              | view, list, resolve                                        | `true`         | —                 | `true`           |
+| add               | create, comment, add an item                               | `false`        | `false`           | `false`          |
+| idempotent change | ensure, relate, adding a label                             | `false`        | `false`           | `true`           |
+| overwrite         | editing a body or title, close, reopen                     | `false`        | `true`            | `true`           |
+| administrative    | merge, visibility, delete, publishing, every Actions write | `false`        | `true`            | `false`          |
 
 - **Overwriting counts as destructive**: it loses what was there, and
   harnesses that confirm only destructive tools should still ask before it.
+- **Every Actions write is administrative**: starting, re-running or
+  cancelling a run. A workflow can deploy, publish or spend whatever its name
+  says, and stopping one halfway can leave a deploy half done.
 - **A tool takes the strictest class its arguments can reach.**
 - **The harness confirms writes.** Every MCP client asks before it runs a
   write tool, so the tool does not ask again by default. Administrative tools
@@ -162,10 +171,10 @@ Every tool belongs to one class, and the class sets its MCP annotations.
   approval of their own.
 - **It asks for every repository and board the call writes to.** Each write
   tool declares which arguments name one (`repo`, an issue or pull request
-  reference, a list of issues, a board, or a board that is written to only when
-  it is given); a bare number means the call's own repository, and what cannot
-  be told is `*`. An "always" answer then covers only what it named,
-  never a write into another repository or board.
+  reference, a workflow run, a list of issues, a board, or a board that is
+  written to only when it is given); a bare number means the call's own
+  repository, and what cannot be told is `*`. An "always" answer then covers
+  only what it named, never a write into another repository or board.
 - **A board is named `owner/projects/N`.** A board belongs to a user or an
   organization, not to a repository, so its writes name the board rather than
   the working tree's repository. A board the call does not name is found with
