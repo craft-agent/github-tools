@@ -57,7 +57,7 @@ export const failedLogSchema = z.object({
 export type FailedLog = z.output<typeof failedLogSchema>
 
 /** The error of a read that leaves the call usable; a cancellation and a `HARD_CODES` failure are thrown. */
-function softFailure(error: unknown): ToolError {
+export function softFailure(error: unknown): ToolError {
   if (!isToolError(error) || HARD_CODES.includes(error.code)) throw error
   return error
 }

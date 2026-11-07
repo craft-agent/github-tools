@@ -3,6 +3,7 @@ import { ToolError, isToolError } from "../errors"
 import { gh, ghJson } from "../gh"
 import type { RefContext, RepoName } from "../refs"
 import { encodePathSegments } from "./branches"
+import { refusalAsInvalid } from "./refusal"
 import { repositoryNotFound } from "./repository"
 
 /** Workflow reads of one repository. */
@@ -133,4 +134,24 @@ export async function readWorkflowFile(
     if (isToolError(error) && error.code === "not_found") return null
     throw error
   }
+}
+
+/**
+ * Starts a `workflow_dispatch` run of a workflow at `ref` and returns what `gh`
+ * printed, which is the new run's URL on a `gh` that reports it. The inputs go
+ * as JSON on stdin, never as `-f`/`-F` arguments, since `-F` reads a value that
+ * starts with `@` as a file. GitHub's refusal (unknown input, ref, or a workflow
+ * without the trigger) is `invalid_argument` carrying its words.
+ */
+export async function dispatchWorkflow(
+  repo: RepoName,
+  id: number,
+  ref: string,
+  inputs: Record<string, string>,
+  ctx: RefContext,
+): Promise<string> {
+  const hasInputs = Object.keys(inputs).length > 0
+  const args = ["workflow", "run", String(id), "--repo", repo.full, "--ref", ref]
+  if (hasInputs) args.push("--json")
+  return refusalAsInvalid(() => gh(args, { ...ctx, stdin: hasInputs ? JSON.stringify(inputs) : undefined }))
 }
