@@ -55,6 +55,7 @@ provides_tools:
   - github_ruleset_delete
   - github_ruleset_edit
   - github_ruleset_read
+  - github_run_read
   - github_stack_link
   - github_stack_read
   - github_stack_unlink
