@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import type { GhRule } from "../../testing/fake-gh"
 import { failure } from "../../testing/issue-fixtures"
+import { CI, DEPLOY, LISTING, workflowListRule as listRule } from "../../testing/workflow-fixtures"
 import { writeHarness } from "../../testing/write-harness"
 import { workflowRead } from "./workflow-read"
 
@@ -12,12 +13,8 @@ function use(rules: GhRule[]) {
   return { calls: () => installed.calls().filter((args) => args[0] !== "--version") }
 }
 
-const CI = { id: 5, name: "CI", path: ".github/workflows/ci.yml", state: "active" }
-const DEPLOY = { id: 6, name: "Deploy", path: ".github/workflows/deploy.yml", state: "disabled_manually" }
-const LISTING = [CI, DEPLOY]
 const YAML = "name: CI\non:\n  workflow_dispatch:\n    inputs:\n      env: {}\n"
 
-const listRule = (workflows: unknown[]): GhRule => ({ match: "^workflow list", stdout: JSON.stringify(workflows) })
 const detailRule = (workflow: { id: number }): GhRule => ({
   match: `^api repos/octo/hello/actions/workflows/${workflow.id}$`,
   stdout: JSON.stringify({
