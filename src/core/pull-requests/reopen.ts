@@ -1,7 +1,7 @@
 import { z } from "zod"
 import { gh } from "../gh"
 import { readPullRequestState } from "../github/pull-requests"
-import { REPO_DESCRIPTION, given, invalid, writableContext } from "../issues/write-support"
+import { REPO_DESCRIPTION, given, invalid, writableContext } from "../write-support"
 import { parseNumberRef } from "../refs"
 import { defineTool } from "../tool"
 import { PR_DESCRIPTION, PR_TARGETS } from "./write-support"

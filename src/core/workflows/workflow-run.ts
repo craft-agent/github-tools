@@ -4,7 +4,7 @@ import { branchHead, defaultBranch } from "../github/branches"
 import { tagCommit } from "../github/releases"
 import { parseRunUrl, readRun, softFailure } from "../github/workflow-runs"
 import { dispatchWorkflow, resolveWorkflow } from "../github/workflows"
-import { REPO_DESCRIPTION, given, invalid, writableContext } from "../issues/write-support"
+import { REPO_DESCRIPTION, given, invalid, writableContext } from "../write-support"
 import { resolveRepo, SHA_PATTERN, shortSha, type RefContext, type RepoName } from "../refs"
 import { confirmWrite, defineTool } from "../tool"
 

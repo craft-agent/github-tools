@@ -1,6 +1,6 @@
 import type { IssueRef } from "../github/issue-refs"
 import type { RepoName } from "../refs"
-import { appended } from "../issues/write-support"
+import { appended } from "../write-support"
 
 /** Closing keywords in a pull request body: the lines that link issues GitHub closes when the pull request merges. */
 

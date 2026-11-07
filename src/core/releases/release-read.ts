@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { listReleases, readRelease, releaseRowSchema, releaseSchema } from "../github/releases"
-import { invalid } from "../issues/write-support"
+import { invalid } from "../write-support"
 import { resolveRepo } from "../refs"
 import { MAX_LIST_LIMIT, REPO_DESCRIPTION, refuseOtherMethod } from "../repos/support"
 import { defineTool, type ToolContext } from "../tool"

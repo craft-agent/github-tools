@@ -7,7 +7,7 @@ import {
   sentAttachments,
 } from "../attachments"
 import { ATTACH_MIN_GH_VERSION, ensureGhAtLeast, gh } from "../gh"
-import { REPO_DESCRIPTION, given, invalid, lastUrl, writableContext } from "../issues/write-support"
+import { REPO_DESCRIPTION, given, invalid, lastUrl, writableContext } from "../write-support"
 import { stepErrorsSchema } from "../projects/item-support"
 import { parseNumberRef } from "../refs"
 import { StepErrors, defineTool } from "../tool"

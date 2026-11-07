@@ -1,4 +1,4 @@
-import { invalid } from "../issues/write-support"
+import { invalid } from "../write-support"
 
 /** What the repository tools share: the argument text, the list cap and the refusal of another method's argument. */
 

@@ -7,7 +7,7 @@ import {
   type PullRequestRef,
   type PullRequestState,
 } from "../github/pull-requests"
-import { given, lastUrl } from "../issues/write-support"
+import { given, lastUrl } from "../write-support"
 import { pause } from "../poll"
 import type { RepoName } from "../refs"
 import type { StepErrors, TargetKind, ToolContext } from "../tool"

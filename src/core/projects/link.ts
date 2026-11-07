@@ -3,7 +3,7 @@ import { assertSameOwner, isLinked, setLinked } from "../github/board-setup"
 import { assertBoardWritable, boardResource, resolveBoard } from "../github/projects"
 import { resolveRepo } from "../refs"
 import { defineTool, type ToolContext } from "../tool"
-import { writableContext } from "../issues/write-support"
+import { writableContext } from "../write-support"
 import { BOARD_LOOKUP_NOTE, BOARD_SELECTION, PROJECT_SCOPE_NOTE, boardSummary, boardSummarySchema } from "./support"
 
 const input = z.object({
