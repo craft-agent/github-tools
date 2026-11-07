@@ -8,7 +8,7 @@ import {
   type Stack,
   type StackPull,
 } from "../github/stacks"
-import { REPO_DESCRIPTION, invalid, writableContext } from "../issues/write-support"
+import { REPO_DESCRIPTION, invalid, writableContext } from "../write-support"
 import { resolveRepo, type RepoName } from "../refs"
 import { defineTool, type ToolContext } from "../tool"
 

@@ -5,15 +5,8 @@ import { MAX_DEPENDENCIES, MAX_SUB_ISSUES, issueBriefSchema, readIssue, type Iss
 import { assertWritable, repositoryContext, type RepositoryContext } from "../github/repository"
 import { parseNumberRef, type RepoName } from "../refs"
 import { defineTool, type ToolContext } from "../tool"
-import {
-  ISSUE_DESCRIPTION,
-  ISSUE_TARGETS,
-  REPO_DESCRIPTION,
-  editIssue,
-  given,
-  invalid,
-  writableContext,
-} from "./write-support"
+import { ISSUE_DESCRIPTION, ISSUE_TARGETS, editIssue } from "./write-support"
+import { REPO_DESCRIPTION, given, invalid, writableContext } from "../write-support"
 
 const REFERENCE_FORMS = "12, #12, owner/repo#12 or its URL; a bare number means the issue's repository."
 

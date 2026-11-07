@@ -2,15 +2,8 @@ import { z } from "zod"
 import { gh } from "../gh"
 import { parseNumberRef } from "../refs"
 import { defineTool } from "../tool"
-import {
-  ISSUE_DESCRIPTION,
-  ISSUE_TARGETS,
-  REPO_DESCRIPTION,
-  given,
-  invalid,
-  lastUrl,
-  writableContext,
-} from "./write-support"
+import { ISSUE_DESCRIPTION, ISSUE_TARGETS } from "./write-support"
+import { REPO_DESCRIPTION, given, invalid, lastUrl, writableContext } from "../write-support"
 
 const input = z.object({
   issue: z.string().describe(ISSUE_DESCRIPTION),

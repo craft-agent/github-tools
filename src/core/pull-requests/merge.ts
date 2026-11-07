@@ -9,7 +9,7 @@ import {
   type PullRequestRef,
 } from "../github/pull-requests"
 import { readStack } from "../github/stacks"
-import { REPO_DESCRIPTION, given, invalid, writableContext } from "../issues/write-support"
+import { REPO_DESCRIPTION, given, invalid, writableContext } from "../write-support"
 import { stepErrorsSchema } from "../projects/item-support"
 import { parseNumberRef, SHA_PATTERN, shortSha, type RepoName } from "../refs"
 import { StepErrors, defineTool, type ToolContext } from "../tool"

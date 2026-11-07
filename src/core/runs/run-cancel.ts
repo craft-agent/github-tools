@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { cancelRun, parseRunRef, readRun } from "../github/workflow-runs"
-import { REPO_DESCRIPTION, invalid, writableContext } from "../issues/write-support"
+import { REPO_DESCRIPTION, invalid, writableContext } from "../write-support"
 import { confirmWrite, defineTool } from "../tool"
 
 const CANCELLATION_HINT = "Cancelling takes a moment; read the run with github_run_read view to see it end."

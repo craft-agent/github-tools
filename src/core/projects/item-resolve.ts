@@ -12,7 +12,7 @@ import {
 } from "../github/projects"
 import { parseNumberRef } from "../refs"
 import type { ToolContext } from "../tool"
-import { invalid } from "../issues/write-support"
+import { invalid } from "../write-support"
 
 /** Finding the board item a write tool means, and the board it is on. */
 

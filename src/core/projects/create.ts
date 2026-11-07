@@ -28,7 +28,7 @@ import {
   viewerLogin,
   type Board,
 } from "../github/projects"
-import { writableContext, invalid } from "../issues/write-support"
+import { writableContext, invalid } from "../write-support"
 import { parseRepo, type RefContext } from "../refs"
 import { StepErrors, defineTool } from "../tool"
 import { PROJECT_SCOPE_NOTE, boardSummary, boardSummarySchema } from "./support"
