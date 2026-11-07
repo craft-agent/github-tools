@@ -1,0 +1,84 @@
+import { z } from "zod"
+import {
+  createRelease,
+  findRelease,
+  releaseTagInput,
+  resolveTarget,
+  tagCommit,
+  type ReleaseBody,
+} from "../github/releases"
+import { REPO_DESCRIPTION, invalid, writableContext } from "../issues/write-support"
+import { resolveRepo } from "../refs"
+import { defineTool } from "../tool"
+
+const input = z.object({
+  repo: z.string().optional().describe(REPO_DESCRIPTION),
+  tag: releaseTagInput,
+  target: z
+    .string()
+    .optional()
+    .describe(
+      "The branch or full commit SHA a new tag is made from when the release is published; default the default branch.",
+    ),
+  title: z.string().optional().describe("The release's title."),
+  notes: z.string().optional().describe("The release notes, in Markdown."),
+  generate_notes: z
+    .boolean()
+    .optional()
+    .describe("Have GitHub write notes from the merged pull requests; notes given come first."),
+  prerelease: z.boolean().optional().describe("Whether to mark the release as a pre-release."),
+})
+
+const output = z.object({
+  repo: z.string().describe("The repository, as owner/name."),
+  tag: z.string().describe("The git tag name of the release."),
+  url: z.string().describe("The release's page on GitHub."),
+  draft: z.literal(true).describe("Whether the release is an unpublished draft; always true."),
+  foreign: z.boolean().describe("Whether the repository differs from the working tree's repository."),
+})
+
+export const releaseCreate = defineTool({
+  id: "github_release_create",
+  title: "Create a GitHub draft release",
+  description:
+    "Create a draft release in a repository. Always creates a draft, which only people who can push see until github_release_publish publishes it. Refuses a tag that has a release (points to github_release_edit), a target for a tag that exists, and a missing branch.",
+  toolset: "releases",
+  class: "add",
+  targets: { repo: "repo" },
+  input,
+  output,
+  async execute(args, ctx) {
+    const context = await writableContext(await resolveRepo(args.repo, ctx), ctx)
+    const repo = context.repo
+    const existing = await findRelease(repo, args.tag, ctx)
+    if (existing) {
+      throw invalid(
+        `${repo.full} has a ${existing.draft ? "draft" : "published"} release ${args.tag} already; change it with github_release_edit.`,
+      )
+    }
+    if (args.target !== undefined) {
+      const tagSha = await tagCommit(repo, args.tag, ctx)
+      if (tagSha !== null) {
+        throw invalid(`Tag ${args.tag} exists already at ${tagSha.slice(0, 7)}; target is only for a new tag.`)
+      }
+      await resolveTarget(repo, args.target, ctx)
+    }
+    const body: ReleaseBody = {
+      draft: true,
+      tag_name: args.tag,
+      ...(args.title !== undefined ? { name: args.title } : {}),
+      ...(args.notes !== undefined ? { body: args.notes } : {}),
+      ...(args.target !== undefined ? { target_commitish: args.target } : {}),
+      ...(args.prerelease !== undefined ? { prerelease: args.prerelease } : {}),
+      ...(args.generate_notes !== undefined ? { generate_release_notes: args.generate_notes } : {}),
+    }
+    const made = await createRelease(repo, body, ctx)
+    return {
+      repo: repo.full,
+      tag: made.tag_name,
+      url: made.html_url,
+      draft: true as const,
+      foreign: context.foreign,
+    }
+  },
+})
