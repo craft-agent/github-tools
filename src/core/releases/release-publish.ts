@@ -2,7 +2,6 @@ import { z } from "zod"
 import { ToolError } from "../errors"
 import {
   PRERELEASE_CANNOT_BE_LATEST,
-  SHA_PATTERN,
   findRelease,
   latestReleaseId,
   publishCommit,
@@ -12,12 +11,8 @@ import {
   type ReleaseBody,
 } from "../github/releases"
 import { REPO_DESCRIPTION, given, invalid, writableContext } from "../issues/write-support"
-import { resolveRepo } from "../refs"
+import { resolveRepo, SHA_PATTERN, shortSha } from "../refs"
 import { confirmWrite, defineTool } from "../tool"
-
-const SHORT_SHA_LENGTH = 12
-
-const short = (sha: string): string => sha.slice(0, SHORT_SHA_LENGTH)
 
 const input = z.object({
   repo: z.string().optional().describe(REPO_DESCRIPTION),
@@ -86,14 +81,14 @@ export const releasePublish = defineTool({
     if (expectedSha && commit.toLowerCase() !== expectedSha.toLowerCase()) {
       throw new ToolError(
         "stale",
-        `Release ${args.tag} of ${repo.full} would tag ${short(commit)}, not ${short(expectedSha)}: its target moved since it was read. Nothing was published.`,
+        `Release ${args.tag} of ${repo.full} would tag ${shortSha(commit)}, not ${shortSha(expectedSha)}: its target moved since it was read. Nothing was published.`,
       )
     }
 
     await confirmWrite(
       releasePublish,
       ctx,
-      `Publish the release ${args.tag} of ${repo.full}? ${tagExists ? `Its tag already names ${short(commit)}` : `It creates the tag at ${short(commit)}`}, and everyone watching the repository is notified.`,
+      `Publish the release ${args.tag} of ${repo.full}? ${tagExists ? `Its tag already names ${shortSha(commit)}` : `It creates the tag at ${shortSha(commit)}`}, and everyone watching the repository is notified.`,
     )
 
     const body: ReleaseBody = {

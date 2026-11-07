@@ -26,7 +26,7 @@ import {
   stepErrorsSchema,
 } from "../projects/item-support"
 import { BOARD_LOOKUP_NOTE, PROJECT_SCOPE_NOTE, boardSummary, boardSummarySchema } from "../projects/support"
-import { resolveRepo, type RepoName } from "../refs"
+import { resolveRepo, SHA_PATTERN, shortSha, type RepoName } from "../refs"
 import { StepErrors, defineTool, type ToolContext } from "../tool"
 import { CLOSES_DESCRIPTION, withClosing } from "./closes"
 import {
@@ -40,8 +40,6 @@ import {
 } from "./write-support"
 
 const PULL_URL = /\/pull\/(\d+)$/
-const SHA_PATTERN = /^[0-9a-f]{40}$/i
-const SHORT_SHA_LENGTH = 12
 /** The failures of `gh pr create` that can come after GitHub made the pull request; the others are refusals that made nothing. */
 const MAY_HAVE_CREATED: readonly ErrorCode[] = ["github_error", "stale", "not_found", "rate_limited"]
 const NOT_A_BRANCH = "head must be a branch of the repository; pull requests from forks are not supported yet."
@@ -103,8 +101,6 @@ const output = z.object({
   foreign: z.boolean(),
   errors: stepErrorsSchema,
 })
-
-const short = (sha: string): string => sha.slice(0, SHORT_SHA_LENGTH)
 
 /** Where the pull request goes in the result: its number, from the URL `gh pr create` printed. */
 function createdPullRequest(stdout: string): { number: number; url: string } {
@@ -262,7 +258,7 @@ export const prCreate = defineTool({
     if (expectedSha && headSha.toLowerCase() !== expectedSha.toLowerCase()) {
       throw new ToolError(
         "stale",
-        `${head} on ${target.full} is at ${short(headSha)}, not ${short(expectedSha)}: the branch moved since it was pushed. Nothing was created.`,
+        `${head} on ${target.full} is at ${shortSha(headSha)}, not ${shortSha(expectedSha)}: the branch moved since it was pushed. Nothing was created.`,
       )
     }
 

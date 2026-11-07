@@ -2,12 +2,10 @@ import { z } from "zod"
 import { ToolError } from "../errors"
 import { parseRunRef, readRun, rerunRun } from "../github/workflow-runs"
 import { REPO_DESCRIPTION, invalid, writableContext } from "../issues/write-support"
+import { shortSha } from "../refs"
 import { confirmWrite, defineTool } from "../tool"
 
-const SHORT_SHA_LENGTH = 12
 const FAILED_RUN_CONCLUSIONS: readonly string[] = ["failure", "cancelled", "timed_out", "startup_failure"]
-
-const short = (sha: string): string => sha.slice(0, SHORT_SHA_LENGTH)
 
 const input = z.object({
   run: z.string().describe("A workflow run id, or its URL."),
@@ -72,8 +70,8 @@ export const runRerun = defineTool({
       }
     }
 
-    const shortSha = short(current.head_sha)
-    const runDesc = `"${current.workflow}" run ${current.id} (${current.conclusion}, ${current.event} on ${current.branch} at ${shortSha}) in ${repo.full}`
+    const shortHead = shortSha(current.head_sha)
+    const runDesc = `"${current.workflow}" run ${current.id} (${current.conclusion}, ${current.event} on ${current.branch} at ${shortHead}) in ${repo.full}`
     const message = targetJob
       ? `Re-run job "${targetJob.name}" of ${runDesc}? Its steps run again, a deploy or a publish included.`
       : failedOnly
