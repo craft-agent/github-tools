@@ -208,5 +208,5 @@ test("maps GitHub HTTP 422 refusal to invalid_argument", async () => {
 
   const error = await failure(run({ run: "123" }))
   expect(error.code).toBe("invalid_argument")
-  expect(error.message).toContain("This workflow run cannot be retried")
+  expect(error.message).toBe("GitHub refused it: This workflow run cannot be retried.")
 })
