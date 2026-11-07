@@ -140,8 +140,7 @@ Add the server to the host's MCP configuration. Flags go in `args`:
 
 ## Tools and skills
 
-Each toolset comes with a skill that tells an agent how to use its tools. A
-toolset with no tools yet registers none (so far only `actions`).
+Each toolset comes with a skill that tells an agent how to use its tools.
 
 ### Issues (`issues`)
 
@@ -266,6 +265,23 @@ The toolset is off by default: add `releases` to `toolsets`. The skill is
 [`github-releases`](skills/github-releases/SKILL.md), shown as
 `github-tools:github-releases` in Claude Code and `github-tools:releases` in
 Hermes. A new release is always a draft; assets are not covered yet.
+
+### Actions (`actions`)
+
+| Tool                   | What it does                                                                                                                          | Class          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| `github_workflow_read` | `list` a repository's workflows, disabled ones included, or `view` one with its file at a branch or tag                               | read           |
+| `github_run_read`      | `list` workflow runs by branch, workflow, status, event or commit, or `view` one with its jobs and failed logs, waiting while it runs | read           |
+| `github_workflow_run`  | start a workflow by hand with its inputs, stopping as `stale` when the ref differs from `head_sha`                                    | administrative |
+| `github_run_rerun`     | re-run a finished run's failed jobs, every job, or one job                                                                            | administrative |
+| `github_run_cancel`    | cancel a queued or running run                                                                                                        | administrative |
+
+The toolset is off by default: add `actions` to `toolsets`. The skill is
+[`github-actions`](skills/github-actions/SKILL.md), shown as
+`github-tools:github-actions` in Claude Code and `github-tools:actions` in
+Hermes. Every Actions write asks each time, since a workflow can deploy or
+publish whatever its name says. Enabling or disabling a workflow, deleting a
+run and downloading artifacts are not covered yet.
 
 ## Reads and writes
 
