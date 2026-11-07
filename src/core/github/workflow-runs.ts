@@ -136,18 +136,25 @@ function invalid(message: string): ToolError {
 }
 
 /** The repository and id a run URL names (`/job/…`, `/attempts/…`, a query or a fragment after the id are ignored), or `undefined` for text that is no such URL. */
-function parseRunUrl(value: string): { repo: RepoName; run: number } | undefined {
+export function parseRunUrl(value: string): { repo: RepoName; run: number } | undefined {
   let url: URL
   try {
-    url = new URL(value)
+    url = new URL(value.trim())
   } catch {
     return undefined
   }
   if (url.protocol !== "https:" || !isGitHubHost(url.hostname)) return undefined
   const [owner, name, actions, runs, id] = url.pathname.split("/").filter(Boolean)
-  if (!owner || !name || actions !== "actions" || runs !== "runs" || !id || !RUN_ID_PATTERN.test(id)) return undefined
-  const run = Number.parseInt(id, 10)
-  return Number.isSafeInteger(run) && run >= 1 ? { repo: parseRepo(`${owner}/${name}`), run } : undefined
+  if (!owner || !name || actions !== "actions" || runs !== "runs" || !id || !isBareRunId(id)) return undefined
+  return { repo: parseRepo(`${owner}/${name}`), run: Number.parseInt(id, 10) }
+}
+
+/** Whether a reference is a bare workflow run id (`123`), naming no repository of its own. */
+export function isBareRunId(value: string): boolean {
+  const text = value.trim()
+  if (!RUN_ID_PATTERN.test(text)) return false
+  const run = Number.parseInt(text, 10)
+  return Number.isSafeInteger(run) && run >= 1
 }
 
 /**
@@ -172,9 +179,8 @@ export async function parseRunRef(
     }
     return fromUrl
   }
-  const run = Number.parseInt(text, 10)
-  if (!RUN_ID_PATTERN.test(text) || !Number.isSafeInteger(run) || run < 1) throw invalid(RUN_REF_ERROR)
-  return { repo: await resolveRepo(repoArg, ctx), run }
+  if (!isBareRunId(text)) throw invalid(RUN_REF_ERROR)
+  return { repo: await resolveRepo(repoArg, ctx), run: Number.parseInt(text, 10) }
 }
 
 /** A workflow run as a list reports it. */

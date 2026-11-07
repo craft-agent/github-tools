@@ -22,9 +22,10 @@ export type ConfirmRequest = { tool: string; message: string }
  * written to, `"owner"` a user or organization login (or `@me`) that a board is
  * about to be created for, `"pull"` one pull request reference (`12`, `#12`,
  * `owner/repo#12` or a pull URL), `"optional_board"` a board that `project`
- * names, which the call writes to only when the argument is given.
+ * names, which the call writes to only when the argument is given, `"run"`
+ * a workflow run id or a run URL.
  */
-export type TargetKind = "repo" | "issue" | "issues" | "pull" | "board" | "optional_board" | "item" | "owner"
+export type TargetKind = "repo" | "issue" | "issues" | "pull" | "board" | "optional_board" | "item" | "owner" | "run"
 
 export type ToolContext = {
   /** The working directory the call runs in; a bare issue number means this tree's repository. */

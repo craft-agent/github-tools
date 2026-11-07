@@ -215,6 +215,13 @@ describe("writeTargets", () => {
         "c/d",
       ])
       expect(await writeTargets({ targets: { repo: "repo" } }, { repo: "a/b" }, { cwd, signal })).toEqual(["a/b"])
+      expect(
+        await writeTargets(
+          { targets: { run: "run", repo: "repo" } },
+          { run: "https://github.com/a/b/actions/runs/1" },
+          { cwd, signal },
+        ),
+      ).toEqual(["a/b"])
     })
 
     test.each([
@@ -350,6 +357,42 @@ describe("pull request targets", () => {
     for (const spec of [prEdit, prComment, prReady, prClose, prReopen]) {
       expect(await writeTargets(spec, { pr: "other/repo#3" }, { cwd })).toEqual(["other/repo"])
     }
+  })
+})
+
+describe("run targets", () => {
+  const runTargets: ToolSpec["targets"] = { run: "run", repo: "repo" }
+
+  test("a run URL names its own repository, not the working tree's", async () => {
+    const cwd = tree(WITH_ORIGIN)
+    const url = "https://github.com/Other/Repo/actions/runs/123"
+    expect(await writeTargets({ targets: runTargets }, { run: url }, { cwd })).toEqual(["other/repo"])
+  })
+
+  test("a bare id means repo, else the working tree's origin", async () => {
+    const cwd = tree(WITH_ORIGIN)
+    expect(await writeTargets({ targets: runTargets }, { run: "123", repo: "x/y" }, { cwd })).toEqual(["x/y"])
+    expect(await writeTargets({ targets: runTargets }, { run: "123" }, { cwd })).toEqual(["octo/self"])
+  })
+
+  test("an invalid run value or non-string yields *", async () => {
+    const cwd = tree(WITH_ORIGIN)
+    const url = "https://github.com/c/d/issues/1"
+    expect(await writeTargets({ targets: runTargets }, { run: url, repo: "a/b" }, { cwd })).toEqual(["a/b", "*"])
+    expect(await writeTargets({ targets: runTargets }, { run: "not-a-run" }, { cwd })).toEqual(["octo/self", "*"])
+    expect(await writeTargets({ targets: runTargets }, { run: 123 as unknown as string }, { cwd })).toEqual([
+      "octo/self",
+      "*",
+    ])
+  })
+
+  test("a qualified run URL that disagrees with repo is listed beside it", async () => {
+    const targets = await writeTargets(
+      { targets: runTargets },
+      { run: "https://github.com/a/b/actions/runs/1", repo: "c/d" },
+      { cwd: tree() },
+    )
+    expect(targets).toEqual(["a/b", "c/d"])
   })
 })
 
