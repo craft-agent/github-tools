@@ -76,6 +76,26 @@ A tool ID change also changes `provides_tools` in `plugin.yaml`; run
 bundle before it runs; raise `MCP_PUBLISHER_VERSION` in the workflow when a new
 one is wanted.
 
+## Hermes install scan
+
+Hermes scans a plugin when it installs it, and a `dangerous` verdict blocks
+the install: `--force` does not override it. A package can pass every other
+check and still be uninstallable in Hermes, so the Tests workflow runs Hermes'
+own scanner (`tools/plugin_guard.py` of Hermes Agent) on the tree a release tag
+carries: the repository's files plus the built `dist/`. Release Drafter
+follows only a successful Tests run, so a tree Hermes would block never gets a
+draft.
+
+- **A blocking finding** fails the run and is listed by file, line and rule
+  (`scripts/hermes_scan.py`). A made-up credential in a fixture is the usual
+  cause: the `hardcoded_secret` rule matches a `token`, `secret`, `password` or
+  `api_key` key with a quoted value of 20 or more characters. Shorten the value
+  or move the fixture under a `tests/` directory, where findings weigh less.
+- **A `caution` finding**, which Hermes installs after asking, only warns.
+- **The scanner is pinned** to one Hermes Agent commit, `HERMES_AGENT_COMMIT`
+  in `.github/workflows/tests.yml`. Raise it deliberately, to a commit of
+  Hermes Agent's default branch, and check that the Tests run still passes.
+
 ## Earlier names
 
 Up to 0.2.0 the package was `@craftsamo/agent-github`, from
