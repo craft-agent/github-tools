@@ -1,10 +1,6 @@
-import { setTimeout as sleep } from "node:timers/promises"
 import { z } from "zod"
-import { abortError } from "../exec"
 import type { PullRequestChecks } from "../github/pull-requests"
-
-const POLL_INTERVAL_MS = 10_000
-const MS_PER_SECOND = 1000
+import { pollUntil } from "../poll"
 
 export const waitedSchema = z.object({
   seconds: z.number().int().describe("How long the call waited, rounded to whole seconds."),
@@ -27,18 +23,8 @@ export type WaitOptions = {
   signal?: AbortSignal
 }
 
-/** Sleeps, and throws the abort error of `signal` when it aborts meanwhile. */
-export async function pause(ms: number, signal: AbortSignal | undefined): Promise<void> {
-  try {
-    await sleep(ms, undefined, { signal })
-  } catch (error) {
-    if (signal?.aborted) throw abortError(signal)
-    throw error
-  }
-}
-
 /** Why the wait ends on this read, or `undefined` to keep waiting. A pull request with no checks yet is not settled. */
-function endOf(current: PullRequestChecks, options: WaitOptions): EndedBy | undefined {
+function endOf(current: PullRequestChecks, options: WaitOptions): Exclude<EndedBy, "timeout"> | undefined {
   const { checks, pr } = current
   if (options.waitSeconds === 0 || pr.state !== "open") return "not_waiting"
   if (options.failFast && checks.fail > 0) return "failed"
@@ -47,26 +33,15 @@ function endOf(current: PullRequestChecks, options: WaitOptions): EndedBy | unde
 }
 
 /**
- * Reads the checks until they settle. Polls every `POLL_INTERVAL_MS` for at
- * most `waitSeconds`, sleeping no longer than what is left, so the last poll
- * falls on the deadline. A pull request that is not open is read once.
+ * Reads the checks until they settle, polling as `pollUntil` does for at most
+ * `waitSeconds`. A pull request that is not open is read once.
  */
 export async function waitForChecks(
   read: () => Promise<PullRequestChecks>,
   options: WaitOptions,
 ): Promise<{ current: PullRequestChecks; waited: Waited }> {
-  const start = Date.now()
-  const deadline = start + options.waitSeconds * MS_PER_SECOND
-  let polls = 0
-  for (;;) {
-    const current = await read()
-    polls++
-    const remaining = deadline - Date.now()
-    const endedBy = endOf(current, options) ?? (remaining <= 0 ? "timeout" : undefined)
-    if (endedBy) {
-      const seconds = Math.round((Date.now() - start) / MS_PER_SECOND)
-      return { current, waited: { seconds, polls, ended_by: endedBy } }
-    }
-    await pause(Math.min(POLL_INTERVAL_MS, remaining), options.signal)
-  }
+  return pollUntil(read, (current) => endOf(current, options), {
+    waitSeconds: options.waitSeconds,
+    signal: options.signal,
+  })
 }

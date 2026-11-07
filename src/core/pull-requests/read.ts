@@ -10,7 +10,8 @@ import {
   readPullRequest,
   searchPullRequests,
 } from "../github/pull-requests"
-import { failedLogSchema } from "../github/workflow-runs"
+import { DEFAULT_LOG_LINES, MAX_LOG_LINES, failedLogSchema } from "../github/workflow-runs"
+import { DEFAULT_WAIT_SECONDS, MAX_WAIT_SECONDS } from "../poll"
 import { parseNumberRef, resolveRepo } from "../refs"
 import { given, quoted, searchWords, LOGIN_PATTERN } from "../search"
 import { defineTool, type ToolContext } from "../tool"
@@ -24,10 +25,6 @@ const DEFAULT_COMMENTS = 5
 const MAX_COMMENTS = 50
 const DEFAULT_LIMIT = 30
 const MAX_LIMIT = 100
-const DEFAULT_WAIT_SECONDS = 45
-const MAX_WAIT_SECONDS = 600
-const DEFAULT_LOG_LINES = 80
-const MAX_LOG_LINES = 500
 const DEFAULT_STATE = "open"
 const CURRENT_USER = "@me"
 const NO_VALUE = "none"

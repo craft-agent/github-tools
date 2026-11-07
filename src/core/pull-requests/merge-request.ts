@@ -2,9 +2,9 @@ import { ToolError, isAbortError, isToolError } from "../errors"
 import { ghJson } from "../gh"
 import type { MergeMethod } from "../github/pull-requests"
 import { STACK_API_VERSION } from "../github/stacks"
+import { pause } from "../poll"
 import type { RepoName } from "../refs"
 import type { ToolContext } from "../tool"
-import { pause } from "./wait"
 
 /** GitHub's asynchronous merge endpoint: one request for every pull request, stacked or not, and the wait for its answer. */
 
