@@ -62,6 +62,7 @@ provides_tools:
   - github_stack_read
   - github_stack_unlink
   - github_workflow_read
+  - github_workflow_run
 provides_hooks:
   - pre_tool_call
 config_schema:

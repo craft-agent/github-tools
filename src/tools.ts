@@ -55,6 +55,7 @@ import { runCancel } from "./core/runs/run-cancel"
 import { runRead } from "./core/runs/run-read"
 import { runRerun } from "./core/runs/run-rerun"
 import { workflowRead } from "./core/workflows/workflow-read"
+import { workflowRun } from "./core/workflows/workflow-run"
 
 /** Every tool spec of the package; entry points register their tools from this list. */
 export const ALL_TOOLS: ToolSpec[] = [
@@ -116,4 +117,5 @@ export const ALL_TOOLS: ToolSpec[] = [
   runRerun,
   runCancel,
   workflowRead,
+  workflowRun,
 ]
