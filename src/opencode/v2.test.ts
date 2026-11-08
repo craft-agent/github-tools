@@ -131,14 +131,14 @@ describe("V2 tool calls", () => {
         metadata: {
           arguments: { repo: "octo/hello", count: 1 },
           class: "add",
-          message: `Title of ${ADD_ID} on octo/hello`,
+          message: `Title of ${ADD_ID}\n\n--- Details ---\n\nTarget: octo/hello`,
         },
         sessionID: SESSION_ID,
       },
     ])
   })
 
-  test("a described write tool adds marked facts and text without changing its permission targets", async () => {
+  test("a described write tool shows its facts and text without changing its permission targets", async () => {
     const { tools, asserts, events } = await setUp()
     await tools.get(LABEL_ID)!.execute({ repo: "Octo/Hello" }, { sessionID: SESSION_ID, signal })
     expect(events).toEqual([`assert:${LABEL_ID}`, `execute:${LABEL_ID}`])
@@ -150,14 +150,14 @@ describe("V2 tool calls", () => {
         metadata: {
           arguments: { repo: "Octo/Hello" },
           class: "add",
-          message: `Title of ${LABEL_ID} on octo/hello\nRepository: Octo/Hello\n\nBody<U+202E>`,
+          message: `Title of ${LABEL_ID}\n\n--- Details ---\n\nTarget: octo/hello\nRepository: Octo/Hello\n\n--- Body ---\n\nBody<U+202E>`,
         },
         sessionID: SESSION_ID,
       },
     ])
   })
 
-  test("a describe that throws still asks with the one-line message", async () => {
+  test("a describe that throws still asks with the title and the targets", async () => {
     const fake = fakeContext()
     const specs = fixtureSpecs(fake.events)
     specs.find((spec) => spec.id === LABEL_ID)!.describe = () => {
@@ -170,7 +170,11 @@ describe("V2 tool calls", () => {
         action: LABEL_ID,
         resources: ["octo/hello"],
         save: ["octo/hello"],
-        metadata: { arguments: { repo: "Octo/Hello" }, class: "add", message: `Title of ${LABEL_ID} on octo/hello` },
+        metadata: {
+          arguments: { repo: "Octo/Hello" },
+          class: "add",
+          message: `Title of ${LABEL_ID}\n\n--- Details ---\n\nTarget: octo/hello`,
+        },
         sessionID: SESSION_ID,
       },
     ])
@@ -201,7 +205,7 @@ describe("V2 tool calls", () => {
     expect(asserts.map((request) => [request.resources, request.save])).toEqual([[["other/repo"], ["other/repo"]]])
   })
 
-  test("a call that writes to two repositories asks for both, and the message names them", async () => {
+  test("a call that writes to two repositories asks for both, and the message names each on a Target line", async () => {
     const repo = tempRepo("https://github.com/Octo/Hello.git")
     cleanups.push(repo.cleanup)
     const { tools, asserts } = await setUp({ location: { directory: repo.dir } })
@@ -212,7 +216,17 @@ describe("V2 tool calls", () => {
         ["fork/hello", "octo/hello"],
       ],
     ])
-    expect(asserts[0]!.metadata?.message).toBe(`Title of ${ADD_ID} on fork/hello, octo/hello`)
+    expect(asserts[0]!.metadata?.message).toBe(
+      `Title of ${ADD_ID}\n\n--- Details ---\n\nTarget: fork/hello\nTarget: octo/hello`,
+    )
+  })
+
+  test("a call whose targets cannot be told shows its title alone", async () => {
+    const { tools, asserts } = await setUp()
+    await expect(tools.get(ADD_ID)!.execute({ repo: 5 }, { sessionID: SESSION_ID, signal })).rejects.toThrow(
+      "invalid_argument",
+    )
+    expect(asserts[0]!.metadata?.message).toBe(`Title of ${ADD_ID}`)
   })
 
   test("the resource is * when the repository cannot be resolved, and an always answer saves nothing", async () => {

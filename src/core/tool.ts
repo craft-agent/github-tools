@@ -30,8 +30,11 @@ export type TargetKind = "repo" | "issue" | "issues" | "pull" | "board" | "optio
 /** One fact an approval prompt shows of a call, read as `Label: value`. */
 export type CallFact = { label: string; value: string }
 
-/** What a call will do, as an approval prompt shows it: short facts first, then an optional free text. */
-export type CallDescription = { facts: CallFact[]; text?: string }
+/** The text a call carries, under the tool's own label (`Note text`). */
+export type CallText = { label: string; body: string }
+
+/** What a call will do, as an approval prompt shows it: short facts, then an optional text. */
+export type CallDescription = { facts: CallFact[]; text?: CallText }
 
 export type ToolContext = {
   /** The working directory the call runs in; a bare issue number means this tree's repository. */
@@ -52,7 +55,10 @@ export type ToolSpec<I extends z.ZodObject<any> = z.ZodObject<any>, O extends z.
   class: WriteClass
   /** The arguments that name a repository or board the call writes to, by name; each must be an argument of `input`. */
   targets?: Readonly<Record<string, TargetKind>>
-  /** What the call will do, for the person approving it: facts such as the kind of target, and the text it carries. */
+  /**
+   * What the call will do, for the person approving it: facts such as the
+   * kind of target, and the text the call carries under the tool's own label.
+   */
   describe?(args: z.output<I>, ctx: ToolContext): CallDescription | Promise<CallDescription>
   input: I
   output: O

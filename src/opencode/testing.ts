@@ -53,7 +53,7 @@ export function fixtureSpecs(events: string[]): ToolSpec[] {
       ...fixture(LABEL_ID, "issues", "add", events),
       describe: (args) => ({
         facts: [{ label: "Repository", value: String(args.repo ?? "here") }],
-        text: "Body\u202E",
+        text: { label: "Body", body: "Body\u202E" },
       }),
     }),
     fixture(ADMIN_ID, "releases", "administrative", events),

@@ -179,7 +179,9 @@ function errorDetail(error: unknown): string {
  * plugin: `list` answers with the selected tools, `run` runs one with the
  * arguments on standard input, and `target` answers with the repositories a
  * call would write to (`{"resources": [...]}`), plus a `description` when the
- * tool gives one. Standard output carries only the JSON document; a
+ * tool gives one: `{"facts": [...], "text"?: {"label", "body"}}`, as the
+ * approval prompt shows it (hidden characters marked). Standard output carries
+ * only the JSON document; a
  * mistake in the command line is one line on standard error and `EXIT_USAGE`.
  * Resolves to the exit code.
  */

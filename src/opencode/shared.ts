@@ -1,5 +1,5 @@
-import { invoke, isToolError, selectTools, type CallDescription, type ToolContext, type ToolSpec } from "../core"
-import { approvalPrompt } from "../entry/description"
+import { invoke, isToolError, selectTools, type ToolContext, type ToolSpec } from "../core"
+import { approvalPrompt, type ShownDescription } from "../entry/description"
 import { errorText } from "../entry/errors"
 import { ANY_RESOURCE } from "../entry/permission"
 import { settingsFromOptions } from "../entry/settings"
@@ -15,13 +15,6 @@ export type PluginDeps = {
   ownDir?: string
 }
 
-/** The first line of the approval prompt; it names every repository the call writes to. */
-export function permissionMessage(spec: Pick<ToolSpec, "title">, resources: string[]): string {
-  return resources.length === 1 && resources[0] === ANY_RESOURCE
-    ? spec.title
-    : `${spec.title} on ${resources.join(", ")}`
-}
-
 /** The resources an "always" answer may persist: all but `*`, which would grant every repository. */
 export function persistableResources(resources: string[]): string[] {
   return resources.filter((resource) => resource !== ANY_RESOURCE)
@@ -32,12 +25,12 @@ export function permissionMetadata(
   spec: Pick<ToolSpec, "title" | "class">,
   args: unknown,
   resources: string[],
-  description?: CallDescription,
+  description?: ShownDescription,
 ) {
   return {
     arguments: args,
     class: spec.class,
-    message: approvalPrompt(permissionMessage(spec, resources), description),
+    message: approvalPrompt(spec.title, resources, description),
   }
 }
 

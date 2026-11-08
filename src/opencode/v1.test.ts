@@ -173,12 +173,16 @@ describe("V1 tool calls", () => {
         permission: ADD_ID,
         patterns: ["octo/hello"],
         always: ["octo/hello"],
-        metadata: { arguments: { repo: "octo/hello" }, class: "add", message: `Title of ${ADD_ID} on octo/hello` },
+        metadata: {
+          arguments: { repo: "octo/hello" },
+          class: "add",
+          message: `Title of ${ADD_ID}\n\n--- Details ---\n\nTarget: octo/hello`,
+        },
       },
     ])
   })
 
-  test("a described write tool adds marked facts and text without changing its permission targets", async () => {
+  test("a described write tool shows its facts and text without changing its permission targets", async () => {
     const { tool, asks, events, context } = await setUp()
     await tool[LABEL_ID]!.execute({ repo: "Octo/Hello" }, context)
     expect(events).toEqual([`ask:${LABEL_ID}`, `execute:${LABEL_ID}`])
@@ -190,7 +194,7 @@ describe("V1 tool calls", () => {
         metadata: {
           arguments: { repo: "Octo/Hello" },
           class: "add",
-          message: `Title of ${LABEL_ID} on octo/hello\nRepository: Octo/Hello\n\nBody<U+202E>`,
+          message: `Title of ${LABEL_ID}\n\n--- Details ---\n\nTarget: octo/hello\nRepository: Octo/Hello\n\n--- Body ---\n\nBody<U+202E>`,
         },
       },
     ])
@@ -220,7 +224,7 @@ describe("V1 tool calls", () => {
     expect(asks.map((request) => [request.patterns, request.always])).toEqual([[["other/repo"], ["other/repo"]]])
   })
 
-  test("a call that writes to two repositories asks for both, and the message names them", async () => {
+  test("a call that writes to two repositories asks for both, and the message names each on a Target line", async () => {
     const repo = tempRepo("git@github.com:Octo/Hello.git")
     cleanups.push(repo.cleanup)
     const { tool, asks, context } = await setUp()
@@ -231,7 +235,15 @@ describe("V1 tool calls", () => {
         ["fork/hello", "octo/hello"],
       ],
     ])
-    expect(asks[0]!.metadata.message).toBe(`Title of ${ADD_ID} on fork/hello, octo/hello`)
+    expect(asks[0]!.metadata.message).toBe(
+      `Title of ${ADD_ID}\n\n--- Details ---\n\nTarget: fork/hello\nTarget: octo/hello`,
+    )
+  })
+
+  test("a call whose targets cannot be told shows its title alone", async () => {
+    const { tool, asks, context } = await setUp()
+    await expect(tool[ADD_ID]!.execute({ repo: 5 }, context)).rejects.toThrow("invalid_argument")
+    expect(asks[0]!.metadata.message).toBe(`Title of ${ADD_ID}`)
   })
 
   test("a repository that cannot be told is asked for as * beside the others, and never saved", async () => {

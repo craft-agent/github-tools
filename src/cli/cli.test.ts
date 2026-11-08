@@ -95,7 +95,7 @@ const specs: ToolSpec[] = [
   }),
   describing(DESCRIBED_ID, (args) => ({
     facts: [{ label: "Repository", value: String(args.repo ?? "here") }],
-    text: "Body\u202E line\r\nnext",
+    text: { label: "Body", body: "Body\u202E line\r\nnext" },
   })),
   describing(HANGING_DESCRIBE_ID, () => new Promise(() => {})),
 ]
@@ -276,7 +276,10 @@ describe("target", () => {
     expect(run.stderr).toBe("")
     expect(json(run)).toEqual({
       resources: ["octo/hello"],
-      description: { facts: [{ label: "Repository", value: "Octo/Hello" }], text: "Body<U+202E> line\nnext" },
+      description: {
+        facts: [{ label: "Repository", value: "Octo/Hello" }],
+        text: { label: "Body", body: "Body<U+202E> line\nnext" },
+      },
     })
   })
 
