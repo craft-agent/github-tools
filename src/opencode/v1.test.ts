@@ -182,7 +182,7 @@ describe("V1 tool calls", () => {
     ])
   })
 
-  test("a described write tool shows its facts and text without changing its permission targets", async () => {
+  test("a described write tool shows its headline, facts and text without changing its permission targets", async () => {
     const { tool, asks, events, context } = await setUp()
     await tool[LABEL_ID]!.execute({ repo: "Octo/Hello" }, context)
     expect(events).toEqual([`ask:${LABEL_ID}`, `execute:${LABEL_ID}`])
@@ -194,7 +194,8 @@ describe("V1 tool calls", () => {
         metadata: {
           arguments: { repo: "Octo/Hello" },
           class: "add",
-          message: `Title of ${LABEL_ID}\n\n--- Details ---\n\nTarget: octo/hello\nRepository: Octo/Hello\n\n--- Body ---\n\nBody<U+202E>`,
+          message:
+            'Label the repository "Octo/Hello"\n\n--- Details ---\n\nTarget: octo/hello\nRepository: Octo/Hello\n\n--- Body ---\n\nBody<U+202E>',
         },
       },
     ])

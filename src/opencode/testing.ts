@@ -52,6 +52,7 @@ export function fixtureSpecs(events: string[]): ToolSpec[] {
     defineTool({
       ...fixture(LABEL_ID, "issues", "add", events),
       describe: (args) => ({
+        headline: { text: "Label the repository {repo}", values: { repo: String(args.repo ?? "here") } },
         facts: [{ label: "Repository", value: String(args.repo ?? "here") }],
         text: { label: "Body", body: "Body\u202E" },
       }),
