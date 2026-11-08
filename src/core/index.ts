@@ -44,6 +44,8 @@ export {
   outputJsonSchema,
   selectTools,
   toolMeta,
+  type CallDescription,
+  type CallFact,
   type ConfirmRequest,
   type TargetKind,
   type ToolAnnotations,
@@ -53,3 +55,4 @@ export {
   type Toolset,
   type WriteClass,
 } from "./tool"
+export { callDescription } from "./describe"
