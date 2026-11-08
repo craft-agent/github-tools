@@ -20,6 +20,7 @@ const WRITE_TARGETS = { issue: "issue", repo: "repo", branch_repo: "repo" } as c
 
 export const READ_ID = "github_issue_read"
 export const ADD_ID = "github_issue_comment"
+export const LABEL_ID = "github_issue_label"
 export const ADMIN_ID = "github_release_publish"
 export const FAILING_ID = "github_issue_close"
 
@@ -41,13 +42,20 @@ function fixture(id: string, toolset: Toolset, writeClass: WriteClass, events: s
 }
 
 /**
- * A read and an add tool of `issues`, an administrative tool of `releases`, and
+ * A read and two add tools of `issues`, an administrative tool of `releases`, and
  * an `issues` tool that fails with `not_found`; `events` logs each execution.
  */
 export function fixtureSpecs(events: string[]): ToolSpec[] {
   return [
     fixture(READ_ID, "issues", "read", events),
     fixture(ADD_ID, "issues", "add", events),
+    defineTool({
+      ...fixture(LABEL_ID, "issues", "add", events),
+      describe: (args) => ({
+        facts: [{ label: "Repository", value: String(args.repo ?? "here") }],
+        text: "Body\u202E",
+      }),
+    }),
     fixture(ADMIN_ID, "releases", "administrative", events),
     defineTool({
       id: FAILING_ID,
