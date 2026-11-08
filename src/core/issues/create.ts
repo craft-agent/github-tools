@@ -30,7 +30,8 @@ import {
 import { BOARD_LOOKUP_NOTE, PROJECT_SCOPE_NOTE, boardSummary, boardSummarySchema } from "../projects/support"
 import { resolveRepo, type RepoName } from "../refs"
 import { StepErrors, defineTool, type ToolContext } from "../tool"
-import { editIssue, given, invalid, lastUrl, nameList, setKind, writableContext } from "./write-support"
+import { editIssue, setKind } from "./write-support"
+import { given, invalid, lastUrl, nameList, writableContext } from "../write-support"
 
 const ISSUE_URL = /\/issues\/(\d+)$/
 

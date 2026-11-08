@@ -6,7 +6,7 @@ import {
   visibilitySchema,
   type Visibility,
 } from "../github/repos"
-import { given, invalid } from "../issues/write-support"
+import { given, invalid } from "../write-support"
 import { parseRepo } from "../refs"
 import { confirmWrite, defineTool } from "../tool"
 

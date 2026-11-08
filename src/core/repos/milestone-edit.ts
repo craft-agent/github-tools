@@ -9,7 +9,7 @@ import {
   writeMilestone,
   type MilestoneBody,
 } from "../github/milestones"
-import { REPO_DESCRIPTION, invalid, writableContext } from "../issues/write-support"
+import { REPO_DESCRIPTION, invalid, writableContext } from "../write-support"
 import { resolveRepo } from "../refs"
 import { defineTool } from "../tool"
 

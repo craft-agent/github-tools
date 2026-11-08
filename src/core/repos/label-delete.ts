@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { deleteLabel, findLabel, labelNameInput, labelsForWrite } from "../github/labels"
-import { REPO_DESCRIPTION, writableContext } from "../issues/write-support"
+import { REPO_DESCRIPTION, writableContext } from "../write-support"
 import { resolveRepo } from "../refs"
 import { confirmWrite, defineTool } from "../tool"
 

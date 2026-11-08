@@ -2,7 +2,7 @@ import { z } from "zod"
 import { branchHead } from "../github/branches"
 import { patchRepository, readAdministeredRepository, replaceTopics, type Repository } from "../github/repos"
 import { repositoryContext } from "../github/repository"
-import { REPO_DESCRIPTION, invalid } from "../issues/write-support"
+import { REPO_DESCRIPTION, invalid } from "../write-support"
 import { resolveRepo } from "../refs"
 import { defineTool } from "../tool"
 

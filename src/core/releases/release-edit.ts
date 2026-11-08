@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { tagCommit } from "../github/branches"
 import {
   PRERELEASE_CANNOT_BE_LATEST,
   findRelease,
@@ -6,11 +7,10 @@ import {
   releaseNotFound,
   releaseTagInput,
   resolveTarget,
-  tagCommit,
   updateRelease,
   type ReleaseBody,
 } from "../github/releases"
-import { REPO_DESCRIPTION, invalid, writableContext } from "../issues/write-support"
+import { REPO_DESCRIPTION, invalid, writableContext } from "../write-support"
 import { resolveRepo } from "../refs"
 import { defineTool } from "../tool"
 

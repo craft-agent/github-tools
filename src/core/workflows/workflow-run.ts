@@ -1,14 +1,12 @@
 import { z } from "zod"
 import { ToolError } from "../errors"
-import { branchHead, defaultBranch } from "../github/branches"
-import { SHA_PATTERN, tagCommit } from "../github/releases"
+import { branchHead, defaultBranch, tagCommit } from "../github/branches"
 import { parseRunUrl, readRun, softFailure } from "../github/workflow-runs"
 import { dispatchWorkflow, resolveWorkflow } from "../github/workflows"
-import { REPO_DESCRIPTION, given, invalid, writableContext } from "../issues/write-support"
-import { resolveRepo, type RefContext, type RepoName } from "../refs"
+import { REPO_DESCRIPTION, given, invalid, writableContext } from "../write-support"
+import { resolveRepo, SHA_PATTERN, shortSha, type RefContext, type RepoName } from "../refs"
 import { confirmWrite, defineTool } from "../tool"
 
-const SHORT_SHA_LENGTH = 12
 /** The longest input value, in characters, the confirmation shows. */
 const MAX_SHOWN_VALUE = 60
 /** The most inputs the confirmation lists. */
@@ -16,8 +14,6 @@ const MAX_SHOWN_INPUTS = 10
 const ACTIVE_STATE = "active"
 const UNKNOWN_RUN_HINT =
   "GitHub did not say which run it started; find it with github_run_read list (workflow, event workflow_dispatch)."
-
-const short = (sha: string): string => sha.slice(0, SHORT_SHA_LENGTH)
 
 const input = z.object({
   workflow: z.string().describe("A workflow's id, file name (ci.yml), path or name."),
@@ -136,7 +132,7 @@ export const workflowRun = defineTool({
     if (expectedSha && commit.toLowerCase() !== expectedSha.toLowerCase()) {
       throw new ToolError(
         "stale",
-        `${ref} of ${repo.full} is at ${short(commit)}, not ${short(expectedSha)}: it moved since it was read. Nothing was started.`,
+        `${ref} of ${repo.full} is at ${shortSha(commit)}, not ${shortSha(expectedSha)}: it moved since it was read. Nothing was started.`,
       )
     }
 
@@ -144,7 +140,7 @@ export const workflowRun = defineTool({
     await confirmWrite(
       workflowRun,
       ctx,
-      `Start the workflow "${workflow.name}" (${workflow.path}) on ${ref} at ${short(commit)} in ${repo.full}${describeInputs(inputs)}? It runs whatever the workflow does, a deploy or a publish included.`,
+      `Start the workflow "${workflow.name}" (${workflow.path}) on ${ref} at ${shortSha(commit)} in ${repo.full}${describeInputs(inputs)}? It runs whatever the workflow does, a deploy or a publish included.`,
     )
 
     const printed = await dispatchWorkflow(repo, workflow.id, ref, inputs, ctx)
@@ -159,7 +155,7 @@ export const workflowRun = defineTool({
         const started = await readRun(repo, run.id, undefined, ctx)
         if (started.head_sha.toLowerCase() !== commit.toLowerCase()) {
           hints.push(
-            `${ref} moved as the workflow started: the run is for ${short(started.head_sha)}, not ${short(commit)}.`,
+            `${ref} moved as the workflow started: the run is for ${shortSha(started.head_sha)}, not ${shortSha(commit)}.`,
           )
         }
       } catch (error) {

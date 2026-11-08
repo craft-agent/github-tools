@@ -1,13 +1,7 @@
 import { z } from "zod"
-import {
-  createRelease,
-  findRelease,
-  releaseTagInput,
-  resolveTarget,
-  tagCommit,
-  type ReleaseBody,
-} from "../github/releases"
-import { REPO_DESCRIPTION, invalid, writableContext } from "../issues/write-support"
+import { tagCommit } from "../github/branches"
+import { createRelease, findRelease, releaseTagInput, resolveTarget, type ReleaseBody } from "../github/releases"
+import { REPO_DESCRIPTION, invalid, writableContext } from "../write-support"
 import { resolveRepo } from "../refs"
 import { defineTool } from "../tool"
 

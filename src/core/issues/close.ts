@@ -4,7 +4,8 @@ import { readIssueFields } from "../github/issues"
 import { ghIssueRef, resolveRelatedIssue } from "../github/issue-refs"
 import { parseNumberRef } from "../refs"
 import { defineTool } from "../tool"
-import { ISSUE_DESCRIPTION, ISSUE_TARGETS, REPO_DESCRIPTION, given, invalid, writableContext } from "./write-support"
+import { ISSUE_DESCRIPTION, ISSUE_TARGETS } from "./write-support"
+import { REPO_DESCRIPTION, given, invalid, writableContext } from "../write-support"
 
 const REASONS = ["completed", "not_planned", "duplicate"] as const
 

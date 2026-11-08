@@ -9,9 +9,9 @@ import {
   type PullRequestRef,
 } from "../github/pull-requests"
 import { readStack } from "../github/stacks"
-import { REPO_DESCRIPTION, given, invalid, writableContext } from "../issues/write-support"
+import { REPO_DESCRIPTION, given, invalid, writableContext } from "../write-support"
 import { stepErrorsSchema } from "../projects/item-support"
-import { parseNumberRef, type RepoName } from "../refs"
+import { parseNumberRef, SHA_PATTERN, shortSha, type RepoName } from "../refs"
 import { StepErrors, defineTool, type ToolContext } from "../tool"
 import { branchOutcomeSchema, tidyBranches, type BranchTarget } from "./merge-branches"
 import {
@@ -25,8 +25,6 @@ import {
 } from "./merge-request"
 import { PR_DESCRIPTION, PR_TARGETS } from "./write-support"
 
-const SHA_PATTERN = /^[0-9a-f]{40}$/i
-const SHORT_SHA_LENGTH = 12
 const CONFLICT_FAILURE = /http 409/i
 const PENDING_NOTE = "GitHub is still merging; github_pr_read view shows when it lands."
 const ENQUEUED_NOTE = "In the merge queue; it merges when the queue reaches it."
@@ -101,8 +99,6 @@ const output = z.object({
   foreign: z.boolean(),
   errors: stepErrorsSchema,
 })
-
-const short = (sha: string): string => sha.slice(0, SHORT_SHA_LENGTH)
 
 const layerOf = (state: MergeState) => ({
   number: state.number,
@@ -197,7 +193,7 @@ async function requestMerge(
     if (now.head_sha.toLowerCase() !== body.sha.toLowerCase()) {
       throw new ToolError(
         "stale",
-        `${label} is at ${short(now.head_sha)}, not ${short(body.sha)}: new commits arrived since it was read. Nothing was merged.`,
+        `${label} is at ${shortSha(now.head_sha)}, not ${shortSha(body.sha)}: new commits arrived since it was read. Nothing was merged.`,
         { cause: error },
       )
     }
@@ -273,7 +269,7 @@ export const prMerge = defineTool({
     if (expectedSha && pull.head_sha.toLowerCase() !== expectedSha.toLowerCase()) {
       throw new ToolError(
         "stale",
-        `${label} is at ${short(pull.head_sha)}, not ${short(expectedSha)}: new commits arrived since it was read. Nothing was merged.`,
+        `${label} is at ${shortSha(pull.head_sha)}, not ${shortSha(expectedSha)}: new commits arrived since it was read. Nothing was merged.`,
       )
     }
 

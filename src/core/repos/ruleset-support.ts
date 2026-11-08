@@ -1,7 +1,7 @@
 import { z } from "zod"
 import { ToolError } from "../errors"
 import { listRulesets, type Ruleset, type RulesetRow } from "../github/rulesets"
-import { invalid } from "../issues/write-support"
+import { invalid } from "../write-support"
 import type { RefContext, RepoName } from "../refs"
 
 /** What the ruleset write tools share: the argument shapes, ref patterns, and the checks made before a ruleset is written. */

@@ -15,6 +15,10 @@ const SSH_ALIAS_HOST = "ssh.github.com"
 const GIT_CONFIG_ENV = ["GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_NOSYSTEM"] as const
 /** Enterprise Managed User logins contain `_`. */
 export const OWNER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/
+/** A full commit SHA: 40 hexadecimal digits, either case. */
+export const SHA_PATTERN = /^[0-9a-f]{40}$/i
+/** How many characters of a commit SHA a message shows. */
+const SHORT_SHA_LENGTH = 12
 const NAME_PATTERN = /^[A-Za-z0-9._-]+$/
 const REPO_PATTERN = /^([^/\s#]+)\/([^/\s#]+)$/
 const QUALIFIED_NUMBER_PATTERN = /^([^/\s#]+)\/([^/\s#]+)#(\d+)$/
@@ -24,6 +28,11 @@ const GIT_SUFFIX = /\.git$/
 
 function invalid(message: string): ToolError {
   return new ToolError("invalid_argument", message)
+}
+
+/** A commit SHA shortened to the length messages show. */
+export function shortSha(sha: string): string {
+  return sha.slice(0, SHORT_SHA_LENGTH)
 }
 
 export function isGitHubHost(host: string): boolean {
