@@ -23,6 +23,8 @@ const MISSING_ID = "github_issue_close"
 const BROKEN_ID = "github_issue_reopen"
 const SLOW_ID = "github_issue_lock"
 const DETAILED_ID = "github_issue_validate"
+const DESCRIBED_ID = "github_issue_label"
+const HANGING_DESCRIBE_ID = "github_issue_pin"
 
 function fixture(id: string, toolset: ToolSpec["toolset"], writeClass: ToolSpec["class"]): ToolSpec {
   return defineTool({
@@ -53,6 +55,23 @@ function failingWith(id: string, writeClass: ToolSpec["class"], fail: (signal?: 
   })
 }
 
+function describing(id: string, describe: ToolSpec["describe"]): ToolSpec {
+  return defineTool({
+    id,
+    title: id,
+    description: id,
+    toolset: "issues",
+    class: "add",
+    targets: { repo: "repo" },
+    input,
+    output,
+    describe,
+    async execute(args, ctx) {
+      return { tool: id, cwd: ctx.cwd, count: args.count, own_dir: ctx.ownDir }
+    },
+  })
+}
+
 const specs: ToolSpec[] = [
   fixture(READ_ID, "issues", "read"),
   fixture(ADD_ID, "issues", "add"),
@@ -74,6 +93,11 @@ const specs: ToolSpec[] = [
       details: { problems: [{ field: "name", reason: "empty" }] },
     })
   }),
+  describing(DESCRIBED_ID, (args) => ({
+    facts: [{ label: "Repository", value: String(args.repo ?? "here") }],
+    text: "Body\u202E line\r\nnext",
+  })),
+  describing(HANGING_DESCRIBE_ID, () => new Promise(() => {})),
 ]
 
 type Run = { code: number; stdout: string; stderr: string }
@@ -135,8 +159,17 @@ describe("list", () => {
       BROKEN_ID,
       SLOW_ID,
       DETAILED_ID,
+      DESCRIBED_ID,
+      HANGING_DESCRIBE_ID,
     ])
-    expect(await ids("--exclude-tools", `${READ_ID},${ADD_ID}`)).toEqual([MISSING_ID, BROKEN_ID, SLOW_ID, DETAILED_ID])
+    expect(await ids("--exclude-tools", `${READ_ID},${ADD_ID}`)).toEqual([
+      MISSING_ID,
+      BROKEN_ID,
+      SLOW_ID,
+      DETAILED_ID,
+      DESCRIBED_ID,
+      HANGING_DESCRIBE_ID,
+    ])
   })
 
   test("reads the environment behind the flags", async () => {
@@ -237,6 +270,28 @@ describe("run", () => {
 })
 
 describe("target", () => {
+  test("includes the call's description with hidden characters marked and newlines normalized", async () => {
+    const run = await cli(["target", DESCRIBED_ID, "--cwd", "/x"], '{"repo":"Octo/Hello"}')
+    expect(run.code).toBe(EXIT_OK)
+    expect(run.stderr).toBe("")
+    expect(json(run)).toEqual({
+      resources: ["octo/hello"],
+      description: { facts: [{ label: "Repository", value: "Octo/Hello" }], text: "Body<U+202E> line\nnext" },
+    })
+  })
+
+  test("still answers resources without a description when describing never settles", async () => {
+    const run = await cli(["target", HANGING_DESCRIBE_ID, "--cwd", "/x"], '{"repo":"Octo/Hello"}', {
+      describeTimeoutMs: 50,
+    })
+    expect(run).toEqual({ code: EXIT_OK, stdout: '{"resources":["octo/hello"]}\n', stderr: "" })
+  })
+
+  test("omits the description and answers * for invalid arguments", async () => {
+    expect(json(await cli(["target", DESCRIBED_ID, "--cwd", "/x"], '{"repo":3}'))).toEqual({ resources: ["*"] })
+    expect(json(await cli(["target", DESCRIBED_ID, "--cwd", "/x"], '{"bogus":1}'))).toEqual({ resources: ["*"] })
+  })
+
   test("is the lowercased repo argument", async () => {
     const run = await cli(["target", ADD_ID, "--cwd", "/x"], JSON.stringify({ repo: "Octo/Hello" }))
     expect(run).toEqual({ code: EXIT_OK, stdout: '{"resources":["octo/hello"]}\n', stderr: "" })
