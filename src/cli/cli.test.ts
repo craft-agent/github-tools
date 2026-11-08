@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { z } from "zod"
-import { ToolError, abortError, annotations, defineTool, selectTools, type ToolSpec } from "../core"
+import { ToolError, abortError, annotations, defineTool, selectTools, type ToolSpec, type Translations } from "../core"
 import { tempRepo } from "../testing/git-repo"
 import { EXIT_FAILED, EXIT_OK, EXIT_USAGE, runCli, type CliIo } from "./cli"
 
@@ -118,6 +118,30 @@ async function cli(argv: string[], stdin = "", overrides: Partial<CliIo> = {}): 
 }
 
 const json = (run: Run): any => JSON.parse(run.stdout)
+
+/** The plugin's own words in English, as `target` answers without a language. */
+const ENGLISH_WORDS = { details: "Details", target: "Target", more: "(+{count} more)" }
+const JAPANESE_WORDS = { details: "詳細", target: "対象", more: "（ほか {count} 件）" }
+
+/** Japanese words for the described fixture's title, headline, fact label and text label. */
+const TRANSLATIONS: Translations = {
+  ja: {
+    [DESCRIBED_ID]: "ラベル付け",
+    "Label the repository {repo}": "リポジトリ {repo} にラベルを付ける",
+    Repository: "リポジトリ",
+    Body: "本文",
+  },
+}
+
+/** The titles of the fixtures that are not `Title of <id>`: the id itself. */
+const OWN_ID_TITLES = [DESCRIBED_ID, HANGING_DESCRIBE_ID]
+
+/** The answer of `target` without a language for a fixture: its resources, its English title and the English words. */
+const answer = (id: string, resources: string[]) => ({
+  resources,
+  title: OWN_ID_TITLES.includes(id) ? id : `Title of ${id}`,
+  words: ENGLISH_WORDS,
+})
 
 const cleanups: (() => void)[] = []
 afterEach(() => {
@@ -276,7 +300,7 @@ describe("target", () => {
     expect(run.code).toBe(EXIT_OK)
     expect(run.stderr).toBe("")
     expect(json(run)).toEqual({
-      resources: ["octo/hello"],
+      ...answer(DESCRIBED_ID, ["octo/hello"]),
       description: {
         headline: 'Label the repository "Octo/Hello"',
         facts: [{ label: "Repository", value: "Octo/Hello" }],
@@ -289,58 +313,61 @@ describe("target", () => {
     const run = await cli(["target", HANGING_DESCRIBE_ID, "--cwd", "/x"], '{"repo":"Octo/Hello"}', {
       describeTimeoutMs: 50,
     })
-    expect(run).toEqual({ code: EXIT_OK, stdout: '{"resources":["octo/hello"]}\n', stderr: "" })
+    expect(run.code).toBe(EXIT_OK)
+    expect(run.stderr).toBe("")
+    expect(json(run)).toEqual(answer(HANGING_DESCRIBE_ID, ["octo/hello"]))
   })
 
   test("omits the description and answers * for invalid arguments", async () => {
-    expect(json(await cli(["target", DESCRIBED_ID, "--cwd", "/x"], '{"repo":3}'))).toEqual({ resources: ["*"] })
-    expect(json(await cli(["target", DESCRIBED_ID, "--cwd", "/x"], '{"bogus":1}'))).toEqual({ resources: ["*"] })
+    expect(json(await cli(["target", DESCRIBED_ID, "--cwd", "/x"], '{"repo":3}'))).toEqual(answer(DESCRIBED_ID, ["*"]))
+    expect(json(await cli(["target", DESCRIBED_ID, "--cwd", "/x"], '{"bogus":1}'))).toEqual(answer(DESCRIBED_ID, ["*"]))
   })
 
   test("is the lowercased repo argument", async () => {
     const run = await cli(["target", ADD_ID, "--cwd", "/x"], JSON.stringify({ repo: "Octo/Hello" }))
-    expect(run).toEqual({ code: EXIT_OK, stdout: '{"resources":["octo/hello"]}\n', stderr: "" })
+    expect(run.code).toBe(EXIT_OK)
+    expect(json(run)).toEqual(answer(ADD_ID, ["octo/hello"]))
   })
 
   test("is the working tree's origin without a repo argument", async () => {
     const repo = tempRepo("git@github.com:Octo/Hello.git")
     cleanups.push(repo.cleanup)
-    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir]))).toEqual({ resources: ["octo/hello"] })
+    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir]))).toEqual(answer(ADD_ID, ["octo/hello"]))
   })
 
   test("is the repository a qualified issue names, not the working tree's", async () => {
     const repo = tempRepo("git@github.com:Octo/Hello.git")
     cleanups.push(repo.cleanup)
     const stdin = JSON.stringify({ issue: "Other/Repo#4", body: "x" })
-    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir], stdin))).toEqual({ resources: ["other/repo"] })
+    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir], stdin))).toEqual(answer(ADD_ID, ["other/repo"]))
   })
 
   test("lists every repository the call writes to", async () => {
     const repo = tempRepo("git@github.com:Octo/Hello.git")
     cleanups.push(repo.cleanup)
     const stdin = JSON.stringify({ issue: "4", parent: "Other/Repo#2" })
-    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir], stdin))).toEqual({
-      resources: ["octo/hello", "other/repo"],
-    })
+    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir], stdin))).toEqual(
+      answer(ADD_ID, ["octo/hello", "other/repo"]),
+    )
   })
 
   test("is * when the repository cannot be resolved", async () => {
     const repo = tempRepo()
     cleanups.push(repo.cleanup)
-    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir]))).toEqual({ resources: ["*"] })
-    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir], '{"repo":"not a repo"}'))).toEqual({
-      resources: ["*"],
-    })
-    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir], '{"repo":3}'))).toEqual({ resources: ["*"] })
+    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir]))).toEqual(answer(ADD_ID, ["*"]))
+    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir], '{"repo":"not a repo"}'))).toEqual(
+      answer(ADD_ID, ["*"]),
+    )
+    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir], '{"repo":3}'))).toEqual(answer(ADD_ID, ["*"]))
   })
 
   test("is * for a bare number in the install directory, and still names a qualified issue there", async () => {
     const repo = tempRepo("git@github.com:Octo/Self.git")
     cleanups.push(repo.cleanup)
     const argv = ["target", ADD_ID, "--cwd", repo.dir]
-    expect(json(await cli(argv, '{"issue":"3"}', { ownDir: repo.dir }))).toEqual({ resources: ["*"] })
-    expect(json(await cli(argv, '{"issue":"o/r#3"}', { ownDir: repo.dir }))).toEqual({ resources: ["o/r"] })
-    expect(json(await cli(argv, '{"issue":"3"}'))).toEqual({ resources: ["octo/self"] })
+    expect(json(await cli(argv, '{"issue":"3"}', { ownDir: repo.dir }))).toEqual(answer(ADD_ID, ["*"]))
+    expect(json(await cli(argv, '{"issue":"o/r#3"}', { ownDir: repo.dir }))).toEqual(answer(ADD_ID, ["o/r"]))
+    expect(json(await cli(argv, '{"issue":"3"}'))).toEqual(answer(ADD_ID, ["octo/self"]))
   })
 
   test("an unknown tool is invalid_argument", async () => {
@@ -353,6 +380,115 @@ describe("target", () => {
     const run = await cli(["target", ADD_ID, "--cwd", "/x"], "{nope")
     expect(run.code).toBe(EXIT_FAILED)
     expect(json(run).error.code).toBe("invalid_argument")
+  })
+})
+
+describe("target in a language", () => {
+  const ARGS = '{"repo":"Octo/Hello"}'
+  const ENGLISH = {
+    resources: ["octo/hello"],
+    title: DESCRIBED_ID,
+    words: ENGLISH_WORDS,
+    description: {
+      headline: 'Label the repository "Octo/Hello"',
+      facts: [{ label: "Repository", value: "Octo/Hello" }],
+      text: { label: "Body", body: "Body<U+202E> line\nnext" },
+    },
+  }
+  const JAPANESE = {
+    resources: ["octo/hello"],
+    title: "ラベル付け",
+    words: JAPANESE_WORDS,
+    description: {
+      headline: 'リポジトリ "Octo/Hello" にラベルを付ける',
+      facts: [{ label: "リポジトリ", value: "Octo/Hello" }],
+      text: { label: "本文", body: "Body<U+202E> line\nnext" },
+    },
+  }
+
+  /** Runs `target` for the described fixture with the fixture translations, over `flags` and `env`. */
+  const target = (flags: string[], env: Record<string, string | undefined> = {}) =>
+    cli(["target", DESCRIBED_ID, "--cwd", "/x", ...flags], ARGS, { env, translations: TRANSLATIONS })
+
+  test("--language translates the title, the plugin's words and the description's words", async () => {
+    const run = await target(["--language", "ja"])
+    expect(run.code).toBe(EXIT_OK)
+    expect(run.stderr).toBe("")
+    expect(json(run)).toEqual(JAPANESE)
+  })
+
+  test("takes the --flag=value form and a regional tag", async () => {
+    expect(json(await target(["--language=ja-JP"]))).toEqual(JAPANESE)
+    expect(json(await target(["--harness-language=ja_JP"]))).toEqual(JAPANESE)
+  })
+
+  test("--harness-language alone translates", async () => {
+    expect(json(await target(["--harness-language", "ja"]))).toEqual(JAPANESE)
+  })
+
+  test("--language wins over --harness-language, and a language without a table is English", async () => {
+    expect(json(await target(["--language", "en", "--harness-language", "ja"]))).toEqual(ENGLISH)
+    expect(json(await target(["--language", "ja", "--harness-language", "fr"]))).toEqual(JAPANESE)
+  })
+
+  test("the environment variable sits between the flag and the harness language", async () => {
+    expect(json(await target(["--harness-language", "fr"], { GITHUB_TOOLS_LANGUAGE: "ja" }))).toEqual(JAPANESE)
+    expect(json(await target(["--harness-language", "ja"], { GITHUB_TOOLS_LANGUAGE: "fr" }))).toEqual(ENGLISH)
+    expect(json(await target(["--language", "fr"], { GITHUB_TOOLS_LANGUAGE: "ja" }))).toEqual(ENGLISH)
+  })
+
+  test("blank values count as unset", async () => {
+    expect(json(await target(["--harness-language", "ja"], { GITHUB_TOOLS_LANGUAGE: "  " }))).toEqual(JAPANESE)
+  })
+
+  test("an unknown language, and none, keep English", async () => {
+    expect(json(await target(["--language", "fr"]))).toEqual(ENGLISH)
+    expect(json(await target([]))).toEqual(ENGLISH)
+  })
+
+  test("without package translations the plugin's own words are still translated", async () => {
+    const run = await cli(["target", ADD_ID, "--cwd", "/x", "--language", "ja"], ARGS)
+    expect(json(run)).toEqual({ resources: ["octo/hello"], title: `Title of ${ADD_ID}`, words: JAPANESE_WORDS })
+  })
+
+  test("the flags may come before --cwd", async () => {
+    const run = await cli(["target", DESCRIBED_ID, "--language", "ja", "--cwd", "/x"], ARGS, {
+      translations: TRANSLATIONS,
+    })
+    expect(json(run)).toEqual(JAPANESE)
+  })
+})
+
+describe("target flags", () => {
+  test.each([["--language"], ["--harness-language"]])("%s without a value is a usage error", async (flag) => {
+    for (const flags of [[flag], [flag, "--cwd", "/x"], [`${flag}=`]]) {
+      const run = await cli(["target", ADD_ID, "--cwd", "/x", ...flags])
+      expect(run).toEqual({
+        code: EXIT_USAGE,
+        stdout: "",
+        stderr: `github-tools-cli: Option ${flag} needs a value.\n`,
+      })
+    }
+  })
+
+  test("any other leftover is still an unknown option", async () => {
+    const run = await cli(["target", ADD_ID, "--cwd", "/x", "--language", "ja", "--bogus"])
+    expect(run.code).toBe(EXIT_USAGE)
+    expect(run.stderr).toContain('Unknown option "--bogus".')
+  })
+
+  test.each([["--language"], ["--harness-language"]])("list and run reject %s", async (flag) => {
+    const cases: [string[], string][] = [
+      [["list", flag, "ja"], flag],
+      [["run", ADD_ID, "--cwd", "/x", flag, "ja"], flag],
+      [["run", ADD_ID, "--cwd", "/x", `${flag}=ja`], `${flag}=ja`],
+    ]
+    for (const [argv, option] of cases) {
+      const run = await cli(argv)
+      expect(run.code).toBe(EXIT_USAGE)
+      expect(run.stdout).toBe("")
+      expect(run.stderr).toContain(`Unknown option "${option}".`)
+    }
   })
 })
 
