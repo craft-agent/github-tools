@@ -1,4 +1,5 @@
 import { invoke, isToolError, selectTools, type ToolContext, type ToolSpec } from "../core"
+import { errorText } from "../entry/errors"
 import { ANY_RESOURCE } from "../entry/permission"
 import { settingsFromOptions } from "../entry/settings"
 import type { PluginOptions } from "./types"
@@ -44,12 +45,16 @@ export function selectedTools(
   return selectTools(specs, settingsFromOptions(options, env))
 }
 
-/** Runs a tool through core `invoke`; a tool failure reaches the harness as an `Error` reading `<code>: <message>`. */
+/**
+ * Runs a tool through core `invoke`; a tool failure reaches the harness as an
+ * `Error` reading `<code>: <message>`, with `details` as JSON on a line of its
+ * own when set.
+ */
 export async function runTool(spec: ToolSpec, args: unknown, ctx: ToolContext): Promise<unknown> {
   try {
     return await invoke(spec, args, ctx)
   } catch (error) {
     if (!isToolError(error)) throw error
-    throw new Error(`${error.code}: ${error.message}`, { cause: error })
+    throw new Error(errorText(error), { cause: error })
   }
 }

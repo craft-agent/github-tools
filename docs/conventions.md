@@ -143,6 +143,25 @@ says what to do next.
 | `declined`         | the person declined a confirmation the tool asked for                    |
 | `github_error`     | GitHub or `gh` failed for another reason; the message carries their text |
 
+- **Structure the caller needs goes in `details`, not in the message.** When
+  fixing the cause takes more than a sentence (the lint violations, the
+  findings, the output of a hook), the error carries it as `details`: a JSON
+  object with snake_case keys, like a result. A model then reads the fields
+  instead of parsing them back out of prose; the message still says what to
+  do next on its own.
+- **`details` is fixed when the error is made.** `ToolError` keeps a frozen
+  JSON copy, so every entry point renders the same value. The copy is what
+  JSON makes of it (`undefined` is dropped, `NaN` becomes `null`), and a value
+  JSON cannot write at all, such as a cycle or a `BigInt`, fails where it was
+  thrown, as a bug, not where it is rendered.
+- **Each entry point passes `details` on only when it is set**, so an error
+  without it reads as it always did. The MCP server and the command line put
+  it beside the code and the message, as `error.details`. The OpenCode and
+  Hermes plugins, whose errors are text, append it to `<code>: <message>` as
+  JSON on a line of its own.
+- The `errors` of a partial result (`StepErrors`) stay `<code>: <message>`
+  strings.
+
 ## Write classes
 
 Every tool belongs to one class, and the class sets its MCP annotations.
@@ -232,6 +251,12 @@ Every entry point takes the same settings:
   `GH_PROMPT_DISABLED=1`, `GH_NO_UPDATE_NOTIFIER=1`, `NO_COLOR=1`, and `gh`'s
   own authentication passed through. Nothing waits on a prompt, and output
   parses the same everywhere.
+- **Every variable the tools read besides the settings is named in
+  `TOOL_VARIABLES` in `src/entry/settings.ts`**, whether a tool reads it itself
+  or passes it through to a program. Codex gives a plugin's server only a few
+  basic variables (`PATH`, `HOME` and the like) and those its manifest names,
+  and `pnpm run manifests` writes that list from the settings and
+  `TOOL_VARIABLES`: a variable left out is set everywhere but in Codex.
 - **Every call has a time limit** (120 s by default), and a call that is
   stopped, by that limit or by cancellation, has its child process killed:
   `SIGTERM`, then `SIGKILL` after two seconds. A hung `gh` neither holds a

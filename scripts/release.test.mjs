@@ -4,7 +4,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { settingVariables } from "../src/entry/settings"
+import { TOOL_VARIABLES, forwardedVariables, settingVariables } from "../src/entry/settings"
+import { CODEX_MANIFEST } from "./codex-env.mjs"
 import { DESCRIPTION, serverJson } from "./server-json.mjs"
 import { VERSION_FILES } from "./version-files.mjs"
 
@@ -13,9 +14,6 @@ const PLUGIN_NAME = "github-tools"
 const SERVER_NAME = "github-tools"
 const MCP_ENTRY = "dist/mcp.js"
 const REGISTRY_DESCRIPTION_LIMIT = 100
-
-/** The legacy manifest Codex loads the plugin from, which names the server relative to the plugin root. */
-const CODEX_MANIFEST = ".codex-plugin/plugin.json"
 
 /** Each MCP configuration and the variable its harness expands to the plugin's install directory. */
 const MCP_CONFIGS = {
@@ -74,10 +72,10 @@ describe("MCP configurations", () => {
     })
   })
 
-  test("Codex's legacy manifest launches dist/mcp.js from the plugin root and forwards every setting variable", () => {
+  test("Codex's legacy manifest launches dist/mcp.js from the plugin root and forwards every variable the server reads", () => {
     const manifest = readJson(CODEX_MANIFEST)
     expect(manifest.mcpServers).toEqual({
-      [SERVER_NAME]: { command: "node", args: [MCP_ENTRY], cwd: ".", env_vars: settingVariables() },
+      [SERVER_NAME]: { command: "node", args: [MCP_ENTRY], cwd: ".", env_vars: forwardedVariables() },
     })
     expect(manifest.skills).toBe("./skills")
   })
@@ -101,6 +99,14 @@ describe("MCP configurations", () => {
     // npx runs the bin named like the unscoped package name when a package provides several bins.
     const unscoped = pkg.name.replace(/^@[^/]+\//, "")
     expect(pkg.bin[unscoped]).toBe(MCP_ENTRY)
+  })
+
+  test("every tool variable is a variable name, listed once and not a setting's", () => {
+    for (const variable of TOOL_VARIABLES) {
+      expect(variable).toMatch(/^[A-Za-z_][A-Za-z0-9_]*$/)
+      expect(settingVariables()).not.toContain(variable)
+    }
+    expect(new Set(TOOL_VARIABLES).size).toBe(TOOL_VARIABLES.length)
   })
 })
 

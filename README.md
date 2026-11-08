@@ -362,11 +362,14 @@ environment variable in `env:` is allowed). Where each harness reads them:
   environment the harness runs in.
 - **Codex** passes a plugin's MCP server only a few basic variables (such as
   `PATH` and `HOME`) and those the plugin's manifest names, which are the
-  variables above: set them in the environment Codex runs in. To pass flags,
-  or to give the server another variable it needs, add the server under
-  `[mcp_servers]` in Codex's `config.toml` instead of using the plugin: flags
-  go in `args`, `env_vars` names the variables to forward from Codex's
-  environment, and `env` sets fixed values.
+  variables above: set them in the environment Codex runs in. A variable the
+  tools read besides the settings belongs in `TOOL_VARIABLES` in
+  `src/entry/settings.ts`; `pnpm run manifests` adds it to the manifest after the
+  settings' variables. To pass flags, or to give the server a variable the
+  package does not name, add the server under `[mcp_servers]` in Codex's
+  `config.toml` instead of using the plugin: flags go in `args`, `env_vars`
+  names the variables to forward from Codex's environment, and `env` sets
+  fixed values.
 
   ```toml
   [mcp_servers.github-tools]
