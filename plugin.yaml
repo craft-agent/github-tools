@@ -1,5 +1,5 @@
 name: github-tools
-version: 0.10.1
+version: 0.11.0
 description: "GitHub tools for coding agents: issues, project boards, pull requests, repositories, releases and Actions."
 manifest_version: 1
 requires_hermes: ">=0.22"
