@@ -328,6 +328,7 @@ variable, and an option or setting wins over the variable too.
 | `tools`         | `--tools`         | `GITHUB_TOOLS_TOOLS`         | single tools to add by ID, whatever their toolset                                                                                |
 | `exclude_tools` | `--exclude-tools` | `GITHUB_TOOLS_EXCLUDE_TOOLS` | single tools to remove by ID; wins over `tools` and `toolsets`                                                                   |
 | `confirm`       | `--confirm`       | `GITHUB_TOOLS_CONFIRM`       | MCP server only: `harness` (default) or `elicitation`, as `docs/conventions.md` describes                                        |
+| `language`      | `--language`      | `GITHUB_TOOLS_LANGUAGE`      | native plugins only: the approval prompt's language, such as `ja`                                                                |
 
 Lists are comma-separated in a flag or a variable. GitHub Actions does not let a
 secret or configuration variable be named `GITHUB_*`, so in a workflow pass a
@@ -353,9 +354,11 @@ environment variable in `env:` is allowed). Where each harness reads them:
           exclude_tools: [github_pr_merge]
   ```
 
-  The plugin passes its own environment to the command line it runs, so the
-  variables work too. A running gateway keeps the environment it started with;
-  restart it (`hermes gateway restart`) after changing one.
+  Without a `language` setting, the approval card follows Hermes's own
+  `display.language` (or `HERMES_LANGUAGE`), the language of its approval
+  buttons, and else stays in English. The plugin passes its own environment
+  to the command line it runs, so the variables work too. A running gateway
+  keeps the environment it started with; restart it (`hermes gateway restart`) after changing one.
 
 - **Claude Code, Grok Build and Antigravity** start the plugin's server without
   flags and pass it the client's environment, so set the variables in the
@@ -381,6 +384,8 @@ environment variable in `env:` is allowed). Where each harness reads them:
 ## Layout
 
 - `src/core/` — the tools, free of any harness.
+- `src/words.ts` — the translations of the tools' words, per language, which
+  the native plugins use in their approval prompts.
 - `src/mcp/` — the MCP server, built to `dist/mcp.js` and run by `github-tools`.
 - `src/opencode/` — the OpenCode plugin, built to `dist/opencode.js`.
 - `src/cli/` — the command line the Hermes plugin calls, built to `dist/cli.js`
