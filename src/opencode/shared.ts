@@ -1,8 +1,18 @@
-import { invoke, isToolError, selectTools, type ToolContext, type ToolSpec } from "../core"
+import {
+  ENGLISH,
+  invoke,
+  isToolError,
+  selectTools,
+  type ToolContext,
+  type ToolSpec,
+  type Translations,
+  type Translator,
+} from "../core"
 import { approvalPrompt, type ShownDescription } from "../entry/description"
 import { errorText } from "../entry/errors"
 import { ANY_RESOURCE } from "../entry/permission"
 import { settingsFromOptions } from "../entry/settings"
+import { promptTranslator, promptWords } from "../entry/words"
 import type { PluginOptions } from "./types"
 
 /** What a plugin takes from its surroundings; each has a default, and a test supplies its own. */
@@ -13,6 +23,8 @@ export type PluginDeps = {
   skillsDir?: URL | string
   /** Where the plugin is installed: never a call's working tree, so a bare number there fails. */
   ownDir?: string
+  /** The translations of the tools' words, per language, for the approval prompt; defaults to none, which keeps it in English. */
+  translations?: Translations
 }
 
 /** The resources an "always" answer may persist: all but `*`, which would grant every repository. */
@@ -26,11 +38,12 @@ export function permissionMetadata(
   args: unknown,
   resources: string[],
   description?: ShownDescription,
+  t: Translator = ENGLISH,
 ) {
   return {
     arguments: args,
     class: spec.class,
-    message: approvalPrompt(spec.title, resources, description),
+    message: approvalPrompt(t.word(spec.title), resources, description, promptWords(t)),
   }
 }
 
@@ -39,13 +52,21 @@ export function needsPermission(spec: Pick<ToolSpec, "class">): boolean {
   return spec.class !== "read"
 }
 
-/** The tools the plugin options (and the environment behind them) select from `specs`. */
+/**
+ * The tools the plugin options (and the environment behind them) select from
+ * `specs`, and the translator of the prompt language they set over the
+ * plugin's translations.
+ */
 export function selectedTools(
   specs: ToolSpec[],
   options: PluginOptions | undefined,
-  env: Record<string, string | undefined> = process.env,
-): ToolSpec[] {
-  return selectTools(specs, settingsFromOptions(options, env))
+  deps: PluginDeps,
+): { specs: ToolSpec[]; translator: Translator } {
+  const settings = settingsFromOptions(options, deps.env ?? process.env)
+  return {
+    specs: selectTools(specs, settings),
+    translator: promptTranslator(deps.translations ?? {}, settings.language),
+  }
 }
 
 /**

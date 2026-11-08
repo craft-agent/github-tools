@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { ToolError, defineTool, type ToolSpec, type Toolset, type WriteClass } from "../core"
+import { ToolError, defineTool, type ToolSpec, type Toolset, type Translations, type WriteClass } from "../core"
 
 /** Fixtures the OpenCode plugin tests share. */
 
@@ -23,6 +23,24 @@ export const ADD_ID = "github_issue_comment"
 export const LABEL_ID = "github_issue_label"
 export const ADMIN_ID = "github_release_publish"
 export const FAILING_ID = "github_issue_close"
+
+/** Japanese words for the add fixture's title and for the label fixture's headline, fact label and text label. */
+export const TRANSLATIONS: Translations = {
+  ja: {
+    [`Title of ${ADD_ID}`]: "追加ツール",
+    "Label the repository {repo}": "リポジトリ {repo} にラベルを付ける",
+    Repository: "リポジトリ",
+    Body: "本文",
+  },
+}
+
+/** The approval prompts of the add and label fixtures for `Octo/Hello`, in English and through `TRANSLATIONS`. */
+export const ENGLISH_ADD = `Title of ${ADD_ID}\n\n--- Details ---\n\nTarget: octo/hello`
+export const JAPANESE_ADD = "追加ツール\n\n--- 詳細 ---\n\n対象: octo/hello"
+export const ENGLISH_LABEL =
+  'Label the repository "Octo/Hello"\n\n--- Details ---\n\nTarget: octo/hello\nRepository: Octo/Hello\n\n--- Body ---\n\nBody<U+202E>'
+export const JAPANESE_LABEL =
+  'リポジトリ "Octo/Hello" にラベルを付ける\n\n--- 詳細 ---\n\n対象: octo/hello\nリポジトリ: Octo/Hello\n\n--- 本文 ---\n\nBody<U+202E>'
 
 function fixture(id: string, toolset: Toolset, writeClass: WriteClass, events: string[]): ToolSpec {
   return defineTool({
