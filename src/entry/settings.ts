@@ -180,21 +180,54 @@ function listOption(name: "tools" | "exclude_tools"): (value: unknown) => string
   }
 }
 
+const LANGUAGE_OPTION = "language"
+const PLUGIN_OPTION_NAMES: readonly string[] = [...TOOL_OPTION_NAMES, LANGUAGE_OPTION]
+
+/** The environment variable of the `language` setting; it is no setting variable the manifests forward. */
+export const LANGUAGE_VARIABLE = "GITHUB_TOOLS_LANGUAGE"
+
+/** The tool settings plus the language of a native plugin's approval prompt, as given (matched later against the package's translations). */
+export type PluginSettings = ToolSettings & { language?: string }
+
+function nonBlank(text: string | undefined): string | undefined {
+  const trimmed = text?.trim()
+  return trimmed === "" ? undefined : trimmed
+}
+
+/** The language of the prompt from a command line's `--language` value, else `GITHUB_TOOLS_LANGUAGE`, else the harness's own display language; blank values count as unset. */
+export function promptLanguage(
+  flag: string | undefined,
+  env: Record<string, string | undefined>,
+  harness: string | undefined,
+): string | undefined {
+  return nonBlank(flag) ?? nonBlank(env[LANGUAGE_VARIABLE]) ?? nonBlank(harness)
+}
+
+function languageOption(value: unknown): string | undefined {
+  if (typeof value !== "string") throw optionError(LANGUAGE_OPTION, 'a language tag such as "ja"')
+  return nonBlank(value)
+}
+
 /**
- * Reads the tool settings from the options a plugin is configured with, for
- * entry points that have no command line. An option wins over its environment
- * variable; an option of the wrong type, or one this function does not know,
- * is `invalid_argument` naming it. `confirm` is not an option here: the
- * harness asks.
+ * Reads the tool settings and the prompt language from the options a plugin
+ * is configured with, for entry points that have no command line. An option
+ * wins over its environment variable (`language` falls back to
+ * `GITHUB_TOOLS_LANGUAGE`, blank meaning unset, and is not checked against any
+ * list); an option of the wrong type, or one this function does not know, is
+ * `invalid_argument` naming it. `confirm` is not an option here: the harness
+ * asks.
  */
 export function settingsFromOptions(
   options: Record<string, unknown> | undefined,
   env: Record<string, string | undefined>,
-): ToolSettings {
+): PluginSettings {
   const given = options ?? {}
-  const unknown = Object.keys(given).find((name) => !(TOOL_OPTION_NAMES as readonly string[]).includes(name))
+  const unknown = Object.keys(given).find((name) => !PLUGIN_OPTION_NAMES.includes(name))
   if (unknown !== undefined) {
-    throw new ToolError("invalid_argument", `Unknown option "${unknown}"; use one of ${TOOL_OPTION_NAMES.join(", ")}.`)
+    throw new ToolError(
+      "invalid_argument",
+      `Unknown option "${unknown}"; use one of ${PLUGIN_OPTION_NAMES.join(", ")}.`,
+    )
   }
 
   const resolve = <T>(
@@ -207,7 +240,7 @@ export function settingsFromOptions(
     return text !== undefined ? fromText(text) : undefined
   }
 
-  const settings: ToolSettings = {}
+  const settings: PluginSettings = {}
   const toolsets = resolve("toolsets", toolsetsOption, ({ text, source }) => checkToolsets(splitList(text), source))
   if (toolsets !== undefined) settings.toolsets = toolsets
   const readOnly = resolve("read_only", booleanOption, ({ text, source }) => parseBoolean(text, source))
@@ -216,5 +249,10 @@ export function settingsFromOptions(
   if (tools !== undefined) settings.tools = tools
   const excluded = resolve("exclude_tools", listOption("exclude_tools"), ({ text }) => splitList(text))
   if (excluded !== undefined) settings.exclude_tools = excluded
+  const language =
+    given[LANGUAGE_OPTION] !== undefined
+      ? languageOption(given[LANGUAGE_OPTION])
+      : promptLanguage(undefined, env, undefined)
+  if (language !== undefined) settings.language = language
   return settings
 }
