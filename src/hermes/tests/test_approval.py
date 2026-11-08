@@ -11,6 +11,11 @@ from unittest import mock
 from support import CWD, FAKE_CLI, LISTING, FakeCliCase, StubContext, approval, listing, runtime
 
 
+CREATE = "Comment on an issue"
+UPDATE = "Merge a pull request"
+DETAILS = "\n\n--- Details ---\n\n"
+
+
 def key(tool_id: str, *resources: str) -> str:
     """The rule_key of a call of ``tool_id`` that names ``resources``."""
     return f"github-tools:{tool_id}:{','.join(resources)}"
@@ -35,7 +40,7 @@ class ApprovalHookTest(FakeCliCase):
             decision,
             {
                 "action": "approve",
-                "message": "Comment on an issue on octo/hello (github_issue_comment)",
+                "message": f"{CREATE}{DETAILS}Target: octo/hello",
                 "rule_key": "github-tools:github_issue_comment:octo/hello",
             },
         )
@@ -56,6 +61,7 @@ class ApprovalHookTest(FakeCliCase):
                 {
                     "resources": ["octo/hello"],
                     "description": {
+                        "headline": 'Create the thing "a_b"',
                         "facts": [{"label": "Kind", "value": "group_chat"}],
                         "text": {"label": "Note", "body": "hi @everyone"},
                     },
@@ -67,7 +73,8 @@ class ApprovalHookTest(FakeCliCase):
             decision,
             {
                 "action": "approve",
-                "message": "Comment on an issue on octo/hello \\(github\\_issue\\_comment\\)\nKind: group\\_chat\n\nhi \\@everyone",
+                "message": 'Create the thing "a\\_b"'
+                f"{DETAILS}Target: octo/hello\nKind: group\\_chat\n\n--- Note ---\n\nhi \\@everyone",
                 "rule_key": key("github_issue_comment", "octo/hello"),
             },
         )
@@ -91,7 +98,8 @@ class ApprovalHookTest(FakeCliCase):
                 ctx = self.register(ctx=SurfaceContext())
                 decision = ctx.hooks[0][1](tool_name="github_issue_comment", args={})
                 self.assertEqual(
-                    decision["message"], f"Comment on an issue on octo/hello (github_issue_comment)\nKind: group_chat\n\n{text}"
+                    decision["message"],
+                    f"{CREATE}{DETAILS}Target: octo/hello\nKind: group_chat\n\n--- Note ---\n\n{text}",
                 )
                 self.assertEqual(decision["rule_key"], key("github_issue_comment", "octo/hello"))
 
@@ -117,25 +125,31 @@ class ApprovalHookTest(FakeCliCase):
                 self.assertEqual(decision["action"], "approve")
                 self.assertEqual(
                     decision["message"],
-                    "Comment on an issue on octo/hello \\(github\\_issue\\_comment\\)\n\nhi &lt;\\@everyone&gt; &amp; all",
+                    f"{CREATE}{DETAILS}Target: octo/hello\n\n--- Note ---\n\nhi &lt;\\@everyone&gt; &amp; all",
                 )
 
-    def test_without_a_description_the_surface_is_not_read(self) -> None:
+    def test_the_surface_is_read_even_without_a_description(self) -> None:
         self.reply("target github_issue_comment", stdout='{"resources":["octo/hello"]}')
-        with mock.patch.object(SurfaceContext, "session_surface") as surface:
+        with mock.patch.object(SurfaceContext, "session_surface", return_value="slack") as surface:
             ctx = self.register(ctx=SurfaceContext())
             decision = ctx.hooks[0][1](tool_name="github_issue_comment", args={})
-            self.assertEqual(decision["message"], "Comment on an issue on octo/hello (github_issue_comment)")
-            surface.assert_not_called()
+            self.assertEqual(decision["message"], f"{CREATE}{DETAILS}Target: octo/hello")
+            surface.assert_called_once_with()
 
     def test_a_bad_description_preserves_the_message_and_resources(self) -> None:
-        for description in ("x", {"facts": "x"}, {"facts": [{"label": "", "value": "v"}]}, {"facts": [], "text": 5}):
+        for description in (
+            "x",
+            {"facts": "x"},
+            {"facts": [{"label": "", "value": "v"}]},
+            {"facts": [], "text": 5},
+            {"facts": [{"label": "a", "value": "b"}], "text": {"label": "Note"}},
+        ):
             self.reply(
                 "target github_issue_comment", stdout=json.dumps({"resources": ["octo/hello"], "description": description})
             )
             with self.subTest(description=description):
                 decision = self.hook()(tool_name="github_issue_comment", args={})
-                self.assertEqual(decision["message"], "Comment on an issue on octo/hello (github_issue_comment)")
+                self.assertEqual(decision["message"], f"{CREATE}{DETAILS}Target: octo/hello")
                 self.assertEqual(decision["rule_key"], key("github_issue_comment", "octo/hello"))
 
     def test_a_description_with_unresolved_resources_keeps_the_single_use_key(self) -> None:
@@ -146,7 +160,7 @@ class ApprovalHookTest(FakeCliCase):
             ),
         )
         decision = self.assert_single_use("github_pr_merge", key("github_pr_merge", "*"), args={})
-        self.assertEqual(decision["message"], "Merge a pull request \\(github\\_pr\\_merge\\)\n\nhi \\@everyone")
+        self.assertEqual(decision["message"], f"{UPDATE}\n\n--- Note ---\n\nhi \\@everyone")
 
     def test_control_characters_in_a_description_are_marked(self) -> None:
         self.reply(
@@ -157,7 +171,7 @@ class ApprovalHookTest(FakeCliCase):
         )
         ctx = self.register(ctx=SurfaceContext())
         decision = ctx.hooks[0][1](tool_name="github_issue_comment", args={})
-        self.assertEqual(decision["message"], "Comment on an issue on octo/hello (github_issue_comment)\nName: a<U+202E>b")
+        self.assertEqual(decision["message"], f"{CREATE}{DETAILS}Target: octo/hello\nName: a<U+202E>b")
 
     def test_invalid_resources_do_not_discard_a_description(self) -> None:
         self.reply(
@@ -165,7 +179,7 @@ class ApprovalHookTest(FakeCliCase):
             stdout=json.dumps({"resources": [], "description": {"facts": [], "text": {"label": "Note", "body": "hi"}}}),
         )
         decision = self.assert_single_use("github_pr_merge", key("github_pr_merge", "*"), args={})
-        self.assertEqual(decision["message"], "Merge a pull request \\(github\\_pr\\_merge\\)\n\nhi")
+        self.assertEqual(decision["message"], f"{UPDATE}\n\n--- Note ---\n\nhi")
 
     def test_a_failed_target_does_not_show_its_description(self) -> None:
         self.reply(
@@ -176,9 +190,9 @@ class ApprovalHookTest(FakeCliCase):
             ),
         )
         decision = self.assert_single_use("github_pr_merge", key("github_pr_merge", "*"), args={})
-        self.assertEqual(decision["message"], "Merge a pull request (github_pr_merge)")
+        self.assertEqual(decision["message"], UPDATE)
 
-    def test_a_card_that_cannot_be_built_still_asks_with_the_line_without_a_description(self) -> None:
+    def test_a_card_that_cannot_be_built_still_asks_with_the_card_without_a_description(self) -> None:
         self.reply(
             "target github_issue_comment",
             stdout=json.dumps(
@@ -186,13 +200,37 @@ class ApprovalHookTest(FakeCliCase):
             ),
         )
         hook = self.hook()
+        build = approval.card.build_message
+        built: list[Any] = []
+
+        def failing_with_a_description(title: str, resources: list[str], description: Any, surface: Any) -> str:
+            built.append((description is None, surface))
+            if description is not None:
+                raise RuntimeError("boom")
+            return build(title, resources, description, surface)
+
+        with mock.patch.object(approval.card, "build_message", side_effect=failing_with_a_description):
+            decision = hook(tool_name="github_issue_comment", args={})
+        self.assertEqual(
+            decision,
+            {
+                "action": "approve",
+                "message": f"{CREATE}{DETAILS}Target: octo/hello",
+                "rule_key": key("github_issue_comment", "octo/hello"),
+            },
+        )
+        self.assertEqual(built, [(False, None), (True, None)])
+
+    def test_a_card_that_cannot_be_built_at_all_still_asks_with_the_title(self) -> None:
+        self.reply("target github_issue_comment", stdout='{"resources":["octo/hello"]}')
+        hook = self.hook()
         with mock.patch.object(approval.card, "build_message", side_effect=RuntimeError("boom")):
             decision = hook(tool_name="github_issue_comment", args={})
         self.assertEqual(
             decision,
             {
                 "action": "approve",
-                "message": "Comment on an issue on octo/hello (github_issue_comment)",
+                "message": CREATE,
                 "rule_key": key("github_issue_comment", "octo/hello"),
             },
         )
@@ -208,7 +246,7 @@ class ApprovalHookTest(FakeCliCase):
     def test_every_repository_a_write_names_is_in_the_message_and_the_rule_key(self) -> None:
         self.reply("target github_issue_comment", stdout='{"resources":["octo/hello","other/repo"]}')
         decision = self.hook()(tool_name="github_issue_comment", args={"issue": "other/repo#2", "body": "hi"})
-        self.assertEqual(decision["message"], "Comment on an issue on octo/hello, other/repo (github_issue_comment)")
+        self.assertEqual(decision["message"], f"{CREATE}{DETAILS}Target: octo/hello\nTarget: other/repo")
         self.assertEqual(decision["rule_key"], "github-tools:github_issue_comment:octo/hello,other/repo")
 
     def assert_single_use(self, tool_id: str, key_prefix: str, **call: Any) -> dict[str, str]:
@@ -224,12 +262,12 @@ class ApprovalHookTest(FakeCliCase):
     def test_an_unresolved_target_is_any_resource_and_leaves_nothing_to_reuse(self) -> None:
         self.reply("target github_pr_merge", stdout='{"resources":["*"]}')
         decision = self.assert_single_use("github_pr_merge", "github-tools:github_pr_merge:*", args={})
-        self.assertEqual(decision["message"], "Merge a pull request (github_pr_merge)")
+        self.assertEqual(decision["message"], UPDATE)
 
     def test_a_resource_that_cannot_be_told_stays_beside_the_others_and_leaves_nothing_to_reuse(self) -> None:
         self.reply("target github_pr_merge", stdout='{"resources":["octo/hello","*"]}')
         decision = self.assert_single_use("github_pr_merge", "github-tools:github_pr_merge:octo/hello,*", args={})
-        self.assertEqual(decision["message"], "Merge a pull request on octo/hello, * (github_pr_merge)")
+        self.assertEqual(decision["message"], f"{UPDATE}{DETAILS}Target: octo/hello\nTarget: \\*")
 
     def test_a_rule_key_that_names_only_known_repositories_is_stable(self) -> None:
         self.reply("target github_issue_comment", stdout='{"resources":["octo/hello"]}')

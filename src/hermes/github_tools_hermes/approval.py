@@ -17,7 +17,7 @@ from .runtime import Runtime, agent_cwd
 TARGET_TIMEOUT_SECONDS = 20
 
 #: What an approval rule matches when a repository a call writes to cannot be told.
-ANY_RESOURCE = "*"
+ANY_RESOURCE = card.ANY_RESOURCE
 
 #: The Hermes hook that can hold a tool call for the person's approval.
 HOOK_NAME = "pre_tool_call"
@@ -51,6 +51,22 @@ def resolve_target(runtime: Runtime, tool_id: str, args: Any) -> Target:
         return Target([ANY_RESOURCE], None)
 
 
+def _message(tool: ToolInfo, target: Target, surface: Callable[[], str | None]) -> str:
+    """The card's message: the tool's title, its targets and its description, fitted to the session's surface.
+
+    A hook that raises asks nothing, so a card that cannot be built falls back
+    to the one without a description, and that one to the title alone.
+    """
+    try:
+        return card.build_message(tool.title, target.resources, target.description, surface())
+    except Exception:
+        pass
+    try:
+        return card.build_message(tool.title, target.resources, None, None)
+    except Exception:
+        return tool.title
+
+
 def make_hook(
     runtime: Runtime, tools: list[ToolInfo], surface: Callable[[], str | None] = lambda: None
 ) -> Callable[..., dict[str, str] | None]:
@@ -67,18 +83,12 @@ def make_hook(
             return None
         target = resolve_target(runtime, tool.id, args)
         resources = target.resources
-        subject = tool.title if resources == [ANY_RESOURCE] else f"{tool.title} on {', '.join(resources)}"
         rule_key = f"github-tools:{tool.id}:{','.join(resources)}"
         if ANY_RESOURCE in resources:
             # Hermes falls back to the bare tool name for a missing rule_key, which an "always" would turn into a
             # grant for every repository; a key no later call repeats leaves nothing reusable.
             rule_key = f"{rule_key}:once-{uuid.uuid4().hex}"
-        header = f"{subject} ({tool.id})"
-        try:
-            message = card.build_message(header, target.description, surface() if target.description else None)
-        except Exception:  # a hook that raises asks nothing, so the card falls back to the line without a description
-            message = header
-        return {"action": "approve", "message": message, "rule_key": rule_key}
+        return {"action": "approve", "message": _message(tool, target, surface), "rule_key": rule_key}
 
     return hook
 
