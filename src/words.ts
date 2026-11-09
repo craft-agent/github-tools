@@ -7,6 +7,7 @@ import { RELEASE_TRANSLATIONS } from "./core/releases/words"
 import { REPO_TRANSLATIONS } from "./core/repos/words"
 import { RUN_TRANSLATIONS } from "./core/runs/words"
 import { WORKFLOW_TRANSLATIONS } from "./core/workflows/words"
+import { WRITE_FACT_TRANSLATIONS } from "./core/write-facts"
 
 /** The translations of every tool's words, per language, which the native plugins use in their approval prompts. */
 export const ALL_TRANSLATIONS: Translations = mergeTranslations(
@@ -17,5 +18,6 @@ export const ALL_TRANSLATIONS: Translations = mergeTranslations(
   RELEASE_TRANSLATIONS,
   RUN_TRANSLATIONS,
   WORKFLOW_TRANSLATIONS,
+  WRITE_FACT_TRANSLATIONS,
   FACT_TRANSLATIONS,
 )

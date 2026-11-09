@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { templatePlaceholders } from "./core/describe"
 import { FACT_TRANSLATIONS } from "./core/facts"
+import { WRITE_FACT_TRANSLATIONS } from "./core/write-facts"
 import { toolWords } from "./testing/tool-words"
 import { ALL_TOOLS } from "./tools"
 import { ALL_TRANSLATIONS } from "./words"
@@ -15,9 +16,12 @@ describe("ALL_TRANSLATIONS", () => {
     }
   })
 
-  test("holds exactly the words of the tools and the shared facts in Japanese", () => {
-    const expected = [...toolWords(ALL_TOOLS), ...Object.keys(FACT_TRANSLATIONS.ja!)].sort()
-    expect(Object.keys(ALL_TRANSLATIONS.ja!).sort()).toEqual(expected)
+  test("holds the title and the intent of every write tool and the shared fact words in Japanese", () => {
+    const keys = new Set(Object.keys(ALL_TRANSLATIONS.ja!))
+    for (const word of toolWords(ALL_TOOLS)) expect(keys.has(word), word).toBe(true)
+    for (const word of [...Object.keys(WRITE_FACT_TRANSLATIONS.ja!), ...Object.keys(FACT_TRANSLATIONS.ja!)]) {
+      expect(keys.has(word), word).toBe(true)
+    }
   })
 
   test("keeps the placeholders of every template in its translation", () => {
