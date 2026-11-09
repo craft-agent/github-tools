@@ -90,3 +90,37 @@ export function fixtureSpecs(events: string[]): ToolSpec[] {
     }),
   ]
 }
+
+export const INTENT_ID = "github_issue_touch"
+export const INTENT_LABEL_ID = "github_issue_mark"
+export const INTENT = "About to touch the issue"
+
+/** Japanese words for the intent fixtures' intent and headline. */
+export const INTENT_TRANSLATIONS: Translations = {
+  ja: {
+    [INTENT]: "イシューに触れようとしています",
+    "Mark the repository {repo}": "リポジトリ {repo} に印を付けようとしています",
+  },
+}
+
+/** The approval prompts of the intent fixtures for `Octo/Hello`: the intent stands for the headline, or the headline stands. */
+export const ENGLISH_INTENT = `${INTENT}\n\n--- Details ---\n\nTarget: octo/hello`
+export const JAPANESE_INTENT = "イシューに触れようとしています\n\n--- 詳細 ---\n\n対象: octo/hello"
+export const ENGLISH_INTENT_LABEL = 'Mark the repository "Octo/Hello"\n\n--- Details ---\n\nTarget: octo/hello'
+export const JAPANESE_INTENT_LABEL =
+  'リポジトリ "Octo/Hello" に印を付けようとしています\n\n--- 詳細 ---\n\n対象: octo/hello'
+
+/** Two add tools of `issues` with an intent: one without `describe`, one with a headline. */
+export function intentSpecs(events: string[]): ToolSpec[] {
+  return [
+    defineTool({ ...fixture(INTENT_ID, "issues", "add", events), intent: INTENT }),
+    defineTool({
+      ...fixture(INTENT_LABEL_ID, "issues", "add", events),
+      intent: INTENT,
+      describe: (args) => ({
+        headline: { text: "Mark the repository {repo}", values: { repo: String(args.repo ?? "here") } },
+        facts: [],
+      }),
+    }),
+  ]
+}

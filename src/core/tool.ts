@@ -56,6 +56,8 @@ export type ToolSpec<I extends z.ZodObject<any> = z.ZodObject<any>, O extends z.
   /** `github_<domain>_<verb>`; a public interface, so it never changes once published. */
   id: string
   title: string
+  /** What the agent is about to do, as a fixed phrase without values (`About to create a note`); the approval prompt shows it where no headline can stand, and the title where the tool has none. */
+  intent?: string
   description: string
   toolset: Toolset
   class: WriteClass
@@ -63,8 +65,8 @@ export type ToolSpec<I extends z.ZodObject<any> = z.ZodObject<any>, O extends z.
   targets?: Readonly<Record<string, TargetKind>>
   /**
    * What the call will do, for the person approving it: a headline template
-   * (the title stands without one), facts such as the kind of target, and the
-   * text the call carries under the tool's own label.
+   * (the intent, else the title, stands without one), facts such as the kind
+   * of target, and the text the call carries under the tool's own label.
    */
   describe?(args: z.output<I>, ctx: ToolContext): CallDescription | Promise<CallDescription>
   input: I
@@ -103,6 +105,12 @@ export function defineTool<I extends z.ZodObject<any>, O extends z.ZodObject<any
   const unknownTarget = Object.keys(spec.targets ?? {}).find((name) => !Object.hasOwn(spec.input.shape, name))
   if (unknownTarget !== undefined) {
     throw new Error(`Tool "${spec.id}" declares the target "${unknownTarget}", which is not one of its arguments.`)
+  }
+  if (spec.intent !== undefined && spec.intent.trim() === "") {
+    throw new Error(`Tool "${spec.id}" must give an intent that is not blank, or none.`)
+  }
+  if (spec.intent !== undefined && /[{}]/.test(spec.intent)) {
+    throw new Error(`Tool "${spec.id}" must give an intent without braces: it carries no values.`)
   }
   return spec
 }
