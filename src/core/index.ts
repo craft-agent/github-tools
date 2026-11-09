@@ -67,6 +67,7 @@ export {
   callDescription,
   cut,
 } from "./describe"
+export { PIN_PATTERN, pinOf } from "./pin"
 export { sizeFact } from "./facts"
 export {
   ENGLISH,
