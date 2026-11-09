@@ -45,6 +45,7 @@ const output = z.object({
 export const projectItemConvert = defineTool({
   id: "github_project_item_convert",
   title: "Convert a GitHub project draft into an issue",
+  intent: "About to convert a GitHub project draft into an issue",
   description: [
     "Turn a draft item into an issue of a repository the viewer may write to: the draft's title and body become the issue, and the item stays on the board with its field values. The viewer must also be able to update the board; both are checked before anything is written. An item that is not a draft is invalid_argument.",
     "Then settle the issue as github_issue_create does: kind (an Issue Type, else a type:<kind> label that is created when missing), labels and milestone. A milestone that does not exist fails before the draft is converted unless create_milestone is true.",

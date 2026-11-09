@@ -185,6 +185,7 @@ async function applyViews(
 export const projectCreate = defineTool({
   id: "github_project_create",
   title: "Create a GitHub project board",
+  intent: "About to create or reuse a GitHub project board",
   description: [
     `Create a project board for a user or organization, or reuse the open board of that owner and exact title (case-insensitive; several are invalid_argument), and bring it to the standard template. The title defaults to ${DEFAULT_BOARD_TITLE}. A board that has to be made is empty, or a copy of template without its draft items.`,
     "With standard (the default): the fields Status (Todo, In Progress, Waiting, Done, Cancelled, each with a color and a description), Start and Target (dates), and the views Roadmap, Kanban and Backlog. On a board this call made, Status gets exactly those options, keeping the ids of GitHub's own Todo, In Progress and Done, and GitHub's default view View 1 is deleted once the three views exist. On a reused or copied board only the missing fields, options and views are added, and nothing is deleted. A reused board must be one the viewer may update.",

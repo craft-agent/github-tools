@@ -34,6 +34,7 @@ const output = z.object({
 export const projectViewEnsure = defineTool({
   id: "github_project_view_ensure",
   title: "Ensure a GitHub project view",
+  intent: "About to ensure a GitHub project view exists",
   description: [
     "Make sure a saved view exists on a project board the viewer may update: a view of that name (without regard to case) is left exactly as it is, and a missing one is created through the REST API with its layout, filter, fields, sorting and grouping.",
     "A field name the board lacks, fields on a roadmap, column_by on a layout other than board, grouping by Sub-issues progress or Linked pull requests and sort_desc without sort_by are invalid_argument, before anything is written.",

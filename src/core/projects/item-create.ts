@@ -33,6 +33,7 @@ const output = z.object({
 export const projectItemCreate = defineTool({
   id: "github_project_item_create",
   title: "Create a draft item on a GitHub project",
+  intent: "About to create a draft item on a GitHub project",
   description: [
     "Create a draft item (a title and a body that live only on the board, with no repository, labels or milestone) on a project board the viewer may update, and set field values in the same call. github_project_item_convert turns a draft into an issue.",
     "With no Status given the draft starts as Todo when the board has a Status single select with that option.",

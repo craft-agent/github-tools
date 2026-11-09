@@ -42,6 +42,7 @@ const output = z.object({
 export const projectItemAdd = defineTool({
   id: "github_project_item_add",
   title: "Add an issue or pull request to a GitHub project",
+  intent: "About to add an issue or pull request to a GitHub project",
   description: [
     "Put an issue or pull request on a project board the viewer may update, and set field values in the same call. Adding is idempotent: one that is already on the board (archived or not) is returned as it is (created: false) and only the given fields are set.",
     "A new item with no Status given starts as Waiting when it is an issue with an open blocking issue and the board has a Waiting option, else as Todo when the board has that option; a board without a Status single select gets no default.",

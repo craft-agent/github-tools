@@ -29,6 +29,7 @@ async function setArchived(args: Args, archived: boolean, ctx: ToolContext) {
 export const projectItemArchive = defineTool({
   id: "github_project_item_archive",
   title: "Archive a GitHub project item",
+  intent: "About to archive a GitHub project item",
   description: [
     "Archive an item on a project board the viewer may update: it leaves the board's views and github_project_read's item_list unless include_archived, and github_project_item_unarchive brings it back. Nothing is deleted. An item that is already archived is left as it is (changed: false).",
     ITEM_NOTE,
@@ -46,6 +47,7 @@ export const projectItemArchive = defineTool({
 export const projectItemUnarchive = defineTool({
   id: "github_project_item_unarchive",
   title: "Unarchive a GitHub project item",
+  intent: "About to unarchive a GitHub project item",
   description: [
     "Bring an archived item back onto a project board the viewer may update, with its field values. An item that is not archived is left as it is (changed: false).",
     ITEM_NOTE,

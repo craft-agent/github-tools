@@ -39,6 +39,7 @@ async function setLink(args: Args, linked: boolean, ctx: ToolContext) {
 export const projectLink = defineTool({
   id: "github_project_link",
   title: "Link a GitHub project to a repository",
+  intent: "About to link a GitHub project to a repository",
   description: [
     "Link a project board to a repository, so the board lookup finds it among that repository's boards. The viewer must be able to update the board and write to the repository; a board that is already linked is left as it is (changed: false). GitHub links only boards of the repository's own owner, so a board of another user or organization is invalid_argument, before anything is written.",
     BOARD_LOOKUP_NOTE,
@@ -55,6 +56,7 @@ export const projectLink = defineTool({
 export const projectUnlink = defineTool({
   id: "github_project_unlink",
   title: "Unlink a GitHub project from a repository",
+  intent: "About to unlink a GitHub project from a repository",
   description: [
     "Unlink a project board from a repository. The viewer must be able to update the board and write to the repository; a board that is not linked is left as it is (changed: false). Nothing on the board is deleted.",
     BOARD_LOOKUP_NOTE,

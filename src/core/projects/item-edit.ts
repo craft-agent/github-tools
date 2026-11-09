@@ -90,6 +90,7 @@ function withWritten(error: unknown, written: readonly string[]): unknown {
 export const projectItemEdit = defineTool({
   id: "github_project_item_edit",
   title: "Edit a GitHub project item",
+  intent: "About to edit a GitHub project item",
   description: [
     "Change a project item in one call: field values (fields) and fields to empty (clear_fields), and, for a draft only, its title, body (replaces it) or append_body (adds after a blank line). A value an item already holds, and an empty field to clear, are skipped; if everything is in place nothing is written (changed: []).",
     "Everything is checked before the first write: a field in both fields and clear_fields, body with append_body, a blank title, draft text on an issue or pull request, an unknown field, option or iteration, a bad date and nothing to change are invalid_argument. A write that fails throws, and its message names what was written before it.",

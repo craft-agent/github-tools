@@ -69,6 +69,7 @@ function planEnsure(
 export const projectFieldEnsure = defineTool({
   id: "github_project_field_ensure",
   title: "Ensure a GitHub project field",
+  intent: "About to ensure a GitHub project field exists",
   description: [
     "Make sure a field exists on a project board the viewer may update, without ever making a second one: a missing field is created, and the missing options of an existing single select are appended after its own, which keep their id, name, color, description and order, so nothing already set moves.",
     "A new single_select field needs options. Status can be extended but not created. A field of that name with another type, options on a field that is not single_select, a repeated option name and a color GitHub does not list are invalid_argument, before anything is written.",
