@@ -184,6 +184,7 @@ function afterOtherChanges(error: unknown, applied: readonly string[]): unknown 
 export const issueEdit = defineTool({
   id: "github_issue_edit",
   title: "Edit a GitHub issue",
+  intent: "About to edit a GitHub issue",
   description: [
     "Change an issue in one call: title, body (body replaces it, append_body adds after a blank line), kind (an Issue Type, else a type:<kind> label that replaces the other type: labels), labels and assignees to add or remove (added assignees are notified), milestone or remove_milestone, and organization issue fields to set or clear.",
     "A milestone that does not exist is an error unless create_milestone is true. Issue fields, their options and values are checked before anything is written; a repository without issue fields refuses them. Needs write permission on the repository.",

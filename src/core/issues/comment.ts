@@ -21,6 +21,7 @@ const output = z.object({
 export const issueComment = defineTool({
   id: "github_issue_comment",
   title: "Comment on a GitHub issue",
+  intent: "About to comment on a GitHub issue",
   description: [
     "Post a comment on an issue; the people following it are notified and the comment stays on the issue.",
     "Needs write permission on the repository.",

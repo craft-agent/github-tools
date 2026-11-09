@@ -93,6 +93,7 @@ async function startingPoint(
 export const issueDevelop = defineTool({
   id: "github_issue_develop",
   title: "Link a development branch to a GitHub issue",
+  intent: "About to link a development branch to a GitHub issue",
   description: [
     "Create a branch on GitHub linked to an issue (its Development panel), or return the linked branch that exists already. It goes through the API: nothing is fetched or checked out locally.",
     "With branch, a linked branch of that name is reused; without it, the first linked branch in the branch repository. A new branch starts from base (it must exist) or the default branch.",

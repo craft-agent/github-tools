@@ -42,6 +42,7 @@ const output = z.object({
 export const issueClose = defineTool({
   id: "github_issue_close",
   title: "Close a GitHub issue",
+  intent: "About to close a GitHub issue",
   description: [
     "Close an issue with a reason: completed, not_planned or duplicate (duplicate_of names the original, in the same forms as an issue). The comment, if any, is posted as it closes, and the people following the issue are notified.",
     "An issue that is closed already is left as it is: nothing is sent, the comment is not posted, changed is false and state_reason is its current reason.",

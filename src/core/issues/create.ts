@@ -129,6 +129,7 @@ async function addBlockers(
 export const issueCreate = defineTool({
   id: "github_issue_create",
   title: "Create a GitHub issue",
+  intent: "About to create a GitHub issue",
   description: [
     "Create an issue in a repository the viewer may write to, and settle its place in the same call: kind (an Issue Type, else a type:<kind> label that is created when missing), labels, assignees (they are notified), milestone, parent and blocked-by issues, organization issue fields, and a project board with field values (the Status starts as Todo, or Waiting when an open issue blocks it).",
     "Everything that can fail is checked before the issue is made: the milestone exists (unless create_milestone is true), the issue fields, their options and values exist (a repository without issue fields refuses them), and the board accepts the values.",

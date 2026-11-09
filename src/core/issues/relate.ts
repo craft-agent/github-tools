@@ -205,6 +205,7 @@ function partialFailure(error: unknown, applied: readonly string[]): unknown {
 export const issueRelate = defineTool({
   id: "github_issue_relate",
   title: "Relate GitHub issues",
+  intent: "About to change how GitHub issues are related",
   description: [
     "Set an issue's parent (parent or remove_parent), sub-issues, blocked-by and blocking issues (add_ and remove_ lists) in one call.",
     "It reads the current relations first and sends only the difference, so a rerun is safe; what already holds is listed as unchanged.",

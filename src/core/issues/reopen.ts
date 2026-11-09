@@ -24,6 +24,7 @@ const output = z.object({
 export const issueReopen = defineTool({
   id: "github_issue_reopen",
   title: "Reopen a GitHub issue",
+  intent: "About to reopen a GitHub issue",
   description: [
     "Reopen a closed issue; the comment, if any, is posted as it reopens, and the people following the issue are notified.",
     "An issue that is open already is left as it is: nothing is sent, the comment is not posted and changed is false.",
