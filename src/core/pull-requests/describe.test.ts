@@ -1,10 +1,21 @@
 import { describe, expect, test } from "bun:test"
 import { HEAD_SHA, branchRule } from "../../testing/develop-fixtures"
-import { PULL_HEADING, pullHeadingRule } from "../../testing/pull-request-write-fixtures"
+import { COMMIT_SHA, PULL_HEADING, pullHeadingRule, stateRule } from "../../testing/pull-request-write-fixtures"
 import { milestonesRule } from "../../testing/write-fixtures"
 import { MAX_FACTS, MAX_HEADLINE_LENGTH, MAX_LABEL_LENGTH } from "../describe"
+import { shortSha } from "../refs"
 import { digest } from "../write-facts"
-import { DESCRIBE_CASES, REAL_TITLE, createRules, describeCase, type DescribeCase } from "./describe.fixtures"
+import {
+  DESCRIBE_CASES,
+  REAL_TITLE,
+  createRules,
+  describeCase,
+  reviewRules,
+  type DescribeCase,
+} from "./describe.fixtures"
+
+/** The methods of a `gh api` call that change something: a review is a POST, a merge a PUT, a branch deletion a DELETE. */
+const WRITE_METHODS = ["POST", "PUT", "PATCH", "DELETE"]
 
 const headline = (text: string, title = REAL_TITLE) => ({ text, values: { title } })
 const word = (text: string) => ({ text })
@@ -278,6 +289,119 @@ describe("github_pr_create", () => {
   })
 })
 
+describe("github_pr_review", () => {
+  const commit = { label: "Commit", value: shortSha(COMMIT_SHA) }
+
+  test("approving names the commit it is posted on, shows the body trimmed as it is sent and pins the full commit", async () => {
+    expect(await describeCase(DESCRIBE_CASES.reviewApprove)).toEqual({
+      headline: headline("About to approve the pull request {title}"),
+      facts: [commit],
+      text: { label: "Review", body: "Ship it." },
+      pins: { head_sha: COMMIT_SHA },
+    })
+  })
+
+  test("an approval without a body has no text", async () => {
+    expect(await describeCase(DESCRIBE_CASES.reviewApproveBare)).toEqual({
+      headline: headline("About to approve the pull request {title}"),
+      facts: [commit],
+      pins: { head_sha: COMMIT_SHA },
+    })
+  })
+
+  test("requesting changes shows the body", async () => {
+    expect(await describeCase(DESCRIBE_CASES.reviewRequestChanges)).toEqual({
+      headline: headline("About to request changes on the pull request {title}"),
+      facts: [commit],
+      text: { label: "Review", body: "Needs a test." },
+      pins: { head_sha: COMMIT_SHA },
+    })
+  })
+
+  test("line comments are counted, and written after the body, each under its place, in the order given", async () => {
+    expect(await describeCase(DESCRIBE_CASES.reviewComments)).toEqual({
+      headline: headline("About to review the pull request {title} with comments"),
+      facts: [commit, { label: "Line comments", value: { text: "{count} comments", values: { count: 2 } } }],
+      text: {
+        label: "Review",
+        body: "A few notes.\n\nsrc/a.ts:12\nWhy this?\n\nsrc/b.ts:3-9 (left)\nRemove this block.",
+      },
+      pins: { head_sha: COMMIT_SHA },
+    })
+  })
+
+  test("one line comment is counted in the singular, and alone it is the whole text", async () => {
+    const description = await describeCase(DESCRIBE_CASES.reviewOneComment)
+    expect(description?.facts[1]).toEqual({
+      label: "Line comments",
+      value: { text: "{count} comment", values: { count: 1 } },
+    })
+    expect(description?.text).toEqual({ label: "Review", body: "src/a.ts:12\nNit." })
+  })
+
+  test("the pin is the head commit the pull request is at now", async () => {
+    const moved = "9".repeat(40)
+    const item: DescribeCase = {
+      ...DESCRIBE_CASES.reviewApprove,
+      rules: reviewRules(pullHeadingRule({ headRefOid: moved })),
+    }
+    expect((await describeCase(item))?.pins).toEqual({ head_sha: moved })
+  })
+
+  test("a comment review is allowed on a closed pull request, and a head_sha in the other case still matches", async () => {
+    const item: DescribeCase = {
+      ...DESCRIBE_CASES.reviewComments,
+      args: { ...DESCRIBE_CASES.reviewComments.args, head_sha: COMMIT_SHA.toUpperCase() },
+      rules: [pullHeadingRule({ state: "CLOSED" })],
+    }
+    expect(await describeCase(item)).toBeDefined()
+  })
+
+  const approving = DESCRIBE_CASES.reviewApprove
+  test.each([
+    ["request_changes without a body", { pr: "7", event: "request_changes", body: " " }, approving.rules],
+    ["a comment review with nothing in it", { pr: "7", event: "comment" }, approving.rules],
+    [
+      "a line comment without a path",
+      { pr: "7", event: "comment", comments: [{ path: " ", line: 1, body: "x" }] },
+      approving.rules,
+    ],
+    [
+      "a line comment without a body",
+      { pr: "7", event: "comment", comments: [{ path: "a.ts", line: 1, body: " " }] },
+      approving.rules,
+    ],
+    [
+      "a range that does not start before its end",
+      { pr: "7", event: "comment", comments: [{ path: "a.ts", start_line: 4, line: 4, body: "x" }] },
+      approving.rules,
+    ],
+    ["a head_sha that is not a full SHA", { pr: "7", event: "approve", head_sha: "abc" }, approving.rules],
+    [
+      "a head_sha the pull request moved from",
+      { pr: "7", event: "approve", head_sha: "f".repeat(40) },
+      approving.rules,
+    ],
+    [
+      "approving a closed pull request",
+      { pr: "7", event: "approve" },
+      reviewRules(pullHeadingRule({ state: "CLOSED" })),
+    ],
+    [
+      "requesting changes on a merged pull request",
+      { pr: "7", event: "request_changes", body: "x" },
+      reviewRules(pullHeadingRule({ state: "MERGED" })),
+    ],
+    [
+      "approving one's own pull request",
+      { pr: "7", event: "approve" },
+      reviewRules(stateRule({ author: { login: "ALICE" } })),
+    ],
+  ])("%s: no description", async (_name, args, rules) => {
+    expect(await describeCase({ ...approving, args, rules })).toBeUndefined()
+  })
+})
+
 describe("every description", () => {
   const cases = Object.values<DescribeCase>(DESCRIBE_CASES)
 
@@ -299,7 +423,9 @@ describe("every description", () => {
   test.each(cases.map((item) => [item.name, item] as const))("%s: only reads", async (_name, item) => {
     let calls: string[][] = []
     await describeCase(item, (seen) => (calls = seen))
-    expect(calls.filter((args) => (args[0] === "pr" && args[1] !== "list") || args.includes("POST"))).toEqual([])
+    const isWrite = (args: string[]) =>
+      (args[0] === "pr" && args[1] !== "list") || WRITE_METHODS.some((method) => args.includes(method))
+    expect(calls.filter(isWrite)).toEqual([])
   })
 
   test("a failing read gives no description", async () => {

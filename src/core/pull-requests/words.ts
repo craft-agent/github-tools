@@ -34,7 +34,17 @@ export const PULL_REQUEST_TRANSLATIONS: Translations = {
       "プルリクエスト「{title}」をドラフトに戻そうとしています",
     "About to edit the pull request {title}": "プルリクエスト「{title}」を編集しようとしています",
     "About to create the pull request {title}": "プルリクエスト「{title}」を作成しようとしています",
+    "About to approve the pull request {title}": "プルリクエスト「{title}」を承認しようとしています",
+    "About to request changes on the pull request {title}":
+      "プルリクエスト「{title}」に変更をリクエストしようとしています",
+    "About to review the pull request {title} with comments":
+      "プルリクエスト「{title}」にコメント付きでレビューしようとしています",
     Head: "ヘッド",
+    Commit: "コミット",
+    "Line comments": "行コメント",
+    "{count} comment": "{count} 件のコメント",
+    "{count} comments": "{count} 件のコメント",
+    Review: "レビュー",
     Closes: "クローズする Issue",
     Reviewers: "レビュアー",
     "Pull request body": "プルリクエストの本文",

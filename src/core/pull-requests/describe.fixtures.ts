@@ -1,7 +1,7 @@
 import { HEAD_SHA, branchRule, defaultBranchRule } from "../../testing/develop-fixtures"
 import { installFakeGh, type GhRule } from "../../testing/fake-gh"
 import { tempRepo } from "../../testing/git-repo"
-import { octoBoardRules } from "../../testing/project-fixtures"
+import { octoBoardRules, viewerRule } from "../../testing/project-fixtures"
 import { pullHeadingRule, stateRule } from "../../testing/pull-request-write-fixtures"
 import { ORIGIN, milestonesRule } from "../../testing/write-fixtures"
 import { callDescription } from "../describe"
@@ -12,6 +12,7 @@ import { prCreate } from "./create"
 import { prEdit } from "./edit"
 import { prReady } from "./ready"
 import { prReopen } from "./reopen"
+import { prReview } from "./review"
 
 /** One call of a pull request write tool to describe, and the replies of GitHub it meets. */
 export type DescribeCase = { name: string; tool: ToolSpec; args: Record<string, unknown>; rules: GhRule[] }
@@ -26,6 +27,14 @@ export const createRules = (...rules: GhRule[]): GhRule[] => [
   branchRule("octo/hello", "main", true),
   branchRule("octo/hello", "feature", true),
   { match: "^pr list", stdout: "[]" },
+]
+
+/** The replies a review finds: pull request 7 open and by `someone`, and the viewer `alice`. */
+export const reviewRules = (...rules: GhRule[]): GhRule[] => [
+  ...rules,
+  pullHeadingRule(),
+  stateRule(),
+  viewerRule("alice"),
 ]
 
 /** Representative calls of the pull request write tools, which the description tests and the words test share. */
@@ -192,6 +201,44 @@ export const DESCRIBE_CASES = {
       labels: ["bug"],
     },
     rules: createRules(),
+  },
+  reviewApprove: {
+    name: "approve, with a body",
+    tool: prReview,
+    args: { pr: "7", event: "approve", body: "  Ship it.  " },
+    rules: reviewRules(),
+  },
+  reviewApproveBare: {
+    name: "approve without a body",
+    tool: prReview,
+    args: { pr: "7", event: "approve" },
+    rules: reviewRules(),
+  },
+  reviewRequestChanges: {
+    name: "request changes",
+    tool: prReview,
+    args: { pr: "7", event: "request_changes", body: "Needs a test." },
+    rules: reviewRules(),
+  },
+  reviewComments: {
+    name: "comment with line comments",
+    tool: prReview,
+    args: {
+      pr: "7",
+      event: "comment",
+      body: "A few notes.",
+      comments: [
+        { path: "src/a.ts", line: 12, body: "Why this?" },
+        { path: "src/b.ts", start_line: 3, line: 9, side: "left", body: "Remove this block." },
+      ],
+    },
+    rules: [pullHeadingRule()],
+  },
+  reviewOneComment: {
+    name: "comment with one line comment and no body",
+    tool: prReview,
+    args: { pr: "7", event: "comment", comments: [{ path: "src/a.ts", line: 12, body: "Nit." }] },
+    rules: [pullHeadingRule()],
   },
 } satisfies Record<string, DescribeCase>
 
