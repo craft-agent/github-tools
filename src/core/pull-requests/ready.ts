@@ -4,7 +4,7 @@ import { readPullRequestState } from "../github/pull-requests"
 import { REPO_DESCRIPTION, invalid, writableContext } from "../write-support"
 import { parseNumberRef } from "../refs"
 import { defineTool } from "../tool"
-import { PR_DESCRIPTION, PR_TARGETS } from "./write-support"
+import { PR_DESCRIPTION, PR_TARGETS, describedPull } from "./write-support"
 
 const OPEN = "open"
 
@@ -35,6 +35,24 @@ export const prReady = defineTool({
   toolset: "pull_requests",
   class: "idempotent",
   targets: PR_TARGETS,
+  async describe(args, ctx) {
+    const { ref, heading } = await describedPull(args, ctx)
+    if (heading.state !== OPEN) {
+      throw invalid(
+        `${ref.repo.full}#${ref.number} is ${heading.state}; only an open pull request can change between draft and ready.`,
+      )
+    }
+
+    const draft = Boolean(args.undo)
+    const headline = draft
+      ? { text: "About to turn the pull request {title} back into a draft", values: { title: heading.title } }
+      : { text: "About to mark the pull request {title} as ready for review", values: { title: heading.title } }
+    if (heading.draft === draft) {
+      const nothingSent = draft ? "Already a draft; nothing is sent" : "Already ready; nothing is sent"
+      return { headline, facts: [{ label: "State", value: { text: nothingSent } }] }
+    }
+    return { headline, facts: [] }
+  },
   input,
   output,
   async execute(args, ctx) {

@@ -1,6 +1,6 @@
 import type { Translations } from "../words"
 
-/** The Japanese of the pull request tools' titles and intents. */
+/** The Japanese of the pull request tools' titles, intents and the words of their descriptions (the shared ones are in `WRITE_FACT_TRANSLATIONS`). */
 export const PULL_REQUEST_TRANSLATIONS: Translations = {
   ja: {
     "Create a GitHub pull request": "GitHub のプルリクエストを作成する",
@@ -25,5 +25,16 @@ export const PULL_REQUEST_TRANSLATIONS: Translations = {
     "About to link GitHub pull requests into a stack": "GitHub のプルリクエストをスタックにまとめようとしています",
     "Take GitHub pull requests out of a stack": "GitHub のプルリクエストをスタックから外す",
     "About to take GitHub pull requests out of a stack": "GitHub のプルリクエストをスタックから外そうとしています",
+    "About to comment on the pull request {title}": "プルリクエスト「{title}」にコメントしようとしています",
+    "About to close the pull request {title}": "プルリクエスト「{title}」をクローズしようとしています",
+    "About to reopen the pull request {title}": "プルリクエスト「{title}」を再オープンしようとしています",
+    "About to mark the pull request {title} as ready for review":
+      "プルリクエスト「{title}」をレビュー可能にしようとしています",
+    "About to turn the pull request {title} back into a draft":
+      "プルリクエスト「{title}」をドラフトに戻そうとしています",
+    Attachments: "添付ファイル",
+    "Already merged; nothing is sent": "すでにマージ済みです（何も送信されません）",
+    "Already ready; nothing is sent": "すでにレビュー可能です（何も送信されません）",
+    "Already a draft; nothing is sent": "すでにドラフトです（何も送信されません）",
   },
 }

@@ -4,10 +4,16 @@ import { readPullRequestState } from "../github/pull-requests"
 import { REPO_DESCRIPTION, given, writableContext } from "../write-support"
 import { parseNumberRef } from "../refs"
 import { defineTool } from "../tool"
-import { PR_DESCRIPTION, PR_TARGETS } from "./write-support"
+import { PR_DESCRIPTION, PR_TARGETS, describedPull } from "./write-support"
 
 const OPEN = "open"
 const CLOSED = "closed"
+
+/** How the `State` fact words a pull request that is closed or merged already. */
+const NOTHING_SENT: Readonly<Record<string, string>> = {
+  closed: "Already closed; nothing is sent",
+  merged: "Already merged; nothing is sent",
+}
 
 const input = z.object({
   pr: z.string().describe(PR_DESCRIPTION),
@@ -36,6 +42,20 @@ export const prClose = defineTool({
   toolset: "pull_requests",
   class: "overwrite",
   targets: PR_TARGETS,
+  async describe(args, ctx) {
+    const { heading } = await describedPull(args, ctx)
+    const headline = { text: "About to close the pull request {title}", values: { title: heading.title } }
+    if (heading.state !== OPEN) {
+      return { headline, facts: [{ label: "State", value: { text: NOTHING_SENT[heading.state] ?? heading.state } }] }
+    }
+
+    const comment = given(args.comment)
+    return {
+      headline,
+      facts: [],
+      ...(comment ? { text: { label: "Comment", body: comment } } : {}),
+    }
+  },
   input,
   output,
   async execute(args, ctx) {
