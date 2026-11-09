@@ -345,6 +345,30 @@ note`). The prompt shows it wherever no headline can stand: a tool without
 - **Annotations are hints, not a boundary.** The `read_only` setting
   (below) is what keeps writes out.
 
+## What this package's approval prompts say
+
+The rules above are the starter's; this section is what this package adds
+to them. Every write tool, whatever its class, follows it.
+
+- **Every write tool gives an `intent`.** It starts with `About to`, names the
+  object as its title does (`GitHub issue`, `pull request`), and says only
+  what every call of the tool does: where a call's direction depends on an
+  argument (`undo` on `github_pr_ready`) or may find the work already done
+  (`github_project_field_ensure`), the phrase says what the tool settles, not
+  which way it went. A read tool gives none, since it asks nothing.
+- **Translations sit beside the tools, one table per directory** (`words.ts`
+  of `issues`, `pull-requests`, `projects`, `repos`, `releases`, `runs` and
+  `workflows`), and `src/words.ts` merges them with the shared fact words.
+  `src/words.test.ts` fails on a key no tool uses, on a word a tool uses
+  without a key, and on a template whose translation changes its
+  placeholders, so a table cannot drift from the tools.
+- **A tool is described from what it read, never from what the model said.**
+  A headline names the issue, pull request or board by the title GitHub
+  returns; the arguments only say which one. A tool that cannot tell its
+  target before it runs gives its intent alone.
+- **Facts this package adds** are listed here, each with the tools that give
+  it: none yet.
+
 ## Toolsets and settings
 
 Every entry point takes the same settings:
