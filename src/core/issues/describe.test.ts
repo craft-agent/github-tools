@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { HEAD_SHA } from "../../testing/develop-fixtures"
 import { HEADING } from "../../testing/write-fixtures"
 import { MAX_FACTS, MAX_HEADLINE_LENGTH, MAX_LABEL_LENGTH } from "../describe"
 import { digest } from "../write-facts"
@@ -162,6 +163,73 @@ describe("github_issue_create", () => {
 
   test("a blank title gives no description", async () => {
     const item: DescribeCase = { ...DESCRIBE_CASES.createPlain, args: { title: "  " } }
+    expect(await describeCase(item)).toBeUndefined()
+  })
+})
+
+describe("github_issue_relate", () => {
+  test("one fact per relation, with the issues as owner/repo#N, added before removed", async () => {
+    expect(await describeCase(DESCRIBE_CASES.relate)).toEqual({
+      headline: headline("About to change the relations of the issue {title}"),
+      facts: [
+        { label: "Parent", value: "octo/hello#1" },
+        { label: "Sub-issues", value: "+octo/hello#13 +octo/other#2 \u2212octo/hello#14" },
+        { label: "Blocked by", value: "+octo/hello#5" },
+        { label: "Blocking", value: "\u2212octo/hello#7" },
+      ],
+    })
+  })
+
+  test("taking the issue out of its parent is a fact", async () => {
+    const description = await describeCase(DESCRIBE_CASES.relateRemovingParent)
+    expect(description?.facts).toEqual([
+      { label: "Parent", value: word("Removed") },
+      { label: "Blocking", value: "+octo/hello#8" },
+    ])
+  })
+
+  test("an issue related to itself gives no description", async () => {
+    const item: DescribeCase = { ...DESCRIBE_CASES.relate, args: { issue: "12", parent: "12" } }
+    expect(await describeCase(item)).toBeUndefined()
+  })
+})
+
+describe("github_issue_develop", () => {
+  test("a branch GitHub names is shown with its base, and the base's head commit is pinned", async () => {
+    expect(await describeCase(DESCRIBE_CASES.developCreating)).toEqual({
+      headline: headline("About to link a development branch to the issue {title}"),
+      facts: [
+        { label: "Branch", value: word("Named by GitHub") },
+        { label: "Base", value: "main" },
+      ],
+      pins: { base_head: HEAD_SHA },
+    })
+  })
+
+  test("a named branch and base are shown as given", async () => {
+    const description = await describeCase(DESCRIBE_CASES.developNamed)
+    expect(description?.facts).toEqual([
+      { label: "Branch", value: "12-fix" },
+      { label: "Base", value: "release/1.x" },
+    ])
+    expect(description?.pins).toEqual({ base_head: HEAD_SHA })
+  })
+
+  test("a branch that is linked already is reused: no base and no pin", async () => {
+    expect(await describeCase(DESCRIBE_CASES.developReusing)).toEqual({
+      headline: headline("About to link a development branch to the issue {title}"),
+      facts: [{ label: "Branch", value: { text: "{name} (already linked)", values: { name: "12-crash" } } }],
+    })
+  })
+
+  test("a base branch that does not exist gives no description", async () => {
+    const item: DescribeCase = {
+      ...DESCRIBE_CASES.developNamed,
+      rules: [
+        ...DESCRIBE_CASES.developNamed.rules.slice(0, 2),
+        { match: "^api repos", stderr: "Not Found (HTTP 404)", code: 1 },
+      ],
+    }
     expect(await describeCase(item)).toBeUndefined()
   })
 })

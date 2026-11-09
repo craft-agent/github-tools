@@ -1,3 +1,4 @@
+import { branchRule, defaultBranchRule, linkedBranchesRule } from "../../testing/develop-fixtures"
 import { installFakeGh, type GhRule } from "../../testing/fake-gh"
 import { tempRepo } from "../../testing/git-repo"
 import { octoBoardRules } from "../../testing/project-fixtures"
@@ -7,7 +8,9 @@ import type { CallDescription, ToolSpec } from "../tool"
 import { issueClose } from "./close"
 import { issueComment } from "./comment"
 import { issueCreate } from "./create"
+import { issueDevelop } from "./develop"
 import { issueEdit } from "./edit"
+import { issueRelate } from "./relate"
 import { issueReopen } from "./reopen"
 
 /** One call of an issue write tool to describe, and the replies of GitHub it meets. */
@@ -131,6 +134,48 @@ export const DESCRIBE_CASES = {
     tool: issueCreate,
     args: { title: "Plan", milestone: "v9", create_milestone: true },
     rules: [milestonesRule("v1")],
+  },
+  relate: {
+    name: "relate, adding and removing",
+    tool: issueRelate,
+    args: {
+      issue: "12",
+      parent: "1",
+      add_sub_issues: ["13", "octo/other#2"],
+      remove_sub_issues: ["14"],
+      add_blocked_by: ["5"],
+      remove_blocking: ["7"],
+    },
+    rules: [issueHeadingRule()],
+  },
+  relateRemovingParent: {
+    name: "relate, taking the issue out of its parent",
+    tool: issueRelate,
+    args: { issue: "12", remove_parent: true, add_blocking: ["octo/hello#8"] },
+    rules: [issueHeadingRule()],
+  },
+  developCreating: {
+    name: "develop, GitHub names the branch",
+    tool: issueDevelop,
+    args: { issue: "12" },
+    rules: [
+      issueHeadingRule(),
+      linkedBranchesRule(),
+      defaultBranchRule("main"),
+      branchRule("octo/hello", "main", true),
+    ],
+  },
+  developNamed: {
+    name: "develop, a named branch from a named base",
+    tool: issueDevelop,
+    args: { issue: "12", branch: "12-fix", base: "release/1.x" },
+    rules: [issueHeadingRule(), linkedBranchesRule(), branchRule("octo/hello", "release/1.x", true)],
+  },
+  developReusing: {
+    name: "develop, a branch is linked already",
+    tool: issueDevelop,
+    args: { issue: "12" },
+    rules: [issueHeadingRule(), linkedBranchesRule([{ name: "12-crash" }])],
   },
 } satisfies Record<string, DescribeCase>
 
