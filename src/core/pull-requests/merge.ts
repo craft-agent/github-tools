@@ -208,6 +208,7 @@ async function requestMerge(
 export const prMerge = defineTool({
   id: "github_pr_merge",
   title: "Merge a GitHub pull request",
+  intent: "About to merge a GitHub pull request",
   description: [
     "Merge a pull request with merge, squash or rebase. Every pull request, stacked or not, merges through one GitHub request that this call follows until it ends.",
     "method may be left out when the repository allows only one; when it allows several, or the one asked is not allowed, the call fails saying which are.",

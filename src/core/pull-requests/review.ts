@@ -79,6 +79,7 @@ const EVENT_PAYLOAD_MAP = {
 export const prReview = defineTool({
   id: "github_pr_review",
   title: "Review a GitHub pull request",
+  intent: "About to review a GitHub pull request",
   description: [
     "Post a review on a pull request: approve to approve changes, request_changes to request revisions (body required), or comment for general feedback.",
     "Only an open pull request can be approved or have changes requested, and GitHub does not let an author approve their own pull request or request changes on it.",

@@ -198,6 +198,7 @@ async function createPullRequest(
 export const prCreate = defineTool({
   id: "github_pr_create",
   title: "Create a GitHub pull request",
+  intent: "About to create a GitHub pull request",
   description: [
     "Open a pull request from a pushed branch of a repository the viewer may write to into another branch of it (default: the default branch), and settle its place in the same call: draft, labels, assignees and reviewers (they are notified), milestone, the issues it closes (a `Closes #12` line at the end of the body) and a project board with field values (the Status starts as Todo). Pull requests from forks are not supported yet.",
     "Everything that can fail is checked before the pull request is made: the branches exist, head_sha (when given) is still the head, no pull request is open from head into base already, the milestone exists and the board accepts the values.",

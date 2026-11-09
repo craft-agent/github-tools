@@ -26,6 +26,7 @@ const output = z.object({
 export const prReady = defineTool({
   id: "github_pr_ready",
   title: "Mark a GitHub pull request ready, or back to draft",
+  intent: "About to change whether a GitHub pull request is a draft",
   description: [
     "Mark a draft pull request ready for review, or with undo true turn it back into a draft. Marking it ready notifies the people asked to review it.",
     "A pull request that is in the asked state already is left as it is: nothing is sent and changed is false. Only an open pull request can change; a closed or merged one is an error.",

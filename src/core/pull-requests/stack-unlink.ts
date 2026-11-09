@@ -32,6 +32,7 @@ const output = z.object({
 export const stackUnlink = defineTool({
   id: "github_stack_unlink",
   title: "Take GitHub pull requests out of a stack",
+  intent: "About to take GitHub pull requests out of a stack",
   description: [
     "Take the pull requests out of a native stack, named by its number or by a pull request in it. Every unmerged pull request leaves (open, draft and closed ones); merged and queued ones stay in the stack, and remaining shows what is left, null when the stack is gone.",
     "The pull requests stay open with their branches and bases as they were, and nothing is deleted: github_stack_link can build the stack again.",

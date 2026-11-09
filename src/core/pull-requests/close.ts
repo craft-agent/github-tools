@@ -27,6 +27,7 @@ const output = z.object({
 export const prClose = defineTool({
   id: "github_pr_close",
   title: "Close a GitHub pull request",
+  intent: "About to close a GitHub pull request",
   description: [
     "Close a pull request without merging it; its branch is not deleted. The comment, if any, is posted as it closes, and the people following the pull request are notified.",
     "A pull request that is closed or merged already is left as it is: nothing is sent, the comment is not posted, changed is false and state says which.",

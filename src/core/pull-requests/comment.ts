@@ -33,6 +33,7 @@ const output = z.object({
 export const prComment = defineTool({
   id: "github_pr_comment",
   title: "Comment on a GitHub pull request",
+  intent: "About to comment on a GitHub pull request",
   description: [
     "Post a comment on a pull request; the people following it are notified and the comment stays on the pull request.",
     "Needs write permission on the repository.",

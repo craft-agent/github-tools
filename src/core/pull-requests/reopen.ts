@@ -27,6 +27,7 @@ const output = z.object({
 export const prReopen = defineTool({
   id: "github_pr_reopen",
   title: "Reopen a GitHub pull request",
+  intent: "About to reopen a GitHub pull request",
   description: [
     "Reopen a closed pull request; the comment, if any, is posted as it reopens, and the people following the pull request are notified. A merged pull request cannot be reopened.",
     "A pull request that is open already is left as it is: nothing is sent, the comment is not posted and changed is false.",

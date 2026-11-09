@@ -108,6 +108,7 @@ async function readPulls(repo: RepoName, numbers: readonly number[], ctx: ToolCo
 export const stackLink = defineTool({
   id: "github_stack_link",
   title: "Link GitHub pull requests into a stack",
+  intent: "About to link GitHub pull requests into a stack",
   description: [
     "Make a native stack of open pull requests of one repository, listed bottom to top, or put more of them on top of an existing stack. Each pull request's base branch must be the head branch of the one below it.",
     "It never changes a base or opens a pull request: github_pr_create and github_pr_edit do that, and a chain whose bases do not match is refused with the base to fix.",

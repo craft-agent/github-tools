@@ -177,6 +177,7 @@ function changedArguments(change: Change): string[] {
 export const prEdit = defineTool({
   id: "github_pr_edit",
   title: "Edit a GitHub pull request",
+  intent: "About to edit a GitHub pull request",
   description: [
     "Change a pull request in one call: title, body (body replaces it, append_body adds after a blank line), base branch (not for a merged pull request), labels, assignees and reviewers to add or remove (added assignees and reviewers are notified), milestone or remove_milestone, and the issues it closes (add_closes adds a `Closes #12` line to the body, remove_closes removes such lines).",
     "A milestone that does not exist is an error. Needs write permission on the repository.",
