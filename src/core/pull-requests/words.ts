@@ -32,6 +32,12 @@ export const PULL_REQUEST_TRANSLATIONS: Translations = {
       "プルリクエスト「{title}」をレビュー可能にしようとしています",
     "About to turn the pull request {title} back into a draft":
       "プルリクエスト「{title}」をドラフトに戻そうとしています",
+    "About to edit the pull request {title}": "プルリクエスト「{title}」を編集しようとしています",
+    "About to create the pull request {title}": "プルリクエスト「{title}」を作成しようとしています",
+    Head: "ヘッド",
+    Closes: "クローズする Issue",
+    Reviewers: "レビュアー",
+    "Pull request body": "プルリクエストの本文",
     Attachments: "添付ファイル",
     "Already merged; nothing is sent": "すでにマージ済みです（何も送信されません）",
     "Already ready; nothing is sent": "すでにレビュー可能です（何も送信されません）",

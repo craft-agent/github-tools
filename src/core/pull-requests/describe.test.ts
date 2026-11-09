@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test"
+import { HEAD_SHA, branchRule } from "../../testing/develop-fixtures"
 import { PULL_HEADING, pullHeadingRule } from "../../testing/pull-request-write-fixtures"
+import { milestonesRule } from "../../testing/write-fixtures"
 import { MAX_FACTS, MAX_HEADLINE_LENGTH, MAX_LABEL_LENGTH } from "../describe"
-import { DESCRIBE_CASES, REAL_TITLE, describeCase, type DescribeCase } from "./describe.fixtures"
+import { digest } from "../write-facts"
+import { DESCRIBE_CASES, REAL_TITLE, createRules, describeCase, type DescribeCase } from "./describe.fixtures"
 
 const headline = (text: string, title = REAL_TITLE) => ({ text, values: { title } })
 const word = (text: string) => ({ text })
@@ -125,6 +128,156 @@ describe("github_pr_ready", () => {
   })
 })
 
+describe("github_pr_edit", () => {
+  test("lists each change, shows the replacing body, pins the body it replaces and names the pull request by its real title", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editReplacing)).toEqual({
+      headline: headline("About to edit the pull request {title}"),
+      facts: [
+        { label: "Title", value: "Not the real title" },
+        { label: "Body", value: word("Replaced") },
+        { label: "Reviewers", value: "+dave +octo/core" },
+        { label: "Labels", value: "+bug +docs \u2212wontfix" },
+      ],
+      text: { label: "New body", body: "Fresh body" },
+      pins: { body: digest("Old body") },
+    })
+  })
+
+  test("a body that clears has no text, and a removed milestone and assignee are facts", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editClearing)).toEqual({
+      headline: headline("About to edit the pull request {title}"),
+      facts: [
+        { label: "Body", value: word("Cleared") },
+        { label: "Assignees", value: "\u2212bob" },
+        { label: "Milestone", value: word("Removed") },
+      ],
+      pins: { body: digest("Old body") },
+    })
+  })
+
+  test("an appended text is shown as appended and pins nothing; a milestone is shown as the repository has it; attachments are listed", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editAppending)).toEqual({
+      headline: headline("About to edit the pull request {title}"),
+      facts: [
+        { label: "Body", value: word("Appended") },
+        { label: "Assignees", value: "+@me" },
+        { label: "Milestone", value: "v1" },
+        { label: "Attachments", value: "screen.png, demo.mp4" },
+      ],
+      text: { label: "Appended text", body: "More details." },
+    })
+  })
+
+  test("a retarget comes first, and the closing issues added and removed are resolved as owner/repo#N", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editRetargeting)).toEqual({
+      headline: headline("About to edit the pull request {title}"),
+      facts: [
+        { label: "Base", value: "release" },
+        { label: "Title", value: "Retarget" },
+        { label: "Closes", value: "+octo/hello#12 +other/thing#3 \u2212octo/hello#5" },
+      ],
+    })
+  })
+
+  test("a merged pull request can still be retitled", async () => {
+    const description = await describeCase(DESCRIBE_CASES.editMerged)
+    expect(description?.facts).toEqual([{ label: "Title", value: "Renamed" }])
+  })
+
+  test.each([
+    ["a merged pull request cannot be retargeted", "release", "MERGED", true],
+    ["the head branch cannot be the base", "feature", "OPEN", true],
+    ["a base branch that does not exist", "nowhere", "OPEN", false],
+  ])("%s: no description", async (_name, base, state, exists) => {
+    const item: DescribeCase = {
+      ...DESCRIBE_CASES.editRetargeting,
+      args: { pr: "7", base },
+      rules: [pullHeadingRule({ state }), branchRule("octo/hello", base, exists)],
+    }
+    expect(await describeCase(item)).toBeUndefined()
+  })
+
+  test.each([
+    ["nothing to change", { pr: "7" }],
+    ["a body and an appended text", { pr: "7", body: "a", append_body: "b" }],
+    ["a blank title", { pr: "7", title: " " }],
+    ["a label both added and removed", { pr: "7", add_labels: ["bug"], remove_labels: ["Bug"] }],
+    ["a closing issue both added and removed", { pr: "7", add_closes: ["5"], remove_closes: ["#5"] }],
+  ])("%s: no description", async (_name, args) => {
+    const item: DescribeCase = { ...DESCRIBE_CASES.editReplacing, args }
+    expect(await describeCase(item)).toBeUndefined()
+  })
+
+  test("a milestone that does not exist gives no description", async () => {
+    const item: DescribeCase = { ...DESCRIBE_CASES.editAppending, args: { pr: "7", milestone: "v9" } }
+    expect(await describeCase(item)).toBeUndefined()
+  })
+})
+
+describe("github_pr_create", () => {
+  test("a head and a title give the call's own title, the branches and a pin on the head commit", async () => {
+    expect(await describeCase(DESCRIBE_CASES.createPlain)).toEqual({
+      headline: headline("About to create the pull request {title}", "Add retry"),
+      facts: [
+        { label: "Base", value: "main" },
+        { label: "Head", value: "feature" },
+      ],
+      pins: { head_sha: HEAD_SHA },
+    })
+  })
+
+  test("every optional piece is a fact, in the order of what decides, and the body is the text", async () => {
+    expect(await describeCase(DESCRIBE_CASES.createFull)).toEqual({
+      headline: headline("About to create the pull request {title}", "Add retry"),
+      facts: [
+        { label: "Base", value: "release" },
+        { label: "Head", value: "feature" },
+        { label: "State", value: word("Draft") },
+        { label: "Closes", value: "+octo/hello#12 +other/thing#7" },
+        { label: "Labels", value: "+bug +docs" },
+        { label: "Milestone", value: "v1" },
+        { label: "Attachments", value: "screen.png, demo.mp4" },
+        { label: "Board", value: "Roadmap" },
+      ],
+      text: { label: "Pull request body", body: "Retry three times." },
+      pins: { head_sha: HEAD_SHA },
+    })
+  })
+
+  test("reviewers, labels and assignees are changes to add", async () => {
+    const description = await describeCase(DESCRIBE_CASES.createPeople)
+    expect(description?.facts.slice(2)).toEqual([
+      { label: "Reviewers", value: "+dave +octo/core" },
+      { label: "Labels", value: "+bug" },
+      { label: "Assignees", value: "+alice" },
+    ])
+  })
+
+  test.each([
+    ["a blank title", { head: "feature", title: " " }, createRules()],
+    ["a blank head", { head: " ", title: "T" }, createRules()],
+    ["a head of a fork", { head: "someone:feature", title: "T" }, createRules()],
+    ["the same head and base", { head: "feature", base: "feature", title: "T" }, createRules()],
+    ["a head_sha that is not a full SHA", { head: "feature", title: "T", head_sha: "abc" }, createRules()],
+    ["a head_sha the branch moved from", { head: "feature", title: "T", head_sha: "f".repeat(40) }, createRules()],
+    ["fields without a project", { head: "feature", title: "T", fields: { Target: "x" } }, createRules()],
+    ["a head branch that does not exist", { head: "gone", title: "T" }, createRules()],
+    ["a base branch that does not exist", { head: "feature", base: "gone", title: "T" }, createRules()],
+    [
+      "a milestone that does not exist",
+      { head: "feature", title: "T", milestone: "v9" },
+      createRules(milestonesRule("v1")),
+    ],
+    [
+      "a pull request open already from head into base",
+      { head: "feature", title: "T" },
+      [{ match: "^pr list", stdout: '[{"number":3,"url":"https://github.com/octo/hello/pull/3"}]' }, ...createRules()],
+    ],
+  ])("%s: no description", async (_name, args, rules) => {
+    expect(await describeCase({ ...DESCRIBE_CASES.createPlain, args, rules })).toBeUndefined()
+  })
+})
+
 describe("every description", () => {
   const cases = Object.values<DescribeCase>(DESCRIBE_CASES)
 
@@ -146,7 +299,7 @@ describe("every description", () => {
   test.each(cases.map((item) => [item.name, item] as const))("%s: only reads", async (_name, item) => {
     let calls: string[][] = []
     await describeCase(item, (seen) => (calls = seen))
-    expect(calls.filter((args) => args[0] === "pr" || args.includes("POST"))).toEqual([])
+    expect(calls.filter((args) => (args[0] === "pr" && args[1] !== "list") || args.includes("POST"))).toEqual([])
   })
 
   test("a failing read gives no description", async () => {

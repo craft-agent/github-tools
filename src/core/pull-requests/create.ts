@@ -1,3 +1,4 @@
+import { basename } from "node:path"
 import { z } from "zod"
 import {
   ATTACHMENTS_NOTE,
@@ -12,6 +13,7 @@ import { planFieldValues } from "../github/board-field-values"
 import { readBoardFields } from "../github/board-fields"
 import { addContentToBoard } from "../github/board-item-write"
 import { branchHead, defaultBranch } from "../github/branches"
+import { issueLabel } from "../github/issue-refs"
 import { milestoneSchema, resolveMilestone, type MilestoneRef } from "../github/milestones"
 import { closingIssueSchema, readPullRequestState, type PullRequestState } from "../github/pull-requests"
 import { assertBoardWritable, resolveBoard } from "../github/projects"
@@ -27,7 +29,9 @@ import {
 } from "../projects/item-support"
 import { BOARD_LOOKUP_NOTE, PROJECT_SCOPE_NOTE, boardSummary, boardSummarySchema } from "../projects/support"
 import { resolveRepo, SHA_PATTERN, shortSha, type RepoName } from "../refs"
-import { StepErrors, defineTool, type ToolContext } from "../tool"
+import { StepErrors, defineTool, type CallFact, type ToolContext } from "../tool"
+import { changeFact, stateFact } from "../write-facts"
+import { milestoneFact } from "../issues/write-support"
 import { CLOSES_DESCRIPTION, withClosing } from "./closes"
 import {
   ATTACHMENTS_STEP,
@@ -213,6 +217,83 @@ export const prCreate = defineTool({
   toolset: "pull_requests",
   class: "add",
   targets: { repo: "repo", project: "optional_board" },
+  async describe(args, ctx) {
+    const title = given(args.title)
+    if (!title) throw invalid("title cannot be blank.")
+    const head = given(args.head)
+    if (!head) throw invalid("head cannot be blank.")
+    if (head.includes(":")) throw invalid(NOT_A_BRANCH)
+    const explicitBase = given(args.base)
+    if (args.base !== undefined && !explicitBase) throw invalid("base is blank; pass a branch, or leave it out.")
+    if (explicitBase === head) throw invalid(`head and base are both ${head}; pass two different branches.`)
+    const expectedSha = given(args.head_sha)
+    if (args.head_sha !== undefined && (!expectedSha || !SHA_PATTERN.test(expectedSha))) {
+      throw invalid("head_sha must be a full commit SHA of 40 hexadecimal characters.")
+    }
+    const milestoneTitle = given(args.milestone)
+    if (args.milestone !== undefined && !milestoneTitle)
+      throw invalid("milestone is blank; pass its title, or leave it out.")
+    if (args.fields !== undefined && args.project === undefined) {
+      throw invalid("fields are board field values and need project; pass the board, or leave fields out.")
+    }
+    const labels = nameList("labels", args.labels)
+    const assignees = nameList("assignees", args.assignees)
+    const reviewers = nameList("reviewers", args.reviewers)
+
+    const requested = await resolveRepo(args.repo, ctx)
+    const closes = await resolveClosing(args.closes, requested, ctx)
+    const base = explicitBase ?? (await defaultBranch(requested, ctx))
+    if (!base) {
+      throw invalid(`${requested.full} has no default branch (it is empty); push a branch to it first, or pass base.`)
+    }
+    if (base === head) throw invalid(`head and base are both ${head}; pass two different branches.`)
+    if ((await branchHead(requested, base, ctx)) === null) {
+      throw invalid(`base branch "${base}" is not on ${requested.full}.`)
+    }
+    const headSha = await branchHead(requested, head, ctx)
+    if (headSha === null) throw invalid(`head branch "${head}" is not on ${requested.full}; push it first.`)
+    if (expectedSha && headSha.toLowerCase() !== expectedSha.toLowerCase()) {
+      throw new ToolError(
+        "stale",
+        `${head} on ${requested.full} is at ${shortSha(headSha)}, not ${shortSha(expectedSha)}: the branch moved since it was pushed. Nothing was created.`,
+      )
+    }
+    const existing = await findOpenPullRequest(requested, head, base, ctx)
+    if (existing) {
+      throw invalid(
+        `${requested.full}#${existing.number} is already open from ${head} into ${base}: ${existing.url}. Change it with github_pr_edit.`,
+      )
+    }
+
+    const facts: CallFact[] = [
+      { label: "Base", value: base },
+      { label: "Head", value: head },
+      ...(args.draft ? [stateFact("draft")] : []),
+    ]
+    const add = (fact: CallFact | undefined): void => {
+      if (fact) facts.push(fact)
+    }
+    add(changeFact("Closes", closes.map(issueLabel)))
+    add(changeFact("Reviewers", reviewers))
+    add(changeFact("Labels", labels))
+    add(changeFact("Assignees", assignees))
+    if (milestoneTitle) add(await milestoneFact(requested, milestoneTitle, false, ctx))
+    if (args.attachments?.length) {
+      add({ label: "Attachments", value: args.attachments.map((file) => basename(file.path)).join(", ") })
+    }
+    if (args.project !== undefined) {
+      const { project } = await resolveBoard({ project: args.project, repo: args.repo }, ctx)
+      assertBoardWritable(project)
+      add({ label: "Board", value: project.title })
+    }
+
+    return {
+      headline: { text: "About to create the pull request {title}", values: { title } },
+      facts,
+      ...(args.body ? { text: { label: "Pull request body", body: args.body } } : {}),
+      pins: { head_sha: headSha },
+    }
+  },
   input,
   output,
   async execute(args, ctx) {
