@@ -2,14 +2,16 @@ import { isAbortError } from "../errors"
 import { GhCallError, gh } from "../gh"
 import { resolveRelatedIssue, type IssueRef } from "../github/issue-refs"
 import {
+  readPullRequestHeading,
   readPullRequestState,
   type ClosingIssue,
+  type PullRequestHeading,
   type PullRequestRef,
   type PullRequestState,
 } from "../github/pull-requests"
 import { given, lastUrl } from "../write-support"
 import { pause } from "../poll"
-import type { RepoName } from "../refs"
+import { parseNumberRef, type RepoName } from "../refs"
 import type { StepErrors, TargetKind, ToolContext } from "../tool"
 import { issueKey } from "./closes"
 
@@ -19,6 +21,15 @@ export const PR_DESCRIPTION = "The pull request, as 12, #12, owner/repo#12 or it
 
 /** The targets of a tool that writes to one pull request, named by `pr` and `repo`. */
 export const PR_TARGETS = { pr: "pull", repo: "repo" } as const satisfies Readonly<Record<string, TargetKind>>
+
+/** The pull request a `pr` and `repo` argument name, resolved as `execute` does, with its heading read from GitHub. */
+export async function describedPull(
+  args: { pr: string; repo?: string },
+  ctx: ToolContext,
+): Promise<{ ref: PullRequestRef; heading: PullRequestHeading }> {
+  const ref = await parseNumberRef(args.pr, args.repo, ctx, { accept: "pull" })
+  return { ref, heading: await readPullRequestHeading(ref, ctx) }
+}
 
 /** Runs `gh pr edit` on one pull request of `repo` with the given flags; `stdin` is the body for `--body-file -`. */
 export function editPullRequest(

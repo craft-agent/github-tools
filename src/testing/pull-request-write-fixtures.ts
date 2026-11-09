@@ -43,6 +43,38 @@ export const stateRule = (extra: Record<string, unknown> = {}, times?: number): 
   times,
 })
 
+/** A token only the pull request heading query holds, so a fake `gh` rule can pick it. */
+export const PULL_HEADING = "id title state isDraft"
+
+/** The node id, title, state, draft flag, head commit and branches of pull request 7, as the heading query returns them. */
+export const pullHeadingRule = (
+  heading: {
+    id?: string
+    title?: string
+    state?: string
+    isDraft?: boolean
+    headRefOid?: string
+    baseRefName?: string
+    headRefName?: string
+  } = {},
+): GhRule => ({
+  match: PULL_HEADING,
+  stdout: gqlReply({
+    repository: {
+      pullRequest: {
+        id: "PR_7",
+        title: "Add retry",
+        state: "OPEN",
+        isDraft: false,
+        headRefOid: COMMIT_SHA,
+        baseRefName: "main",
+        headRefName: "feature",
+        ...heading,
+      },
+    },
+  }),
+})
+
 /** The state query finds no such pull request. */
 export const noPullRequestRule = (): GhRule => ({
   match: STATE,
