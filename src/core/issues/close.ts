@@ -1,10 +1,10 @@
 import { z } from "zod"
 import { gh } from "../gh"
 import { readIssueFields } from "../github/issues"
-import { ghIssueRef, resolveRelatedIssue } from "../github/issue-refs"
+import { ghIssueRef, issueLabel, resolveRelatedIssue } from "../github/issue-refs"
 import { parseNumberRef } from "../refs"
 import { defineTool } from "../tool"
-import { ISSUE_DESCRIPTION, ISSUE_TARGETS } from "./write-support"
+import { ISSUE_DESCRIPTION, ISSUE_TARGETS, describedIssue } from "./write-support"
 import { REPO_DESCRIPTION, given, invalid, writableContext } from "../write-support"
 
 const REASONS = ["completed", "not_planned", "duplicate"] as const
@@ -16,6 +16,13 @@ const GH_REASONS: Record<Reason, string> = {
   completed: "completed",
   not_planned: "not planned",
   duplicate: "duplicate",
+}
+
+/** How the `Reason` fact words each reason. */
+const REASON_WORDS: Record<Reason, string> = {
+  completed: "Completed",
+  not_planned: "Not planned",
+  duplicate: "Duplicate",
 }
 
 const CLOSED = "closed"
@@ -51,6 +58,25 @@ export const issueClose = defineTool({
   toolset: "issues",
   class: "overwrite",
   targets: ISSUE_TARGETS,
+  async describe(args, ctx) {
+    const { ref, heading } = await describedIssue(args, ctx)
+    const headline = { text: "About to close the issue {title}", values: { title: heading.title } }
+    if (heading.state === CLOSED) {
+      return { headline, facts: [{ label: "State", value: { text: "Already closed; nothing is sent" } }] }
+    }
+
+    const duplicateOf = given(args.duplicate_of)
+    const original = duplicateOf ? await resolveRelatedIssue(duplicateOf, ref.repo, ctx) : undefined
+    const comment = given(args.comment)
+    return {
+      headline,
+      facts: [
+        { label: "Reason", value: { text: REASON_WORDS[args.reason] } },
+        ...(original ? [{ label: "Duplicate of", value: issueLabel(original) }] : []),
+      ],
+      ...(comment ? { text: { label: "Comment", body: comment } } : {}),
+    }
+  },
   input,
   output,
   async execute(args, ctx) {

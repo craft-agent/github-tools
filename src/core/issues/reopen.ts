@@ -3,7 +3,7 @@ import { gh } from "../gh"
 import { readIssueFields } from "../github/issues"
 import { parseNumberRef } from "../refs"
 import { defineTool } from "../tool"
-import { ISSUE_DESCRIPTION, ISSUE_TARGETS } from "./write-support"
+import { ISSUE_DESCRIPTION, ISSUE_TARGETS, describedIssue } from "./write-support"
 import { REPO_DESCRIPTION, given, writableContext } from "../write-support"
 
 const OPEN = "open"
@@ -33,6 +33,20 @@ export const issueReopen = defineTool({
   toolset: "issues",
   class: "overwrite",
   targets: ISSUE_TARGETS,
+  async describe(args, ctx) {
+    const { heading } = await describedIssue(args, ctx)
+    const headline = { text: "About to reopen the issue {title}", values: { title: heading.title } }
+    if (heading.state === OPEN) {
+      return { headline, facts: [{ label: "State", value: { text: "Already open; nothing is sent" } }] }
+    }
+
+    const comment = given(args.comment)
+    return {
+      headline,
+      facts: [],
+      ...(comment ? { text: { label: "Comment", body: comment } } : {}),
+    }
+  },
   input,
   output,
   async execute(args, ctx) {

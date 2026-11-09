@@ -1,6 +1,6 @@
 import type { Translations } from "../words"
 
-/** The Japanese of the issue tools' titles and intents. */
+/** The Japanese of the issue tools' titles, intents and the words of their descriptions (the shared ones are in `WRITE_FACT_TRANSLATIONS`). */
 export const ISSUE_TRANSLATIONS: Translations = {
   ja: {
     "Create a GitHub issue": "GitHub の Issue を作成する",
@@ -17,5 +17,15 @@ export const ISSUE_TRANSLATIONS: Translations = {
     "About to change how GitHub issues are related": "GitHub の Issue の関連付けを変更しようとしています",
     "Link a development branch to a GitHub issue": "GitHub の Issue に開発用ブランチを紐付ける",
     "About to link a development branch to a GitHub issue": "GitHub の Issue に開発用ブランチを紐付けようとしています",
+    "About to comment on the issue {title}": "Issue「{title}」にコメントしようとしています",
+    "About to close the issue {title}": "Issue「{title}」をクローズしようとしています",
+    "About to reopen the issue {title}": "Issue「{title}」を再オープンしようとしています",
+    Reason: "理由",
+    "Duplicate of": "重複元",
+    Completed: "完了",
+    "Not planned": "計画外",
+    Duplicate: "重複",
+    "Already closed; nothing is sent": "すでにクローズ済みです（何も送信されません）",
+    "Already open; nothing is sent": "すでにオープン中です（何も送信されません）",
   },
 }

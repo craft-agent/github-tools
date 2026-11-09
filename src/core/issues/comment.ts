@@ -2,8 +2,11 @@ import { z } from "zod"
 import { gh } from "../gh"
 import { parseNumberRef } from "../refs"
 import { defineTool } from "../tool"
-import { ISSUE_DESCRIPTION, ISSUE_TARGETS } from "./write-support"
+import { stateFact } from "../write-facts"
+import { ISSUE_DESCRIPTION, ISSUE_TARGETS, describedIssue } from "./write-support"
 import { REPO_DESCRIPTION, given, invalid, lastUrl, writableContext } from "../write-support"
+
+const CLOSED = "closed"
 
 const input = z.object({
   issue: z.string().describe(ISSUE_DESCRIPTION),
@@ -30,6 +33,14 @@ export const issueComment = defineTool({
   toolset: "issues",
   class: "add",
   targets: ISSUE_TARGETS,
+  async describe(args, ctx) {
+    const { heading } = await describedIssue(args, ctx)
+    return {
+      headline: { text: "About to comment on the issue {title}", values: { title: heading.title } },
+      facts: heading.state === CLOSED ? [stateFact(heading.state)] : [],
+      text: { label: "Comment", body: args.body },
+    }
+  },
   input,
   output,
   async execute(args, ctx) {
