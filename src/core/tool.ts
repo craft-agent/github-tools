@@ -27,8 +27,11 @@ export type ConfirmRequest = { tool: string; message: string }
  */
 export type TargetKind = "repo" | "issue" | "issues" | "pull" | "board" | "optional_board" | "item" | "owner" | "run"
 
+/** A fact's value as a template the tool picks, such as `{bytes} bytes`, and the values it holds; the entry point fills them in unquoted. */
+export type CallValue = { text: string; values?: Record<string, string | number> }
+
 /** One fact an approval prompt shows of a call, read as `Label: value`. */
-export type CallFact = { label: string; value: string }
+export type CallFact = { label: string; value: string | CallValue }
 
 /** A headline template the tool picks, such as `Create the note {name}`, and the values the entry point quotes into it. */
 export type CallHeadline = { text: string; values?: Record<string, string> }
