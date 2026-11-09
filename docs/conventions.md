@@ -371,9 +371,10 @@ to them. Every write tool, whatever its class, follows it.
   for an open issue about to be closed, since it is always open.
   `src/core/write-facts.ts` holds the ones several toolsets share.
   - `State` (`stateFact`): the target's state as `Open`, `Closed`, `Merged`
-    or `Draft`. A comment on a closed issue shows it; closing or reopening
-    an issue that is already in that state shows `Already closed; nothing is
-sent` or `Already open; nothing is sent` as its only fact and no text.
+    or `Draft`. A comment on a closed issue shows it; closing, reopening or
+    merging a target that is already in that state shows `Already closed;
+nothing is sent`, `Already open; nothing is sent` or `Already merged;
+nothing is sent` as its only fact and no text.
   - A change to a list (`changeFact`): `Labels`, `Assignees`, `Blocked by`,
     `Sub-issues`, `Blocking`, `Issue fields` as `+added −removed`. The names
     are data, never translated.
@@ -381,9 +382,19 @@ sent` or `Already open; nothing is sent` as its only fact and no text.
     (`Replaced`, `Appended` or `Cleared`), `Milestone`, `Kind` (edit);
     `Parent`, `Board` (create, relate); `Branch` and `Base` (develop). A
     milestone the call creates reads `<name> (new)`.
-  - A replacing body is pinned by the digest of the body it replaces, and a
-    new development branch by the head commit of its base, since the prompt
-    shows neither.
+  - Pull request tools: `Base`, `Head` (create, edit), `Closes` (the issues a
+    pull request names, or the ones a merge closes, as `owner/repo#N` even in
+    other repositories), `Reviewers`, `Attachments` (the file names), `Commit`
+    and `Line comments` (review), `Method` (`Merge commit`, `Squash` or
+    `Rebase`), `Also merges` (the lower layers a merge takes along) and
+    `Branch` (`Deleted after merge`) (merge). A review's text is its body
+    followed by each line comment under its `path:line`. A call that is
+    refused before it writes gets no description at all.
+  - A replacing body is pinned by the digest of the body it replaces, a new
+    development branch by the head commit of its base, a new pull request, a
+    review and a merge by the head commit of the pull request, and a merge
+    that takes lower layers along by the digest of their commits, since the
+    prompt shows none of them in full.
 
 ## Toolsets and settings
 
