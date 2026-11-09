@@ -45,8 +45,6 @@ export const ISSUE_TRANSLATIONS: Translations = {
     Cleared: "空にする",
     Appended: "追記",
     Removed: "解除",
-    "Already closed; nothing is sent": "すでにクローズ済みです（何も送信されません）",
-    "Already open; nothing is sent": "すでにオープン中です（何も送信されません）",
     "{name} (new)": "{name}（新規作成）",
     "{name} (already linked)": "{name}（紐付け済み）",
     "Named by GitHub": "GitHub が命名",

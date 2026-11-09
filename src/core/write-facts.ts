@@ -50,5 +50,7 @@ export const WRITE_FACT_TRANSLATIONS: Translations = {
     Assignees: "担当者",
     Milestone: "マイルストーン",
     Base: "ベース",
+    "Already closed; nothing is sent": "すでにクローズ済みです（何も送信されません）",
+    "Already open; nothing is sent": "すでにオープン中です（何も送信されません）",
   },
 }
