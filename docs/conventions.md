@@ -367,7 +367,23 @@ to them. Every write tool, whatever its class, follows it.
   returns; the arguments only say which one. A tool that cannot tell its
   target before it runs gives its intent alone.
 - **Facts this package adds** are listed here, each with the tools that give
-  it: none yet.
+  it. A fact appears only where it changes the answer: `State` is not shown
+  for an open issue about to be closed, since it is always open.
+  `src/core/write-facts.ts` holds the ones several toolsets share.
+  - `State` (`stateFact`): the target's state as `Open`, `Closed`, `Merged`
+    or `Draft`. A comment on a closed issue shows it; closing or reopening
+    an issue that is already in that state shows `Already closed; nothing is
+sent` or `Already open; nothing is sent` as its only fact and no text.
+  - A change to a list (`changeFact`): `Labels`, `Assignees`, `Blocked by`,
+    `Sub-issues`, `Blocking`, `Issue fields` as `+added −removed`. The names
+    are data, never translated.
+  - Issue tools: `Reason` and `Duplicate of` (close); `Title`, `Body`
+    (`Replaced`, `Appended` or `Cleared`), `Milestone`, `Kind` (edit);
+    `Parent`, `Board` (create, relate); `Branch` and `Base` (develop). A
+    milestone the call creates reads `<name> (new)`.
+  - A replacing body is pinned by the digest of the body it replaces, and a
+    new development branch by the head commit of its base, since the prompt
+    shows neither.
 
 ## Toolsets and settings
 
