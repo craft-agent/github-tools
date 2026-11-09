@@ -43,6 +43,7 @@ const output = z.object({
 export const releasePublish = defineTool({
   id: "github_release_publish",
   title: "Publish a GitHub release",
+  intent: "About to publish a GitHub release",
   description:
     "Publish a draft release: creates its tag (pinned to the commit it would name) or uses the existing one, and notifies everyone watching; cannot be undone in effect. Refuses a published release, a target branch that is gone, and with head_sha a commit other than the one reviewed (stale). Read the commit to pass with github_release_read view.",
   toolset: "releases",

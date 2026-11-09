@@ -42,6 +42,7 @@ const output = z.object({
 export const releaseEdit = defineTool({
   id: "github_release_edit",
   title: "Edit a GitHub release",
+  intent: "About to edit a GitHub release",
   description:
     "Edit a GitHub release. Replaces only the parts given, on a draft or a published release. Editing notifies no one; publishing is github_release_publish.",
   toolset: "releases",

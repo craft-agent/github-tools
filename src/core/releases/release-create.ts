@@ -34,6 +34,7 @@ const output = z.object({
 export const releaseCreate = defineTool({
   id: "github_release_create",
   title: "Create a GitHub draft release",
+  intent: "About to create a GitHub draft release",
   description:
     "Create a draft release in a repository. Always creates a draft, which only people who can push see until github_release_publish publishes it. Refuses a tag that has a release (points to github_release_edit), a target for a tag that exists, and a missing branch.",
   toolset: "releases",

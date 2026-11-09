@@ -20,6 +20,7 @@ const output = z.object({
 export const releaseDelete = defineTool({
   id: "github_release_delete",
   title: "Delete a GitHub release",
+  intent: "About to delete a GitHub release",
   description:
     "Delete a GitHub release and its assets, keeping its git tag. Refuses an unknown release. Cannot be undone.",
   toolset: "releases",
