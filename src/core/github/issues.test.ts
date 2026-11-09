@@ -21,7 +21,7 @@ import {
   subIssuesRule,
   variable,
 } from "../../testing/issue-fixtures"
-import { FIELDS, issueFieldsRule } from "../../testing/write-fixtures"
+import { FIELDS, HEADING, issueFieldsRule, issueHeadingRule } from "../../testing/write-fixtures"
 import type { ToolError } from "../errors"
 import { parseRepo } from "../refs"
 import {
@@ -29,6 +29,7 @@ import {
   issueDetailSchema,
   readIssue,
   readIssueFields,
+  readIssueHeading,
   readSubIssues,
   searchIssues,
   stateWord,
@@ -497,6 +498,39 @@ describe("readIssueFields", () => {
   test("an issue that does not exist is not_found", async () => {
     useFake([{ match: FIELDS, stdout: gqlReply({ repository: { issue: null } }) }])
     const error = await failure(readIssueFields(REF, CTX))
+    expect(error.code).toBe("not_found")
+    expect(error.message).toContain("octo/hello#12")
+  })
+})
+
+describe("readIssueHeading", () => {
+  test("reads the id, the title, the state and the reason in one query", async () => {
+    const installed = useFake([
+      issueHeadingRule({ id: "I_7", title: "Crash", state: "CLOSED", stateReason: "NOT_PLANNED" }),
+    ])
+    expect(await readIssueHeading(REF, CTX)).toEqual({
+      id: "I_7",
+      title: "Crash",
+      state: "closed",
+      state_reason: "not_planned",
+    })
+    expect(apiCalls(installed)).toHaveLength(1)
+    expect(variable(apiCalls(installed)[0]!, "n")).toBe("12")
+  })
+
+  test("a missing reason is null", async () => {
+    useFake([issueHeadingRule()])
+    expect(await readIssueHeading(REF, CTX)).toEqual({
+      id: "I_12",
+      title: "Crash on save",
+      state: "open",
+      state_reason: null,
+    })
+  })
+
+  test("an issue that does not exist is not_found", async () => {
+    useFake([{ match: HEADING, stdout: gqlReply({ repository: { issue: null } }) }])
+    const error = await failure(readIssueHeading(REF, CTX))
     expect(error.code).toBe("not_found")
     expect(error.message).toContain("octo/hello#12")
   })

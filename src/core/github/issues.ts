@@ -239,6 +239,10 @@ const FIELDS_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(own
   id state stateReason body labels(first:${MAX_LABELS}){nodes{name}}
 }}}`
 
+const HEADING_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){issue(number:$n){
+  id title state stateReason
+}}}`
+
 /**
  * `type:ISSUE`, not `ISSUE_ADVANCED`: the plain search applies every
  * qualifier to the whole query, so `repo:a/b x OR y` stays in `a/b`, while the
@@ -470,6 +474,28 @@ export async function readIssueFields(ref: { repo: RepoName; number: number }, c
     state_reason: stateWord(issue.stateReason),
     body: issue.body ?? "",
     labels: nodesOf(issue.labels).map((label) => label.name),
+  }
+}
+
+/** What a description of a write names an issue by: its node id, real title, state and reason (as `stateWord` gives them). */
+export type IssueHeading = { id: string; title: string; state: string; state_reason: string | null }
+
+/** The node id, title, state and reason of one issue, in one small read. */
+export async function readIssueHeading(
+  ref: { repo: RepoName; number: number },
+  ctx: RefContext,
+): Promise<IssueHeading> {
+  const issue = await readIssueData<Pick<RawIssue, "id" | "title" | "state" | "stateReason">>(
+    HEADING_QUERY,
+    ref,
+    {},
+    ctx,
+  )
+  return {
+    id: issue.id,
+    title: issue.title,
+    state: stateWord(issue.state),
+    state_reason: stateWord(issue.stateReason),
   }
 }
 

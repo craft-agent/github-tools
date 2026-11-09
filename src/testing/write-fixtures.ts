@@ -15,6 +15,7 @@ export const LABEL = "label\\(name:"
 export const MILESTONES = "milestones\\?state=all"
 export const MILESTONE_CREATE = "-X POST"
 export const FIELDS = "labels\\(first:100\\)"
+export const HEADING = "id title state stateReason"
 export const ISSUE_FIELD_DEFINITIONS = "issueFields\\(first"
 export const ISSUE_FIELD_VALUES = "issueFieldValues\\(first"
 export const ISSUE_FIELD_MUTATION = "setIssueFieldValue"
@@ -94,6 +95,23 @@ export const issueFieldsRule = (
         stateReason: fields.stateReason ?? null,
         body: fields.body ?? "",
         labels: { nodes: (fields.labels ?? []).map((name) => ({ name })) },
+      },
+    },
+  }),
+})
+
+/** The node id, title, state and reason of the issue, as the heading query returns them. */
+export const issueHeadingRule = (
+  heading: { id?: string; title?: string; state?: string; stateReason?: string | null } = {},
+): GhRule => ({
+  match: HEADING,
+  stdout: gqlReply({
+    repository: {
+      issue: {
+        id: heading.id ?? ISSUE_ID,
+        title: heading.title ?? "Crash on save",
+        state: heading.state ?? "OPEN",
+        stateReason: heading.stateReason ?? null,
       },
     },
   }),
