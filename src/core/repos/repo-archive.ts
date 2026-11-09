@@ -7,6 +7,7 @@ import { confirmWrite, defineTool } from "../tool"
 export const repoArchive = defineTool({
   id: "github_repo_archive",
   title: "Archive a GitHub repository",
+  intent: "About to archive a GitHub repository",
   description:
     "Archive a repository, which makes it read-only: no pushes, issues, pull requests or comments until github_repo_unarchive lifts it. Needs admin permission; refuses a repository that is archived already, before writing.",
   toolset: "repos",

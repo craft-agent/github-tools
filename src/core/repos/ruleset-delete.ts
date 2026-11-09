@@ -10,6 +10,7 @@ import { REPO_DESCRIPTION } from "./support"
 export const rulesetDelete = defineTool({
   id: "github_ruleset_delete",
   title: "Delete a GitHub ruleset",
+  intent: "About to delete a GitHub ruleset",
   description: [
     'Delete a repository ruleset for good; github_ruleset_edit with enforcement "disabled" keeps it without enforcing it.',
     "Pass updated_at from github_ruleset_read to guard against a change made meanwhile: if the ruleset changed since, the call fails with stale and deletes nothing.",

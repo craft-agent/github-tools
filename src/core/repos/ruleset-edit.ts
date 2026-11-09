@@ -58,6 +58,7 @@ const list = (values: readonly string[], none: string): string => values.join(",
 export const rulesetEdit = defineTool({
   id: "github_ruleset_edit",
   title: "Edit a GitHub ruleset",
+  intent: "About to edit a GitHub ruleset",
   description: [
     "Edit a repository's ruleset: name, enforcement, the refs it covers (include and exclude, each replacing its list), rules and bypass (each replacing the whole list). Pass at least one part.",
     'Ref patterns are read as github_ruleset_create reads them. enforcement "disabled" keeps a ruleset without enforcing it. GitHub validates the rule types and parameters and refuses bad ones as invalid_argument.',

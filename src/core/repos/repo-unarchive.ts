@@ -7,6 +7,7 @@ import { defineTool } from "../tool"
 export const repoUnarchive = defineTool({
   id: "github_repo_unarchive",
   title: "Unarchive a GitHub repository",
+  intent: "About to unarchive a GitHub repository",
   description:
     "Unarchive a repository, which makes it writable again. Needs admin permission. A repository that is not archived is left as it is: changed is false and nothing is sent.",
   toolset: "repos",

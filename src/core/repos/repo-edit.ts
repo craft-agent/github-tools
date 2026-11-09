@@ -91,6 +91,7 @@ function topicList(argument: string, values: string[] | undefined): string[] {
 export const repoEdit = defineTool({
   id: "github_repo_edit",
   title: "Edit a GitHub repository's settings",
+  intent: "About to edit a GitHub repository's settings",
   description: [
     "Edit a repository's settings: description, homepage, default branch, topics (add_topics, remove_topics), the features that are on and the merge methods and options. Pass at least one.",
     "The boolean arguments are GitHub's REST names; github_repo_read view reports them under features (has_issues as issues, has_wiki as wiki, has_projects as projects, has_discussions as discussions) and merge (allow_merge_commit as merge_commit, allow_squash_merge as squash, allow_rebase_merge as rebase, allow_auto_merge as auto_merge, delete_branch_on_merge, allow_update_branch as update_branch); is_template keeps its name.",

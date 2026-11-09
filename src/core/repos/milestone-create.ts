@@ -14,6 +14,7 @@ import { defineTool } from "../tool"
 export const milestoneCreate = defineTool({
   id: "github_milestone_create",
   title: "Create a GitHub milestone",
+  intent: "About to create a GitHub milestone",
   description:
     "Create a repository milestone with an optional due date and description. Refuses a title the repository has in any state, without regard to case; use github_milestone_edit to change it. due must be a real YYYY-MM-DD date.",
   toolset: "repos",

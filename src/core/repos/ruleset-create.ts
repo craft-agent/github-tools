@@ -49,6 +49,7 @@ const output = z.object({
 export const rulesetCreate = defineTool({
   id: "github_ruleset_create",
   title: "Create a GitHub ruleset",
+  intent: "About to create a GitHub ruleset",
   description: [
     "Create a ruleset on a repository: a name, what it applies to (target branch, tag or push), its enforcement, the refs it covers (include, exclude) and its rules.",
     "Ref patterns ~DEFAULT_BRANCH, ~ALL and anything starting with refs/ are kept; a bare name or glob gets refs/heads/ (branch) or refs/tags/ (tag) in front. include defaults to the default branch for a branch ruleset and is required for a tag ruleset; a push ruleset has neither include nor exclude.",

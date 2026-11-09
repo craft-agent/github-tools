@@ -14,6 +14,7 @@ const input = z.object({
 export const labelCreate = defineTool({
   id: "github_label_create",
   title: "Create a GitHub label",
+  intent: "About to create a GitHub label",
   description:
     "Create a repository label. Refuses a name the repository has already, without regard to case; use github_label_edit to change it. Without color, GitHub picks one.",
   toolset: "repos",

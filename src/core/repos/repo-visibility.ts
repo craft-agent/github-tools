@@ -25,6 +25,7 @@ function consequence(from: Visibility, to: Visibility): string {
 export const repoVisibility = defineTool({
   id: "github_repo_visibility",
   title: "Change a GitHub repository's visibility",
+  intent: "About to change a GitHub repository's visibility",
   description:
     "Change a repository's visibility to public, private or internal (internal for an organization's repository only). Making it public lets anyone read its code, history, issues and wiki; making a public one private or internal loses its stars and watchers, and its forks stay public. Needs admin permission; refuses the visibility it has already, before writing.",
   toolset: "repos",

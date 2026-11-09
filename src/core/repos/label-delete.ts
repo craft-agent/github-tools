@@ -7,6 +7,7 @@ import { confirmWrite, defineTool } from "../tool"
 export const labelDelete = defineTool({
   id: "github_label_delete",
   title: "Delete a GitHub label",
+  intent: "About to delete a GitHub label",
   description:
     "Delete a repository label, matched without regard to case, removing it from every issue and pull request it is on. Refuses an unknown label before writing.",
   toolset: "repos",

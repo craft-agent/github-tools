@@ -25,6 +25,7 @@ const CHANGES = ["name", "color", "description"] as const
 export const labelEdit = defineTool({
   id: "github_label_edit",
   title: "Edit a GitHub label",
+  intent: "About to edit a GitHub label",
   description:
     "Edit a repository label, matched without regard to case. Refuses an unknown label, no change arguments, or a new name another label has. Unchanged fields are left alone; changed is [] when nothing is sent.",
   toolset: "repos",

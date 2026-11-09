@@ -18,6 +18,7 @@ const CHANGES = ["title", "due", "description", "state"] as const
 export const milestoneEdit = defineTool({
   id: "github_milestone_edit",
   title: "Edit a GitHub milestone",
+  intent: "About to edit a GitHub milestone",
   description:
     "Edit a repository milestone by number or title (any case, any state). Refuses an unknown milestone, no change arguments, due with clear_due, or a title another milestone has. due must be a real YYYY-MM-DD date. Unchanged fields are left alone; changed is [] when nothing is sent.",
   toolset: "repos",

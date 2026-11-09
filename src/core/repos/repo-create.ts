@@ -50,6 +50,7 @@ function confirmation(repo: string, visibility: Visibility, template: string | u
 export const repoCreate = defineTool({
   id: "github_repo_create",
   title: "Create a GitHub repository",
+  intent: "About to create a GitHub repository",
   description: [
     "Create a repository for the viewer or for an organization the viewer can create repositories in (repo, owner/name), private unless visibility says public or internal; a public one is readable by anyone.",
     "internal is for an organization's repository only.",
