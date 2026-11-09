@@ -1,10 +1,13 @@
 import { installFakeGh, type GhRule } from "../../testing/fake-gh"
 import { tempRepo } from "../../testing/git-repo"
-import { ORIGIN, issueHeadingRule } from "../../testing/write-fixtures"
+import { octoBoardRules } from "../../testing/project-fixtures"
+import { ORIGIN, issueFieldsRule, issueHeadingRule, milestonesRule } from "../../testing/write-fixtures"
 import { callDescription } from "../describe"
 import type { CallDescription, ToolSpec } from "../tool"
 import { issueClose } from "./close"
 import { issueComment } from "./comment"
+import { issueCreate } from "./create"
+import { issueEdit } from "./edit"
 import { issueReopen } from "./reopen"
 
 /** One call of an issue write tool to describe, and the replies of GitHub it meets. */
@@ -65,6 +68,69 @@ export const DESCRIBE_CASES = {
     tool: issueReopen,
     args: { issue: "12", comment: "Not posted." },
     rules: [issueHeadingRule()],
+  },
+  editReplacing: {
+    name: "edit replacing the body",
+    tool: issueEdit,
+    args: {
+      issue: "12",
+      title: "Not the real title",
+      body: "Fresh body",
+      add_labels: ["bug", "docs"],
+      remove_labels: ["wontfix"],
+      add_assignees: ["@me"],
+    },
+    rules: [issueHeadingRule(), issueFieldsRule({ body: "Old body" })],
+  },
+  editClearing: {
+    name: "edit clearing the body and the milestone",
+    tool: issueEdit,
+    args: { issue: "12", body: "", remove_milestone: true, remove_assignees: ["bob"] },
+    rules: [issueHeadingRule(), issueFieldsRule({ body: "Old body" })],
+  },
+  editAppending: {
+    name: "edit appending to the body, with a new milestone, a kind and issue fields",
+    tool: issueEdit,
+    args: {
+      issue: "12",
+      append_body: "More details.",
+      milestone: "v2",
+      create_milestone: true,
+      kind: "bug",
+      issue_fields: { Priority: "High" },
+      clear_issue_fields: ["Sprint"],
+    },
+    rules: [issueHeadingRule(), milestonesRule("v1")],
+  },
+  editMilestone: {
+    name: "edit into an existing milestone, named in other letters",
+    tool: issueEdit,
+    args: { issue: "12", milestone: "V1" },
+    rules: [issueHeadingRule(), milestonesRule("v1")],
+  },
+  createPlain: { name: "create with only a title", tool: issueCreate, args: { title: "  Add retry  " }, rules: [] },
+  createFull: {
+    name: "create with every optional piece",
+    tool: issueCreate,
+    args: {
+      title: "Add retry",
+      body: "Retry three times.",
+      kind: "bug",
+      labels: ["bug", "docs", "bug"],
+      assignees: ["alice"],
+      milestone: "v1",
+      parent: "5",
+      blocked_by: ["6", "other/thing#7", " ", "6"],
+      issue_fields: { Priority: "High" },
+      project: "octo/3",
+    },
+    rules: [milestonesRule("v1"), ...octoBoardRules(3)],
+  },
+  createNewMilestone: {
+    name: "create with a milestone it makes",
+    tool: issueCreate,
+    args: { title: "Plan", milestone: "v9", create_milestone: true },
+    rules: [milestonesRule("v1")],
   },
 } satisfies Record<string, DescribeCase>
 

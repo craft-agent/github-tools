@@ -21,8 +21,9 @@ import {
 } from "../github/kind"
 import { milestoneSchema, resolveMilestone, type MilestoneRef } from "../github/milestones"
 import { parseNumberRef } from "../refs"
-import { defineTool } from "../tool"
-import { ISSUE_DESCRIPTION, ISSUE_TARGETS, editIssue } from "./write-support"
+import { defineTool, type CallFact, type CallText } from "../tool"
+import { changeFact, digest } from "../write-facts"
+import { ISSUE_DESCRIPTION, ISSUE_TARGETS, describedIssue, editIssue, milestoneFact } from "./write-support"
 import { REPO_DESCRIPTION, appended, given, invalid, lastUrl, nameList, writableContext } from "../write-support"
 
 const input = z.object({
@@ -193,6 +194,47 @@ export const issueEdit = defineTool({
   toolset: "issues",
   class: "overwrite",
   targets: ISSUE_TARGETS,
+  async describe(args, ctx) {
+    const change = parseChange(args)
+    const { ref, heading } = await describedIssue(args, ctx)
+    const facts: CallFact[] = []
+    const add = (fact: CallFact | undefined): void => {
+      if (fact) facts.push(fact)
+    }
+
+    let text: CallText | undefined
+    let pins: Record<string, string> | undefined
+    if (change.title) add({ label: "Title", value: change.title })
+    if (change.body !== undefined) {
+      const cleared = change.body === ""
+      add({ label: "Body", value: { text: cleared ? "Cleared" : "Replaced" } })
+      if (!cleared) text = { label: "New body", body: change.body }
+      pins = { body: digest((await readIssueFields(ref, ctx)).body) }
+    }
+    if (change.appendBody !== undefined) {
+      add({ label: "Body", value: { text: "Appended" } })
+      text = { label: "Appended text", body: change.appendBody }
+    }
+    add(changeFact("Labels", change.addLabels, change.removeLabels))
+    add(changeFact("Assignees", change.addAssignees, change.removeAssignees))
+    if (change.milestone) add(await milestoneFact(ref.repo, change.milestone, change.createMilestone, ctx))
+    if (change.removeMilestone) add({ label: "Milestone", value: { text: "Removed" } })
+    if (change.kind) add({ label: "Kind", value: change.kind })
+    add(
+      changeFact(
+        "Issue fields",
+        issueFieldNames("issue_fields", Object.keys(change.issueFields)),
+        change.clearIssueFields,
+      ),
+    )
+
+    return {
+      headline: { text: "About to edit the issue {title}", values: { title: heading.title } },
+      facts,
+      ...(text ? { text } : {}),
+      ...(pins ? { pins } : {}),
+    }
+  },
   input,
   output,
   async execute(args, ctx) {

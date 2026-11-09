@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { HEADING } from "../../testing/write-fixtures"
 import { MAX_FACTS, MAX_HEADLINE_LENGTH, MAX_LABEL_LENGTH } from "../describe"
+import { digest } from "../write-facts"
 import { DESCRIBE_CASES, REAL_TITLE, describeCase, type DescribeCase } from "./describe.fixtures"
 
 const headline = (text: string, title = REAL_TITLE) => ({ text, values: { title } })
@@ -68,6 +69,100 @@ describe("github_issue_reopen", () => {
       headline: headline("About to reopen the issue {title}"),
       facts: [{ label: "State", value: word("Already open; nothing is sent") }],
     })
+  })
+})
+
+describe("github_issue_edit", () => {
+  test("lists each change, shows the replacing body, pins the body it replaces and names the issue by its real title", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editReplacing)).toEqual({
+      headline: headline("About to edit the issue {title}"),
+      facts: [
+        { label: "Title", value: "Not the real title" },
+        { label: "Body", value: word("Replaced") },
+        { label: "Labels", value: "+bug +docs \u2212wontfix" },
+        { label: "Assignees", value: "+@me" },
+      ],
+      text: { label: "New body", body: "Fresh body" },
+      pins: { body: digest("Old body") },
+    })
+  })
+
+  test("a body that clears has no text, and a removed milestone and assignee are facts", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editClearing)).toEqual({
+      headline: headline("About to edit the issue {title}"),
+      facts: [
+        { label: "Body", value: word("Cleared") },
+        { label: "Assignees", value: "\u2212bob" },
+        { label: "Milestone", value: word("Removed") },
+      ],
+      pins: { body: digest("Old body") },
+    })
+  })
+
+  test("an appended text is shown as appended, pins nothing, and a new milestone says it is new", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editAppending)).toEqual({
+      headline: headline("About to edit the issue {title}"),
+      facts: [
+        { label: "Body", value: word("Appended") },
+        { label: "Milestone", value: { text: "{name} (new)", values: { name: "v2" } } },
+        { label: "Kind", value: "bug" },
+        { label: "Issue fields", value: "+Priority \u2212Sprint" },
+      ],
+      text: { label: "Appended text", body: "More details." },
+    })
+  })
+
+  test("a milestone that exists is shown by its title as the repository has it", async () => {
+    const description = await describeCase(DESCRIBE_CASES.editMilestone)
+    expect(description?.facts).toEqual([{ label: "Milestone", value: "v1" }])
+  })
+
+  test("a milestone that does not exist, without create_milestone, gives no description", async () => {
+    const item: DescribeCase = { ...DESCRIBE_CASES.editMilestone, args: { issue: "12", milestone: "v9" } }
+    expect(await describeCase(item)).toBeUndefined()
+  })
+
+  test("an edit that changes nothing gives no description", async () => {
+    const item: DescribeCase = { ...DESCRIBE_CASES.editMilestone, args: { issue: "12" } }
+    expect(await describeCase(item)).toBeUndefined()
+  })
+})
+
+describe("github_issue_create", () => {
+  test("a title alone gives the headline with the title the issue will have", async () => {
+    expect(await describeCase(DESCRIBE_CASES.createPlain)).toEqual({
+      headline: headline("About to create the issue {title}", "Add retry"),
+      facts: [],
+    })
+  })
+
+  test("every optional piece is a fact, in the order of what decides, and the body is the text", async () => {
+    expect(await describeCase(DESCRIBE_CASES.createFull)).toEqual({
+      headline: headline("About to create the issue {title}", "Add retry"),
+      facts: [
+        { label: "Labels", value: "+bug +docs" },
+        { label: "Assignees", value: "+alice" },
+        { label: "Kind", value: "bug" },
+        { label: "Milestone", value: "v1" },
+        { label: "Parent", value: "octo/hello#5" },
+        { label: "Blocked by", value: "+octo/hello#6 +other/thing#7" },
+        { label: "Issue fields", value: "+Priority" },
+        { label: "Board", value: "Roadmap" },
+      ],
+      text: { label: "Issue body", body: "Retry three times." },
+    })
+  })
+
+  test("a milestone the call makes says it is new", async () => {
+    const description = await describeCase(DESCRIBE_CASES.createNewMilestone)
+    expect(description?.facts).toEqual([
+      { label: "Milestone", value: { text: "{name} (new)", values: { name: "v9" } } },
+    ])
+  })
+
+  test("a blank title gives no description", async () => {
+    const item: DescribeCase = { ...DESCRIBE_CASES.createPlain, args: { title: "  " } }
+    expect(await describeCase(item)).toBeUndefined()
   })
 })
 

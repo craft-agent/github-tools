@@ -1,8 +1,10 @@
+import { isToolError } from "../errors"
 import { gh } from "../gh"
 import { readIssueHeading, type IssueHeading } from "../github/issues"
 import { kindFlags, withKindFallback, type KindPlacement } from "../github/kind"
+import { resolveMilestone } from "../github/milestones"
 import { parseNumberRef, type RepoName } from "../refs"
-import type { TargetKind, ToolContext } from "../tool"
+import type { CallFact, TargetKind, ToolContext } from "../tool"
 
 /** What the issue write tools share: `gh issue edit`, the kind, the issue argument. */
 
@@ -18,6 +20,26 @@ export async function describedIssue(
 ): Promise<{ ref: { repo: RepoName; number: number }; heading: IssueHeading }> {
   const ref = await parseNumberRef(args.issue, args.repo, ctx, { accept: "issue" })
   return { ref, heading: await readIssueHeading(ref, ctx) }
+}
+
+/**
+ * The `Milestone` fact for a milestone title: the title as the repository has
+ * it, else, when the call creates it, the title as a new one. A missing one
+ * that is not created is refused, as the call is.
+ */
+export async function milestoneFact(
+  repo: RepoName,
+  title: string,
+  create: boolean,
+  ctx: ToolContext,
+): Promise<CallFact> {
+  try {
+    const found = await resolveMilestone(repo, title, { create: false }, ctx)
+    return { label: "Milestone", value: found.title }
+  } catch (error) {
+    if (!create || !isToolError(error) || error.code !== "invalid_argument") throw error
+    return { label: "Milestone", value: { text: "{name} (new)", values: { name: title } } }
+  }
 }
 
 /** Runs `gh issue edit` on one issue of `repo` with the given flags; `stdin` is the body for `--body-file -`. */
