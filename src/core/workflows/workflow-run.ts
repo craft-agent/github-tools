@@ -102,6 +102,7 @@ function startedRun(stdout: string, repo: RepoName): { id: number; url: string }
 export const workflowRun = defineTool({
   id: "github_workflow_run",
   title: "Start a GitHub Actions workflow",
+  intent: "About to start a GitHub Actions workflow",
   description:
     "Start a workflow by hand (a workflow_dispatch run) at a branch or tag (ref, default the default branch), with inputs. GitHub checks the inputs and the ref, and its refusal is returned. It runs whatever the workflow does, a deploy or a publish included, and cannot be undone in effect. Refuses a workflow that is not active. With head_sha it stops with stale, starting nothing, if ref is at another commit; the start names the ref, not the commit, so a push right after the check still runs the newer commit (the run's commit is checked afterwards and a hint says so). Read the run with github_run_read view, which waits.",
   toolset: "actions",

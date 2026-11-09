@@ -22,6 +22,7 @@ const output = z.object({
 export const runCancel = defineTool({
   id: "github_run_cancel",
   title: "Cancel a workflow run",
+  intent: "About to cancel a workflow run",
   description:
     "Cancel a workflow run that is in progress or queued. Refuses a run that has already completed. Stopping jobs cannot be undone, and a deployment may be left half done. Read the final state with github_run_read view.",
   toolset: "actions",

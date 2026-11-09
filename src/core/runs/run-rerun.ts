@@ -33,6 +33,7 @@ const output = z.object({
 export const runRerun = defineTool({
   id: "github_run_rerun",
   title: "Re-run a workflow run",
+  intent: "About to re-run a workflow run",
   description:
     "Re-run a completed workflow run: only failed jobs (the default), a specific job, or every job. Refuses a run that is still going (use github_run_read view to wait or github_run_cancel to cancel), a run where nothing failed when failed_only is true, an unknown job, or passing both job and failed_only. Cannot be undone in effect; steps run again, including deploys and publishes. Read the outcome with github_run_read view, which waits for the run to complete.",
   toolset: "actions",
