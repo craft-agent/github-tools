@@ -33,7 +33,6 @@ export const ISSUE_TRANSLATIONS: Translations = {
     "Blocked by": "ブロック元",
     Blocking: "ブロック先",
     "Issue fields": "Issue フィールド",
-    Branch: "ブランチ",
     "Issue body": "Issue の本文",
     Completed: "完了",
     "Not planned": "計画外",

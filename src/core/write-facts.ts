@@ -50,6 +50,7 @@ export const WRITE_FACT_TRANSLATIONS: Translations = {
     Assignees: "担当者",
     Milestone: "マイルストーン",
     Base: "ベース",
+    Branch: "ブランチ",
     Board: "ボード",
     "New body": "新しい本文",
     "Appended text": "追記する本文",

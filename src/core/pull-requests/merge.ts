@@ -4,6 +4,7 @@ import {
   MERGE_METHODS,
   readMergeMethods,
   readMergeState,
+  readPullRequestState,
   type MergeMethod,
   type MergeState,
   type PullRequestRef,
@@ -12,7 +13,8 @@ import { readStack } from "../github/stacks"
 import { REPO_DESCRIPTION, given, invalid, writableContext } from "../write-support"
 import { stepErrorsSchema } from "../projects/item-support"
 import { parseNumberRef, SHA_PATTERN, shortSha, type RepoName } from "../refs"
-import { StepErrors, defineTool, type ToolContext } from "../tool"
+import { StepErrors, defineTool, type CallFact, type ToolContext } from "../tool"
+import { digest } from "../write-facts"
 import { branchOutcomeSchema, tidyBranches, type BranchTarget } from "./merge-branches"
 import {
   MERGE_POLL_INTERVAL_MS,
@@ -23,7 +25,7 @@ import {
   type MergeProgress,
   type MergeRequestBody,
 } from "./merge-request"
-import { PR_DESCRIPTION, PR_TARGETS } from "./write-support"
+import { PR_DESCRIPTION, PR_TARGETS, describedPull } from "./write-support"
 
 const CONFLICT_FAILURE = /http 409/i
 const PENDING_NOTE = "GitHub is still merging; github_pr_read view shows when it lands."
@@ -31,6 +33,18 @@ const ENQUEUED_NOTE = "In the merge queue; it merges when the queue reaches it."
 const BRANCH_KEPT_NOTE =
   "The head branch of a pull request that has not merged yet was not deleted; delete it once it lands."
 const NO_REASON = "GitHub gave no reason"
+const MERGED = "merged"
+const CLOSED = "closed"
+const COMMIT_MESSAGE_SEPARATOR = "\n\n"
+/** How the `State` fact words a pull request that is merged already. */
+const ALREADY_MERGED = "Already merged; nothing is sent"
+
+/** How the `Method` fact words each merge method. */
+const METHOD_WORDS: Readonly<Record<MergeMethod, string>> = {
+  merge: "Merge commit",
+  squash: "Squash",
+  rebase: "Rebase",
+}
 
 const input = z.object({
   pr: z.string().describe(PR_DESCRIPTION),
@@ -225,6 +239,55 @@ export const prMerge = defineTool({
   toolset: "pull_requests",
   class: "administrative",
   targets: PR_TARGETS,
+  async describe(args, ctx) {
+    const subject = given(args.subject)
+    const message = given(args.body)
+    if (args.method === "rebase") refuseCommitMessage(subject, message)
+    const expectedSha = given(args.head_sha)
+    if (args.head_sha !== undefined && (!expectedSha || !SHA_PATTERN.test(expectedSha))) {
+      throw invalid("head_sha must be a full commit SHA of 40 hexadecimal characters.")
+    }
+
+    const { ref, heading } = await describedPull(args, ctx)
+    const label = `${ref.repo.full}#${ref.number}`
+    const pull = await readMergeState(ref, ctx)
+    const headline = { text: "About to merge the pull request {title}", values: { title: heading.title } }
+    if (pull.state === MERGED) return { headline, facts: [{ label: "State", value: { text: ALREADY_MERGED } }] }
+    refuseUnmergeable(pull, label)
+
+    const method = await chooseMethod(args.method, ref.repo, ctx)
+    if (method === "rebase") refuseCommitMessage(subject, message)
+    if (expectedSha && pull.head_sha.toLowerCase() !== expectedSha.toLowerCase()) {
+      throw new ToolError(
+        "stale",
+        `${label} is at ${shortSha(pull.head_sha)}, not ${shortSha(expectedSha)}: new commits arrived since it was read. Nothing was merged.`,
+      )
+    }
+    const lower = await lowerLayers(pull, ref.repo, Boolean(args.with_lower_layers), ctx)
+
+    const facts: CallFact[] = [{ label: "Method", value: { text: METHOD_WORDS[method] } }]
+    const closes = (await readPullRequestState(ref, ctx)).closing_issues
+      .filter((issue) => issue.state !== CLOSED)
+      .map((issue) => `${issue.repo}#${issue.number}`)
+    if (closes.length > 0) facts.push({ label: "Closes", value: closes.join(" ") })
+    if (lower.length > 0) {
+      facts.push({ label: "Also merges", value: lower.map((layer) => `#${layer.number}`).join(" ") })
+    }
+    if (args.delete_branch) facts.push({ label: "Branch", value: { text: "Deleted after merge" } })
+
+    const commitMessage = [subject, message].filter(Boolean).join(COMMIT_MESSAGE_SEPARATOR)
+    return {
+      headline,
+      facts,
+      ...(commitMessage ? { text: { label: "Merge commit message", body: commitMessage } } : {}),
+      pins: {
+        head_sha: pull.head_sha,
+        ...(lower.length > 0
+          ? { lower_layers: digest(lower.map((layer) => `#${layer.number}@${layer.head_sha}`).join("\n")) }
+          : {}),
+      },
+    }
+  },
   input,
   output,
   async execute(args, ctx) {

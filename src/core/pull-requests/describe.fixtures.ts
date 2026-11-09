@@ -1,8 +1,10 @@
 import { HEAD_SHA, branchRule, defaultBranchRule } from "../../testing/develop-fixtures"
 import { installFakeGh, type GhRule } from "../../testing/fake-gh"
 import { tempRepo } from "../../testing/git-repo"
+import { ALL_METHODS, headSha, mergeStateRule, mergedState, methodsRule, stackedAt } from "../../testing/merge-fixtures"
 import { octoBoardRules, viewerRule } from "../../testing/project-fixtures"
-import { pullHeadingRule, stateRule } from "../../testing/pull-request-write-fixtures"
+import { linkedIssues, pullHeadingRule, rawClosingIssue, stateRule } from "../../testing/pull-request-write-fixtures"
+import { rawFullStack, stackRule } from "../../testing/stack-fixtures"
 import { ORIGIN, milestonesRule } from "../../testing/write-fixtures"
 import { callDescription } from "../describe"
 import type { CallDescription, ToolSpec } from "../tool"
@@ -10,6 +12,7 @@ import { prClose } from "./close"
 import { prComment } from "./comment"
 import { prCreate } from "./create"
 import { prEdit } from "./edit"
+import { prMerge } from "./merge"
 import { prReady } from "./ready"
 import { prReopen } from "./reopen"
 import { prReview } from "./review"
@@ -35,6 +38,23 @@ export const reviewRules = (...rules: GhRule[]): GhRule[] => [
   pullHeadingRule(),
   stateRule(),
   viewerRule("alice"),
+]
+
+/** The replies a merge call finds: pull request 7 open at `headSha(7)`, in no stack, closing nothing, the repository allowing every method. */
+export const mergeRules = (...rules: GhRule[]): GhRule[] => [
+  ...rules,
+  pullHeadingRule({ headRefOid: headSha(7) }),
+  mergeStateRule(7),
+  stateRule(),
+  methodsRule(...ALL_METHODS),
+]
+
+/** The replies of a stack of three pull requests, 3 below 4 below 5, and the merge state of each; `lower` adjusts the layers below 5. */
+export const stackRules = (lower: { 3?: Record<string, unknown>; 4?: Record<string, unknown> } = {}): GhRule[] => [
+  mergeStateRule(5, stackedAt(1, 3)),
+  mergeStateRule(4, { ...stackedAt(1, 2), ...lower[4] }),
+  mergeStateRule(3, { ...stackedAt(1, 1), ...lower[3] }),
+  stackRule(1, rawFullStack(1, [3, 4, 5])),
 ]
 
 /** Representative calls of the pull request write tools, which the description tests and the words test share. */
@@ -239,6 +259,56 @@ export const DESCRIBE_CASES = {
     tool: prReview,
     args: { pr: "7", event: "comment", comments: [{ path: "src/a.ts", line: 12, body: "Nit." }] },
     rules: [pullHeadingRule()],
+  },
+  mergeCommit: {
+    name: "merge with a merge commit",
+    tool: prMerge,
+    args: { pr: "7", method: "merge" },
+    rules: mergeRules(),
+  },
+  mergeSquash: {
+    name: "squash with a message, closing issues and the branch deleted",
+    tool: prMerge,
+    args: {
+      pr: "7",
+      method: "squash",
+      subject: "  Add retry (#7)  ",
+      body: "Retries three times.",
+      delete_branch: true,
+      head_sha: headSha(7),
+    },
+    rules: mergeRules(
+      stateRule(
+        linkedIssues(rawClosingIssue(12), rawClosingIssue(3, "other/thing"), {
+          ...rawClosingIssue(5),
+          state: "CLOSED",
+        }),
+      ),
+    ),
+  },
+  mergeRebase: {
+    name: "rebase",
+    tool: prMerge,
+    args: { pr: "7", method: "rebase" },
+    rules: mergeRules(),
+  },
+  mergeOnlyMethod: {
+    name: "merge with the only method the repository allows",
+    tool: prMerge,
+    args: { pr: "7" },
+    rules: mergeRules(methodsRule("squash")),
+  },
+  mergeStack: {
+    name: "merge the top of a stack of three with the layers below",
+    tool: prMerge,
+    args: { pr: "5", method: "squash", with_lower_layers: true },
+    rules: mergeRules(...stackRules()),
+  },
+  mergeMerged: {
+    name: "merge a pull request that is merged already",
+    tool: prMerge,
+    args: { pr: "7", method: "squash" },
+    rules: mergeRules(pullHeadingRule({ state: "MERGED" }), mergeStateRule(7, mergedState(7))),
   },
 } satisfies Record<string, DescribeCase>
 

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { HEAD_SHA, branchRule } from "../../testing/develop-fixtures"
+import { headSha, mergeStateRule, mergedState, methodsRule } from "../../testing/merge-fixtures"
 import { COMMIT_SHA, PULL_HEADING, pullHeadingRule, stateRule } from "../../testing/pull-request-write-fixtures"
 import { milestonesRule } from "../../testing/write-fixtures"
 import { MAX_FACTS, MAX_HEADLINE_LENGTH, MAX_LABEL_LENGTH } from "../describe"
@@ -10,7 +11,9 @@ import {
   REAL_TITLE,
   createRules,
   describeCase,
+  mergeRules,
   reviewRules,
+  stackRules,
   type DescribeCase,
 } from "./describe.fixtures"
 
@@ -399,6 +402,135 @@ describe("github_pr_review", () => {
     ],
   ])("%s: no description", async (_name, args, rules) => {
     expect(await describeCase({ ...approving, args, rules })).toBeUndefined()
+  })
+})
+
+describe("github_pr_merge", () => {
+  const method = (text: string) => ({ label: "Method", value: word(text) })
+
+  test("a merge commit gives its method and pins the head commit, with no text", async () => {
+    expect(await describeCase(DESCRIBE_CASES.mergeCommit)).toEqual({
+      headline: headline("About to merge the pull request {title}"),
+      facts: [method("Merge commit")],
+      pins: { head_sha: headSha(7) },
+    })
+  })
+
+  test("a squash lists the open issues it closes, in any repository, the branch it deletes and the commit message it sets", async () => {
+    expect(await describeCase(DESCRIBE_CASES.mergeSquash)).toEqual({
+      headline: headline("About to merge the pull request {title}"),
+      facts: [
+        method("Squash"),
+        { label: "Closes", value: "octo/hello#12 other/thing#3" },
+        { label: "Branch", value: word("Deleted after merge") },
+      ],
+      text: { label: "Merge commit message", body: "Add retry (#7)\n\nRetries three times." },
+      pins: { head_sha: headSha(7) },
+    })
+  })
+
+  test("a rebase gives its method", async () => {
+    expect((await describeCase(DESCRIBE_CASES.mergeRebase))?.facts).toEqual([method("Rebase")])
+  })
+
+  test("the method is the one the repository allows when none is asked", async () => {
+    expect((await describeCase(DESCRIBE_CASES.mergeOnlyMethod))?.facts).toEqual([method("Squash")])
+  })
+
+  test.each([
+    ["a subject alone", { pr: "7", method: "merge", subject: "Title" }, "Title"],
+    ["a body alone", { pr: "7", method: "squash", body: " Details. " }, "Details."],
+  ])("%s is the commit message", async (_name, args, body) => {
+    const item: DescribeCase = { ...DESCRIBE_CASES.mergeCommit, args }
+    expect((await describeCase(item))?.text).toEqual({ label: "Merge commit message", body })
+  })
+
+  test("a stack names the layers below it that go along and pins each of them", async () => {
+    expect(await describeCase(DESCRIBE_CASES.mergeStack)).toEqual({
+      headline: headline("About to merge the pull request {title}"),
+      facts: [method("Squash"), { label: "Also merges", value: "#3 #4" }],
+      pins: { head_sha: headSha(5), lower_layers: digest(`#3@${headSha(3)}\n#4@${headSha(4)}`) },
+    })
+  })
+
+  test("a lower layer that moved changes the pin of the layers, not the pin of the head", async () => {
+    const moved = "c".repeat(40)
+    const item: DescribeCase = {
+      ...DESCRIBE_CASES.mergeStack,
+      rules: mergeRules(...stackRules({ 4: { headRefOid: moved } })),
+    }
+    expect((await describeCase(item))?.pins).toEqual({
+      head_sha: headSha(5),
+      lower_layers: digest(`#3@${headSha(3)}\n#4@${moved}`),
+    })
+  })
+
+  test("a layer below that is merged already does not go along", async () => {
+    const item: DescribeCase = {
+      ...DESCRIBE_CASES.mergeStack,
+      rules: mergeRules(...stackRules({ 3: mergedState(3) })),
+    }
+    const description = await describeCase(item)
+    expect(description?.facts[1]).toEqual({ label: "Also merges", value: "#4" })
+    expect(description?.pins).toEqual({ head_sha: headSha(5), lower_layers: digest(`#4@${headSha(4)}`) })
+  })
+
+  test("with_lower_layers on a pull request with nothing below it adds no fact and no pin", async () => {
+    const item: DescribeCase = {
+      ...DESCRIBE_CASES.mergeCommit,
+      args: { pr: "7", method: "merge", with_lower_layers: true },
+    }
+    const description = await describeCase(item)
+    expect(description?.facts).toEqual([method("Merge commit")])
+    expect(description?.pins).toEqual({ head_sha: headSha(7) })
+  })
+
+  test("a pull request that is merged already says nothing is sent, and pins nothing", async () => {
+    expect(await describeCase(DESCRIBE_CASES.mergeMerged)).toEqual({
+      headline: headline("About to merge the pull request {title}"),
+      facts: [{ label: "State", value: word("Already merged; nothing is sent") }],
+    })
+  })
+
+  test("a head_sha in the other case still matches", async () => {
+    const item: DescribeCase = {
+      ...DESCRIBE_CASES.mergeCommit,
+      args: { pr: "7", method: "merge", head_sha: headSha(7).toUpperCase() },
+    }
+    expect(await describeCase(item)).toBeDefined()
+  })
+
+  const merging = DESCRIBE_CASES.mergeCommit
+  test.each([
+    ["a closed pull request", { pr: "7", method: "merge" }, mergeRules(mergeStateRule(7, { state: "CLOSED" }))],
+    ["a draft", { pr: "7", method: "merge" }, mergeRules(mergeStateRule(7, { isDraft: true }))],
+    ["conflicts", { pr: "7", method: "merge" }, mergeRules(mergeStateRule(7, { mergeable: "CONFLICTING" }))],
+    ["a dirty merge state", { pr: "7", method: "merge" }, mergeRules(mergeStateRule(7, { mergeStateStatus: "DIRTY" }))],
+    ["a head_sha that is not a full SHA", { pr: "7", method: "merge", head_sha: "abc" }, merging.rules],
+    ["a head_sha the pull request moved from", { pr: "7", method: "merge", head_sha: "f".repeat(40) }, merging.rules],
+    ["a rebase with a subject", { pr: "7", method: "rebase", subject: "Title" }, merging.rules],
+    ["a rebase with a body", { pr: "7", method: "rebase", body: "Details" }, merging.rules],
+    ["a method the repository does not allow", { pr: "7", method: "merge" }, mergeRules(methodsRule("squash"))],
+    ["several methods and none asked", { pr: "7" }, merging.rules],
+    ["no method allowed", { pr: "7", method: "merge" }, mergeRules(methodsRule())],
+    [
+      "the only allowed method being a rebase, with a subject",
+      { pr: "7", subject: "Title" },
+      mergeRules(methodsRule("rebase")),
+    ],
+    ["layers below without with_lower_layers", { pr: "5", method: "squash" }, mergeRules(...stackRules())],
+    [
+      "a lower layer that is a draft",
+      { pr: "5", method: "squash", with_lower_layers: true },
+      mergeRules(...stackRules({ 3: { isDraft: true } })),
+    ],
+    [
+      "a lower layer in conflict",
+      { pr: "5", method: "squash", with_lower_layers: true },
+      mergeRules(...stackRules({ 4: { mergeable: "CONFLICTING" } })),
+    ],
+  ])("%s: no description", async (_name, args, rules) => {
+    expect(await describeCase({ ...merging, args, rules })).toBeUndefined()
   })
 })
 
