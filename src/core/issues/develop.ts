@@ -4,7 +4,7 @@ import { branchHead, defaultBranch } from "../github/branches"
 import { createLinkedBranch, linkedBranchSchema, readLinkedBranches } from "../github/issues"
 import { parseNumberRef, parseRepo, type RepoName } from "../refs"
 import { defineTool, type ToolContext } from "../tool"
-import { ISSUE_DESCRIPTION, ISSUE_TARGETS } from "./write-support"
+import { ISSUE_DESCRIPTION, ISSUE_TARGETS, describedIssue } from "./write-support"
 import { REPO_DESCRIPTION, given, invalid, writableContext } from "../write-support"
 
 /** Characters git refuses anywhere in a ref name: controls, space, and `~ ^ : ? * [ \`. */
@@ -93,6 +93,7 @@ async function startingPoint(
 export const issueDevelop = defineTool({
   id: "github_issue_develop",
   title: "Link a development branch to a GitHub issue",
+  intent: "About to link a development branch to a GitHub issue",
   description: [
     "Create a branch on GitHub linked to an issue (its Development panel), or return the linked branch that exists already. It goes through the API: nothing is fetched or checked out locally.",
     "With branch, a linked branch of that name is reused; without it, the first linked branch in the branch repository. A new branch starts from base (it must exist) or the default branch.",
@@ -101,6 +102,36 @@ export const issueDevelop = defineTool({
   toolset: "issues",
   class: "idempotent",
   targets: { ...ISSUE_TARGETS, branch_repo: "repo" },
+  async describe(args, ctx) {
+    const branch = branchName("branch", args.branch)
+    const base = branchName("base", args.base)
+    const { ref, heading } = await describedIssue(args, ctx)
+    const branchRepo = args.branch_repo === undefined ? ref.repo : parseRepo(args.branch_repo)
+    const headline = {
+      text: "About to link a development branch to the issue {title}",
+      values: { title: heading.title },
+    }
+
+    const { branches: linked } = await readLinkedBranches(ref, ctx)
+    const here = linked.filter((entry) => sameRepo(entry.repo, branchRepo.full))
+    const existing = branch === undefined ? here[0] : here.find((entry) => entry.name === branch)
+    if (existing) {
+      return {
+        headline,
+        facts: [{ label: "Branch", value: { text: "{name} (already linked)", values: { name: existing.name } } }],
+      }
+    }
+
+    const from = await startingPoint(base, branchRepo, ctx)
+    return {
+      headline,
+      facts: [
+        { label: "Branch", value: branch ?? { text: "Named by GitHub" } },
+        { label: "Base", value: from.name },
+      ],
+      pins: { base_head: from.oid },
+    }
+  },
   input,
   output,
   async execute(args, ctx) {

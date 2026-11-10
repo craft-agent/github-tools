@@ -4,8 +4,9 @@ import { ghIssueRef, issueLabel, resolveRelatedIssue, type IssueRef } from "../g
 import { MAX_DEPENDENCIES, MAX_SUB_ISSUES, issueBriefSchema, readIssue, type IssueBrief } from "../github/issues"
 import { assertWritable, repositoryContext, type RepositoryContext } from "../github/repository"
 import { parseNumberRef, type RepoName } from "../refs"
-import { defineTool, type ToolContext } from "../tool"
-import { ISSUE_DESCRIPTION, ISSUE_TARGETS, editIssue } from "./write-support"
+import { defineTool, type CallFact, type ToolContext } from "../tool"
+import { changeFact } from "../write-facts"
+import { ISSUE_DESCRIPTION, ISSUE_TARGETS, describedIssue, editIssue } from "./write-support"
 import { REPO_DESCRIPTION, given, invalid, writableContext } from "../write-support"
 
 const REFERENCE_FORMS = "12, #12, owner/repo#12 or its URL; a bare number means the issue's repository."
@@ -58,6 +59,13 @@ const LISTS = [
 ] as const
 
 type ListName = (typeof LISTS)[number]["name"]
+
+/** The fact label of each list relation. */
+const RELATION_LABELS: Record<ListName, string> = {
+  sub_issues: "Sub-issues",
+  blocked_by: "Blocked by",
+  blocking: "Blocking",
+}
 
 const input = z.object({
   issue: z.string().describe(ISSUE_DESCRIPTION),
@@ -205,6 +213,7 @@ function partialFailure(error: unknown, applied: readonly string[]): unknown {
 export const issueRelate = defineTool({
   id: "github_issue_relate",
   title: "Relate GitHub issues",
+  intent: "About to change how GitHub issues are related",
   description: [
     "Set an issue's parent (parent or remove_parent), sub-issues, blocked-by and blocking issues (add_ and remove_ lists) in one call.",
     "It reads the current relations first and sends only the difference, so a rerun is safe; what already holds is listed as unchanged.",
@@ -222,6 +231,23 @@ export const issueRelate = defineTool({
     remove_blocked_by: "issues",
     add_blocking: "issues",
     remove_blocking: "issues",
+  },
+  async describe(args, ctx) {
+    const { ref, heading } = await describedIssue(args, ctx)
+    const request = await parseRequest(args, ref, ctx)
+    const facts: CallFact[] = []
+    if (request.parent) facts.push({ label: "Parent", value: issueLabel(request.parent) })
+    if (request.removeParent) facts.push({ label: "Parent", value: { text: "Removed" } })
+    for (const list of LISTS) {
+      const wanted = request.lists[list.name]
+      const fact = changeFact(RELATION_LABELS[list.name], wanted.add.map(issueLabel), wanted.remove.map(issueLabel))
+      if (fact) facts.push(fact)
+    }
+
+    return {
+      headline: { text: "About to change the relations of the issue {title}", values: { title: heading.title } },
+      facts,
+    }
   },
   input,
   output,

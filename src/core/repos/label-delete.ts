@@ -3,15 +3,22 @@ import { deleteLabel, findLabel, labelNameInput, labelsForWrite } from "../githu
 import { REPO_DESCRIPTION, writableContext } from "../write-support"
 import { resolveRepo } from "../refs"
 import { confirmWrite, defineTool } from "../tool"
+import { describedWritableRepo } from "./describe-support"
 
 export const labelDelete = defineTool({
   id: "github_label_delete",
   title: "Delete a GitHub label",
+  intent: "About to delete a GitHub label",
   description:
     "Delete a repository label, matched without regard to case, removing it from every issue and pull request it is on. Refuses an unknown label before writing.",
   toolset: "repos",
   class: "administrative",
   targets: { repo: "repo" },
+  async describe(args, ctx) {
+    const repo = await describedWritableRepo(args, ctx)
+    const label = findLabel(await labelsForWrite(repo, ctx), args.name)
+    return { headline: { text: "About to delete the label {name}", values: { name: label.name } }, facts: [] }
+  },
   input: z.object({ repo: z.string().optional().describe(REPO_DESCRIPTION), name: labelNameInput }),
   output: z.object({ repo: z.string(), deleted: z.string(), foreign: z.boolean() }),
   async execute(args, ctx) {

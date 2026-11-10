@@ -1,3 +1,4 @@
+import { basename } from "node:path"
 import { z } from "zod"
 import {
   ATTACHMENTS_NOTE,
@@ -15,12 +16,15 @@ import { closingIssueSchema, readPullRequestState, type PullRequestState } from 
 import { REPO_DESCRIPTION, appended, given, invalid, lastUrl, nameList, writableContext } from "../write-support"
 import { stepErrorsSchema } from "../projects/item-support"
 import { parseNumberRef } from "../refs"
-import { StepErrors, defineTool } from "../tool"
+import { StepErrors, defineTool, type CallFact, type CallText } from "../tool"
+import { changeFact, digest } from "../write-facts"
+import { milestoneFact } from "../issues/write-support"
 import { CLOSES_DESCRIPTION, splitClosingBlock, withClosing } from "./closes"
 import {
   PR_DESCRIPTION,
   PR_TARGETS,
   closingNotes,
+  describedPull,
   editPullRequest,
   resolveClosing,
   settleUpload,
@@ -177,6 +181,7 @@ function changedArguments(change: Change): string[] {
 export const prEdit = defineTool({
   id: "github_pr_edit",
   title: "Edit a GitHub pull request",
+  intent: "About to edit a GitHub pull request",
   description: [
     "Change a pull request in one call: title, body (body replaces it, append_body adds after a blank line), base branch (not for a merged pull request), labels, assignees and reviewers to add or remove (added assignees and reviewers are notified), milestone or remove_milestone, and the issues it closes (add_closes adds a `Closes #12` line to the body, remove_closes removes such lines).",
     "A milestone that does not exist is an error. Needs write permission on the repository.",
@@ -188,6 +193,59 @@ export const prEdit = defineTool({
   toolset: "pull_requests",
   class: "overwrite",
   targets: PR_TARGETS,
+  async describe(args, ctx) {
+    const { ref, heading } = await describedPull(args, ctx)
+    const change = parseChange(args, {
+      add: await resolveClosing(args.add_closes, ref.repo, ctx),
+      remove: await resolveClosing(args.remove_closes, ref.repo, ctx),
+    })
+    if (change.base !== undefined) {
+      if (heading.state === MERGED) {
+        throw invalid(`${ref.repo.full}#${ref.number} is merged; the base of a merged pull request cannot be changed.`)
+      }
+      if (change.base === heading.head) {
+        throw invalid(`base ${change.base} is the head branch of ${ref.repo.full}#${ref.number}; pass another branch.`)
+      }
+      if ((await branchHead(ref.repo, change.base, ctx)) === null) {
+        throw invalid(`base branch "${change.base}" is not on ${ref.repo.full}.`)
+      }
+    }
+
+    const facts: CallFact[] = []
+    const add = (fact: CallFact | undefined): void => {
+      if (fact) facts.push(fact)
+    }
+    let text: CallText | undefined
+    let pins: Record<string, string> | undefined
+    if (change.base !== undefined) add({ label: "Base", value: change.base })
+    if (change.title) add({ label: "Title", value: change.title })
+    if (change.body !== undefined) {
+      const cleared = change.body === ""
+      add({ label: "Body", value: { text: cleared ? "Cleared" : "Replaced" } })
+      if (!cleared) text = { label: "New body", body: change.body }
+      pins = { body: digest((await readPullRequestState(ref, ctx)).body) }
+    }
+    if (change.appendBody !== undefined) {
+      add({ label: "Body", value: { text: "Appended" } })
+      text = { label: "Appended text", body: change.appendBody }
+    }
+    add(changeFact("Closes", change.addCloses.map(labelOf), change.removeCloses.map(labelOf)))
+    add(changeFact("Reviewers", change.addReviewers, change.removeReviewers))
+    add(changeFact("Labels", change.addLabels, change.removeLabels))
+    add(changeFact("Assignees", change.addAssignees, change.removeAssignees))
+    if (change.milestone) add(await milestoneFact(ref.repo, change.milestone, false, ctx))
+    if (change.removeMilestone) add({ label: "Milestone", value: { text: "Removed" } })
+    if (change.attachments) {
+      add({ label: "Attachments", value: (args.attachments ?? []).map((file) => basename(file.path)).join(", ") })
+    }
+
+    return {
+      headline: { text: "About to edit the pull request {title}", values: { title: heading.title } },
+      facts,
+      ...(text ? { text } : {}),
+      ...(pins ? { pins } : {}),
+    }
+  },
   input,
   output,
   async execute(args, ctx) {

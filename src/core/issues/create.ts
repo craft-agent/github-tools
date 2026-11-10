@@ -29,8 +29,9 @@ import {
 } from "../projects/item-support"
 import { BOARD_LOOKUP_NOTE, PROJECT_SCOPE_NOTE, boardSummary, boardSummarySchema } from "../projects/support"
 import { resolveRepo, type RepoName } from "../refs"
-import { StepErrors, defineTool, type ToolContext } from "../tool"
-import { editIssue, setKind } from "./write-support"
+import { StepErrors, defineTool, type CallFact, type ToolContext } from "../tool"
+import { changeFact } from "../write-facts"
+import { editIssue, milestoneFact, setKind } from "./write-support"
 import { given, invalid, lastUrl, nameList, writableContext } from "../write-support"
 
 const ISSUE_URL = /\/issues\/(\d+)$/
@@ -129,6 +130,7 @@ async function addBlockers(
 export const issueCreate = defineTool({
   id: "github_issue_create",
   title: "Create a GitHub issue",
+  intent: "About to create a GitHub issue",
   description: [
     "Create an issue in a repository the viewer may write to, and settle its place in the same call: kind (an Issue Type, else a type:<kind> label that is created when missing), labels, assignees (they are notified), milestone, parent and blocked-by issues, organization issue fields, and a project board with field values (the Status starts as Todo, or Waiting when an open issue blocks it).",
     "Everything that can fail is checked before the issue is made: the milestone exists (unless create_milestone is true), the issue fields, their options and values exist (a repository without issue fields refuses them), and the board accepts the values.",
@@ -140,6 +142,46 @@ export const issueCreate = defineTool({
   toolset: "issues",
   class: "add",
   targets: { repo: "repo", parent: "issue", blocked_by: "issues", project: "optional_board" },
+  async describe(args, ctx) {
+    const title = given(args.title)
+    if (!title) throw invalid("title cannot be blank.")
+    const requested = await resolveRepo(args.repo, ctx)
+    const facts: CallFact[] = []
+    const add = (fact: CallFact | undefined): void => {
+      if (fact) facts.push(fact)
+    }
+
+    add(changeFact("Labels", nameList("labels", args.labels)))
+    add(changeFact("Assignees", nameList("assignees", args.assignees)))
+    const [kind] = nameList("kind", args.kind === undefined ? [] : [args.kind])
+    if (kind) add({ label: "Kind", value: kind })
+    const milestone = given(args.milestone)
+    if (milestone) add(await milestoneFact(requested, milestone, Boolean(args.create_milestone), ctx))
+    const parent = given(args.parent)
+    if (parent) add({ label: "Parent", value: issueLabel(await resolveRelatedIssue(parent, requested, ctx)) })
+    const blockers = new Set<string>()
+    for (const ref of args.blocked_by ?? []) {
+      const blocker = given(ref)
+      if (blocker) blockers.add(issueLabel(await resolveRelatedIssue(blocker, requested, ctx)))
+    }
+    add(changeFact("Blocked by", [...blockers]))
+    add(
+      changeFact(
+        "Issue fields",
+        Object.keys(args.issue_fields ?? {}).map((name) => name.trim()),
+      ),
+    )
+    if (args.project !== undefined) {
+      const { project } = await resolveBoard({ project: args.project, repo: args.repo }, ctx)
+      add({ label: "Board", value: project.title })
+    }
+
+    return {
+      headline: { text: "About to create the issue {title}", values: { title } },
+      facts,
+      ...(args.body ? { text: { label: "Issue body", body: args.body } } : {}),
+    }
+  },
   input,
   output,
   async execute(args, ctx) {

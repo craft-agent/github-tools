@@ -8,9 +8,11 @@ import {
   type Stack,
   type StackPull,
 } from "../github/stacks"
+import { readPullRequestHeading } from "../github/pull-requests"
 import { REPO_DESCRIPTION, invalid, writableContext } from "../write-support"
 import { resolveRepo, type RepoName } from "../refs"
 import { defineTool, type ToolContext } from "../tool"
+import { layersFact } from "./write-support"
 
 const MIN_NEW_STACK = 2
 const MAX_PULL_REQUESTS = 100
@@ -105,9 +107,28 @@ async function readPulls(repo: RepoName, numbers: readonly number[], ctx: ToolCo
   })
 }
 
+const headlineOn = (base: string) => ({
+  text: "About to link the pull requests into a stack on {base}",
+  values: { base },
+})
+
+/** The layers with their real titles read from GitHub, in the order given. */
+async function titledLayers(
+  repo: RepoName,
+  numbers: readonly number[],
+  ctx: ToolContext,
+): Promise<{ number: number; title: string }[]> {
+  const layers: { number: number; title: string }[] = []
+  for (const number of numbers) {
+    layers.push({ number, title: (await readPullRequestHeading({ repo, number }, ctx)).title })
+  }
+  return layers
+}
+
 export const stackLink = defineTool({
   id: "github_stack_link",
   title: "Link GitHub pull requests into a stack",
+  intent: "About to link GitHub pull requests into a stack",
   description: [
     "Make a native stack of open pull requests of one repository, listed bottom to top, or put more of them on top of an existing stack. Each pull request's base branch must be the head branch of the one below it.",
     "It never changes a base or opens a pull request: github_pr_create and github_pr_edit do that, and a chain whose bases do not match is refused with the base to fix.",
@@ -117,6 +138,46 @@ export const stackLink = defineTool({
   toolset: "pull_requests",
   class: "idempotent",
   targets: { repo: "repo" },
+  async describe(args, ctx) {
+    const numbers = args.prs
+    const repeated = numbers.find((number, index) => numbers.indexOf(number) !== index)
+    if (repeated !== undefined) throw invalid(`#${repeated} is listed twice; list each pull request once.`)
+
+    const repo = await resolveRepo(args.repo, ctx)
+    const pulls = await readPulls(repo, numbers, ctx)
+    refuseUnstackable(pulls, repo)
+    refuseBrokenChain(pulls)
+
+    const stackNumber = stackAmong(pulls)
+    if (stackNumber === null) {
+      if (numbers.length < MIN_NEW_STACK) {
+        throw invalid(
+          `A stack needs at least ${MIN_NEW_STACK} pull requests; list the ones to join with #${numbers[0]}.`,
+        )
+      }
+      return {
+        headline: headlineOn(pulls[0]!.base),
+        facts: [layersFact(await titledLayers(repo, numbers, ctx)), { label: "Stack", value: { text: "New stack" } }],
+      }
+    }
+
+    const existing = await readStack(repo, stackNumber, ctx)
+    const added = newOnTop(pulls, existing)
+    const headline = headlineOn(existing.base)
+    if (added.length === 0) {
+      return { headline, facts: [{ label: "State", value: { text: "Already linked; nothing is sent" } }] }
+    }
+    return {
+      headline,
+      facts: [
+        layersFact([...existing.layers, ...(await titledLayers(repo, added, ctx))]),
+        {
+          label: "Stack",
+          value: { text: "Extends a stack of {count}", values: { count: existing.size } },
+        },
+      ],
+    }
+  },
   input,
   output,
   async execute(args, ctx) {

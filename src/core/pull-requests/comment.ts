@@ -1,3 +1,4 @@
+import { basename } from "node:path"
 import { z } from "zod"
 import {
   ATTACHMENTS_NOTE,
@@ -11,7 +12,10 @@ import { REPO_DESCRIPTION, given, invalid, lastUrl, writableContext } from "../w
 import { stepErrorsSchema } from "../projects/item-support"
 import { parseNumberRef } from "../refs"
 import { StepErrors, defineTool } from "../tool"
-import { PR_DESCRIPTION, PR_TARGETS, settleUpload } from "./write-support"
+import { stateFact } from "../write-facts"
+import { PR_DESCRIPTION, PR_TARGETS, describedPull, settleUpload } from "./write-support"
+
+const OPEN = "open"
 
 const input = z.object({
   pr: z.string().describe(PR_DESCRIPTION),
@@ -33,6 +37,7 @@ const output = z.object({
 export const prComment = defineTool({
   id: "github_pr_comment",
   title: "Comment on a GitHub pull request",
+  intent: "About to comment on a GitHub pull request",
   description: [
     "Post a comment on a pull request; the people following it are notified and the comment stays on the pull request.",
     "Needs write permission on the repository.",
@@ -42,6 +47,19 @@ export const prComment = defineTool({
   toolset: "pull_requests",
   class: "add",
   targets: PR_TARGETS,
+  async describe(args, ctx) {
+    if (!given(args.body)) throw invalid("body cannot be blank.")
+    const { heading } = await describedPull(args, ctx)
+    const attachments = (args.attachments ?? []).map((file) => basename(file.path))
+    return {
+      headline: { text: "About to comment on the pull request {title}", values: { title: heading.title } },
+      facts: [
+        ...(heading.state === OPEN ? [] : [stateFact(heading.state)]),
+        ...(attachments.length > 0 ? [{ label: "Attachments", value: attachments.join(", ") }] : []),
+      ],
+      text: { label: "Comment", body: args.body },
+    }
+  },
   input,
   output,
   async execute(args, ctx) {

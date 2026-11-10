@@ -4,11 +4,12 @@ import { ghJson } from "../gh"
 import { viewerLogin } from "../github/projects"
 import { readPullRequestState } from "../github/pull-requests"
 import { REPO_DESCRIPTION, given, invalid, writableContext } from "../write-support"
-import { parseNumberRef, SHA_PATTERN } from "../refs"
-import { defineTool } from "../tool"
-import { PR_DESCRIPTION, PR_TARGETS } from "./write-support"
+import { parseNumberRef, SHA_PATTERN, shortSha } from "../refs"
+import { defineTool, type CallFact } from "../tool"
+import { PR_DESCRIPTION, PR_TARGETS, describedPull } from "./write-support"
 
 const OPEN = "open"
+const BLOCK_SEPARATOR = "\n\n"
 const NOT_IN_DIFF =
   /could not be resolved|must be part of the diff|pull_request_review_thread\.line|is outside the diff/i
 
@@ -76,9 +77,61 @@ const EVENT_PAYLOAD_MAP = {
   comment: "COMMENT",
 } as const
 
+/** What the headline says the call is about to do, by the review's event. */
+const HEADLINES: Readonly<Record<ReviewEvent, string>> = {
+  approve: "About to approve the pull request {title}",
+  request_changes: "About to request changes on the pull request {title}",
+  comment: "About to review the pull request {title} with comments",
+}
+
+type ReviewArgs = z.output<typeof input>
+type LineComment = z.output<typeof lineCommentSchema>
+
+/** The review's arguments as `execute` checks them, before any call to GitHub; refuses what it refuses. */
+function checkedReview(args: ReviewArgs): { body: string | undefined; comments: LineComment[]; expectedSha?: string } {
+  const body = given(args.body)
+  if (args.event === "request_changes" && !body) {
+    throw invalid("request_changes requires a body explaining the requested changes.")
+  }
+
+  const comments = args.comments ?? []
+  if (args.event === "comment" && !body && comments.length === 0) {
+    throw invalid("A comment review needs a body or at least one line comment.")
+  }
+
+  for (const comment of comments) {
+    if (!given(comment.path)) throw invalid("Line comment path cannot be blank.")
+    if (!given(comment.body)) throw invalid("Line comment body cannot be blank.")
+    if (comment.start_line !== undefined && comment.start_line >= comment.line) {
+      throw invalid(`start_line (${comment.start_line}) must be less than line (${comment.line}).`)
+    }
+  }
+
+  const expectedSha = given(args.head_sha)
+  if (args.head_sha !== undefined && (!expectedSha || !SHA_PATTERN.test(expectedSha))) {
+    throw invalid("head_sha must be a full commit SHA of 40 hexadecimal characters.")
+  }
+  return { body, comments, expectedSha }
+}
+
+/** Where a line comment goes, as `path:line`, `path:start-line` for a range, and `(left)` for the old version. */
+function placeOf(comment: LineComment): string {
+  const lines = comment.start_line === undefined ? `${comment.line}` : `${comment.start_line}-${comment.line}`
+  return `${comment.path}:${lines}${comment.side === "left" ? " (left)" : ""}`
+}
+
+/** The `Line comments` fact, with the count in the singular or the plural. */
+function lineCommentsFact(count: number): CallFact {
+  return {
+    label: "Line comments",
+    value: { text: count === 1 ? "{count} comment" : "{count} comments", values: { count } },
+  }
+}
+
 export const prReview = defineTool({
   id: "github_pr_review",
   title: "Review a GitHub pull request",
+  intent: "About to review a GitHub pull request",
   description: [
     "Post a review on a pull request: approve to approve changes, request_changes to request revisions (body required), or comment for general feedback.",
     "Only an open pull request can be approved or have changes requested, and GitHub does not let an author approve their own pull request or request changes on it.",
@@ -89,6 +142,42 @@ export const prReview = defineTool({
   toolset: "pull_requests",
   class: "add",
   targets: PR_TARGETS,
+  async describe(args, ctx) {
+    const { body, comments, expectedSha } = checkedReview(args)
+    const { ref, heading } = await describedPull(args, ctx)
+    const label = `${ref.repo.full}#${ref.number}`
+
+    if (expectedSha && heading.head_sha.toLowerCase() !== expectedSha.toLowerCase()) {
+      throw new ToolError(
+        "stale",
+        `${label} is at ${shortSha(heading.head_sha)}, not ${shortSha(expectedSha)}: new commits arrived since it was read. Nothing was posted.`,
+      )
+    }
+    if (args.event === "approve" || args.event === "request_changes") {
+      if (heading.state !== OPEN) {
+        throw invalid(
+          `${label} is ${heading.state}; only an open pull request can be approved or have changes requested.`,
+        )
+      }
+      const author = (await readPullRequestState(ref, ctx)).author
+      const viewer = await viewerLogin(ctx)
+      if (author && viewer.toLowerCase() === author.toLowerCase()) {
+        throw invalid(
+          `GitHub does not let the author of ${label} approve it or request changes on it; post event comment instead.`,
+        )
+      }
+    }
+
+    const facts: CallFact[] = [{ label: "Commit", value: shortSha(heading.head_sha) }]
+    if (comments.length > 0) facts.push(lineCommentsFact(comments.length))
+    const blocks = [...(body ? [body] : []), ...comments.map((comment) => `${placeOf(comment)}\n${comment.body}`)]
+    return {
+      headline: { text: HEADLINES[args.event], values: { title: heading.title } },
+      facts,
+      ...(blocks.length > 0 ? { text: { label: "Review", body: blocks.join(BLOCK_SEPARATOR) } } : {}),
+      pins: { head_sha: heading.head_sha },
+    }
+  },
   input,
   output,
   async execute(args, ctx) {

@@ -5,6 +5,7 @@ import { addDraftToBoard } from "../github/board-item-write"
 import { assertBoardWritable, given, resolveBoard } from "../github/projects"
 import { invalid } from "../write-support"
 import { StepErrors, defineTool } from "../tool"
+import { fieldsFact } from "./describe-support"
 import {
   FIELDS_NOTE,
   applyFieldWrites,
@@ -33,6 +34,7 @@ const output = z.object({
 export const projectItemCreate = defineTool({
   id: "github_project_item_create",
   title: "Create a draft item on a GitHub project",
+  intent: "About to create a draft item on a GitHub project",
   description: [
     "Create a draft item (a title and a body that live only on the board, with no repository, labels or milestone) on a project board the viewer may update, and set field values in the same call. github_project_item_convert turns a draft into an issue.",
     "With no Status given the draft starts as Todo when the board has a Status single select with that option.",
@@ -44,6 +46,23 @@ export const projectItemCreate = defineTool({
   toolset: "projects",
   class: "add",
   targets: { project: "board" },
+  async describe(args, ctx) {
+    const title = given(args.title)
+    if (!title) throw invalid("title cannot be blank.")
+    const { project } = await resolveBoard(args, ctx)
+    assertBoardWritable(project)
+    const fields = await readBoardFields(project.id, ctx)
+    const writes = planFieldValues(fields, args.fields ?? {})
+    const status = statusToDefault(fields, args.fields ?? {})
+    if (status) writes.push(...defaultStatusWrite(fields, status, false))
+
+    const fieldsText = fieldsFact(writes)
+    return {
+      headline: { text: "About to create the draft {title}", values: { title } },
+      facts: [{ label: "Board", value: project.title }, ...(fieldsText ? [fieldsText] : [])],
+      ...(args.body ? { text: { label: "Draft body", body: args.body } } : {}),
+    }
+  },
   input,
   output,
   async execute(args, ctx) {

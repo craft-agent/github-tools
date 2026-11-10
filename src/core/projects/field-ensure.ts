@@ -6,15 +6,35 @@ import {
   fieldRequest,
   issueFieldColumnRequest,
   readOwnerIssueFields,
+  requireIssueField,
   FIELD_TYPES,
+  STATUS_FIELD,
   type FieldOutcome,
+  type FieldType,
 } from "../github/board-field-setup"
 import { boardFieldSchema, readBoardFields, type BoardField } from "../github/board-fields"
-import { OPTION_COLORS } from "../github/board-options"
-import { assertBoardWritable, resolveBoard, type Board } from "../github/projects"
+import { OPTION_COLORS, appendOptions } from "../github/board-options"
+import { assertBoardWritable, resolveBoard, sameTitle, type Board } from "../github/projects"
 import type { RefContext } from "../refs"
-import { defineTool } from "../tool"
+import { defineTool, type CallDescription, type CallFact } from "../tool"
+import { changeFact } from "../write-facts"
+import { ALREADY_THERE } from "./describe-support"
 import { BOARD_LOOKUP_NOTE, BOARD_SELECTION, PROJECT_SCOPE_NOTE, boardSummary, boardSummarySchema } from "./support"
+
+/** The `Type` fact's words for the field types, and for a column that mirrors an organization's issue field. */
+const TYPE_WORDS: Readonly<Record<FieldType, string>> = {
+  text: "Text",
+  number: "Number",
+  date: "Date",
+  single_select: "Single select",
+}
+const ISSUE_FIELD_TYPE = "Issue field"
+
+/** The `Options` fact listing the options a call adds, none when it adds none. */
+const optionsFact = (added: readonly string[]): CallFact[] => {
+  const fact = changeFact("Options", added)
+  return fact ? [fact] : []
+}
 
 const input = z.object({
   ...BOARD_SELECTION,
@@ -69,6 +89,7 @@ function planEnsure(
 export const projectFieldEnsure = defineTool({
   id: "github_project_field_ensure",
   title: "Ensure a GitHub project field",
+  intent: "About to ensure a GitHub project field exists",
   description: [
     "Make sure a field exists on a project board the viewer may update, without ever making a second one: a missing field is created, and the missing options of an existing single select are appended after its own, which keep their id, name, color, description and order, so nothing already set moves.",
     "A new single_select field needs options. Status can be extended but not created. A field of that name with another type, options on a field that is not single_select, a repeated option name and a color GitHub does not list are invalid_argument, before anything is written.",
@@ -79,6 +100,69 @@ export const projectFieldEnsure = defineTool({
   toolset: "projects",
   class: "idempotent",
   targets: { project: "board" },
+  async describe(args, ctx) {
+    planEnsure(args)
+    const name = args.name.trim()
+    const { project } = await resolveBoard(args, ctx)
+    assertBoardWritable(project)
+    const fields = await readBoardFields(project.id, ctx)
+    const headline = { text: "About to make sure the field {name} is on the project board", values: { name } }
+    const nothingSent: CallDescription = { headline, facts: [{ label: "State", value: { text: ALREADY_THERE } }] }
+    const board: CallFact = { label: "Board", value: project.title }
+
+    if (args.issue_field) {
+      const definition = requireIssueField(
+        project,
+        await readOwnerIssueFields(project, ctx),
+        issueFieldColumnRequest(args.name, args.type),
+      )
+      const existing = fields.find((field) => sameTitle(field.name, definition.name))
+      if (existing?.issue_field) return nothingSent
+      if (existing) {
+        throw new ToolError(
+          "invalid_argument",
+          `The board has its own field "${existing.name}"; an issue field column cannot take the same name. Rename or delete the board's field in the web UI, or use the board's field.`,
+        )
+      }
+      return { headline, facts: [board, { label: "Type", value: { text: ISSUE_FIELD_TYPE } }] }
+    }
+
+    if (!args.type) throw new ToolError("invalid_argument", "type is required unless issue_field is true.")
+    const request = fieldRequest(args.name, args.type, args.options)
+    const existing = fields.find((field) => sameTitle(field.name, request.name))
+    if (!existing) {
+      if (sameTitle(request.name, STATUS_FIELD)) {
+        throw new ToolError(
+          "invalid_argument",
+          `${STATUS_FIELD} cannot be created, only extended; this board has no such field.`,
+        )
+      }
+      if (request.type === "single_select" && request.options.length === 0) {
+        throw new ToolError(
+          "invalid_argument",
+          `A new single_select field needs options; "${request.name}" is not on the board.`,
+        )
+      }
+      const type: CallFact = { label: "Type", value: { text: TYPE_WORDS[request.type] } }
+      return { headline, facts: [board, type, ...optionsFact(request.options.map((option) => option.name))] }
+    }
+    if (existing.type !== request.type) {
+      throw new ToolError(
+        "invalid_argument",
+        `Field "${existing.name}" is ${existing.type}, not ${request.type}; use another name or type.`,
+      )
+    }
+    if (request.type !== "single_select" || request.options.length === 0) return nothingSent
+    const merge = appendOptions(existing.options ?? [], request.options)
+    if (!merge.changed) return nothingSent
+    if (existing.issue_field) {
+      throw new ToolError(
+        "invalid_argument",
+        `"${existing.name}" mirrors the organization's issue field; its options are the organization's and cannot be changed on a board.`,
+      )
+    }
+    return { headline, facts: [board, ...optionsFact(merge.added)] }
+  },
   input,
   output,
   async execute(args, ctx) {

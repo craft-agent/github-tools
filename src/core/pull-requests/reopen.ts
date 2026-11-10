@@ -4,7 +4,7 @@ import { readPullRequestState } from "../github/pull-requests"
 import { REPO_DESCRIPTION, given, invalid, writableContext } from "../write-support"
 import { parseNumberRef } from "../refs"
 import { defineTool } from "../tool"
-import { PR_DESCRIPTION, PR_TARGETS } from "./write-support"
+import { PR_DESCRIPTION, PR_TARGETS, describedPull } from "./write-support"
 
 const OPEN = "open"
 const MERGED = "merged"
@@ -27,6 +27,7 @@ const output = z.object({
 export const prReopen = defineTool({
   id: "github_pr_reopen",
   title: "Reopen a GitHub pull request",
+  intent: "About to reopen a GitHub pull request",
   description: [
     "Reopen a closed pull request; the comment, if any, is posted as it reopens, and the people following the pull request are notified. A merged pull request cannot be reopened.",
     "A pull request that is open already is left as it is: nothing is sent, the comment is not posted and changed is false.",
@@ -35,6 +36,23 @@ export const prReopen = defineTool({
   toolset: "pull_requests",
   class: "overwrite",
   targets: PR_TARGETS,
+  async describe(args, ctx) {
+    const { ref, heading } = await describedPull(args, ctx)
+    if (heading.state === MERGED) {
+      throw invalid(`${ref.repo.full}#${ref.number} is merged; a merged pull request cannot be reopened.`)
+    }
+    const headline = { text: "About to reopen the pull request {title}", values: { title: heading.title } }
+    if (heading.state === OPEN) {
+      return { headline, facts: [{ label: "State", value: { text: "Already open; nothing is sent" } }] }
+    }
+
+    const comment = given(args.comment)
+    return {
+      headline,
+      facts: [],
+      ...(comment ? { text: { label: "Comment", body: comment } } : {}),
+    }
+  },
   input,
   output,
   async execute(args, ctx) {

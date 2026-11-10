@@ -2,10 +2,13 @@ import { z } from "zod"
 import { planFieldValues } from "../github/board-field-values"
 import { readBoardFields } from "../github/board-fields"
 import { addContentToBoard, itemContentRefSchema, readBoardContent } from "../github/board-item-write"
-import { readBlockedBy } from "../github/issues"
+import { isAbortError } from "../errors"
+import { readBlockedBy, readIssueHeading } from "../github/issues"
 import { assertBoardWritable, resolveBoard } from "../github/projects"
-import { parseNumberRef } from "../refs"
-import { StepErrors, defineTool } from "../tool"
+import { readPullRequestHeading } from "../github/pull-requests"
+import { parseNumberRef, type RepoName } from "../refs"
+import { StepErrors, defineTool, type ToolContext } from "../tool"
+import { fieldsFact } from "./describe-support"
 import {
   FIELDS_NOTE,
   ITEM_BOARD_SELECTION,
@@ -18,6 +21,9 @@ import {
   stepErrorsSchema,
 } from "./item-support"
 import { BOARD_LOOKUP_NOTE, PROJECT_SCOPE_NOTE, boardSummary, boardSummarySchema } from "./support"
+
+/** How the `State` fact words an item that is on the board already and gets no field values. */
+const ALREADY_ON_BOARD = "Already on the board; nothing is sent"
 
 const input = z.object({
   ...ITEM_BOARD_SELECTION,
@@ -39,9 +45,20 @@ const output = z.object({
   errors: stepErrorsSchema,
 })
 
+/** Whether an open issue blocks the issue; blockers that cannot be read count as none, as `execute` takes them. */
+async function isBlocked(ref: { repo: RepoName; number: number }, ctx: ToolContext): Promise<boolean> {
+  try {
+    return (await readBlockedBy(ref, ctx)).some((blocker) => blocker.state === "open")
+  } catch (error) {
+    if (isAbortError(error) || ctx.signal?.aborted) throw error
+    return false
+  }
+}
+
 export const projectItemAdd = defineTool({
   id: "github_project_item_add",
   title: "Add an issue or pull request to a GitHub project",
+  intent: "About to add an issue or pull request to a GitHub project",
   description: [
     "Put an issue or pull request on a project board the viewer may update, and set field values in the same call. Adding is idempotent: one that is already on the board (archived or not) is returned as it is (created: false) and only the given fields are set.",
     "A new item with no Status given starts as Waiting when it is an issue with an open blocking issue and the board has a Waiting option, else as Todo when the board has that option; a board without a Status single select gets no default.",
@@ -53,6 +70,32 @@ export const projectItemAdd = defineTool({
   toolset: "projects",
   class: "idempotent",
   targets: { project: "board" },
+  async describe(args, ctx) {
+    const ref = await parseNumberRef(args.item, args.repo, ctx)
+    const { project } = await resolveBoard(args, ctx)
+    assertBoardWritable(project)
+    const fields = await readBoardFields(project.id, ctx)
+    const writes = planFieldValues(fields, args.fields ?? {})
+
+    const { items, type } = await readBoardContent(ref, ctx)
+    const existing = items.some((item) => item.board_id === project.id)
+    const { title } = type === "issue" ? await readIssueHeading(ref, ctx) : await readPullRequestHeading(ref, ctx)
+    const headline = { text: "About to add {title} to the project board", values: { title } }
+    if (existing && writes.length === 0) {
+      return { headline, facts: [{ label: "State", value: { text: ALREADY_ON_BOARD } }] }
+    }
+    if (!existing) {
+      const status = statusToDefault(fields, args.fields ?? {})
+      const waiting = status && type === "issue" && hasWaitingOption(status) ? await isBlocked(ref, ctx) : false
+      if (status) writes.push(...defaultStatusWrite(fields, status, waiting))
+    }
+
+    const fieldsText = fieldsFact(writes)
+    return {
+      headline,
+      facts: [{ label: "Board", value: project.title }, ...(fieldsText ? [fieldsText] : [])],
+    }
+  },
   input,
   output,
   async execute(args, ctx) {

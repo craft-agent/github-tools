@@ -3,10 +3,12 @@ import { convertDraftToIssue } from "../github/board-item-write"
 import { kindPlacementSchema, resolveKind } from "../github/kind"
 import { milestoneSchema, resolveMilestone } from "../github/milestones"
 import { assertBoardWritable, given } from "../github/projects"
-import { editIssue, setKind } from "../issues/write-support"
+import { editIssue, milestoneFact, setKind } from "../issues/write-support"
 import { invalid, nameList, writableContext } from "../write-support"
 import { resolveRepo } from "../refs"
-import { StepErrors, defineTool } from "../tool"
+import { StepErrors, defineTool, type CallFact } from "../tool"
+import { changeFact } from "../write-facts"
+import { describedItem } from "./describe-support"
 import { resolveBoardItem } from "./item-resolve"
 import { ITEM_NOTE, contentNoun, itemArgument, stepErrorsSchema } from "./item-support"
 import { BOARD_LOOKUP_NOTE, BOARD_SELECTION, PROJECT_SCOPE_NOTE, boardSummary, boardSummarySchema } from "./support"
@@ -45,6 +47,7 @@ const output = z.object({
 export const projectItemConvert = defineTool({
   id: "github_project_item_convert",
   title: "Convert a GitHub project draft into an issue",
+  intent: "About to convert a GitHub project draft into an issue",
   description: [
     "Turn a draft item into an issue of a repository the viewer may write to: the draft's title and body become the issue, and the item stays on the board with its field values. The viewer must also be able to update the board; both are checked before anything is written. An item that is not a draft is invalid_argument.",
     "Then settle the issue as github_issue_create does: kind (an Issue Type, else a type:<kind> label that is created when missing), labels and milestone. A milestone that does not exist fails before the draft is converted unless create_milestone is true.",
@@ -56,6 +59,35 @@ export const projectItemConvert = defineTool({
   toolset: "projects",
   class: "add",
   targets: { item: "item", repo: "repo" },
+  async describe(args, ctx) {
+    const [kind] = nameList("kind", args.kind === undefined ? [] : [args.kind])
+    const labels = nameList("labels", args.labels)
+    const milestoneTitle = given(args.milestone)
+    if (args.create_milestone && !milestoneTitle) throw invalid("create_milestone needs milestone.")
+
+    const { board, item } = await describedItem(args, ctx)
+    assertBoardWritable(board)
+    if (item.content?.type !== "draft") {
+      throw invalid(
+        `Only a draft can be converted into an issue, but item ${item.item_id} is ${contentNoun(item.content)}.`,
+      )
+    }
+
+    const context = await writableContext(await resolveRepo(args.repo, ctx), ctx)
+    const facts: CallFact[] = []
+    if (kind) facts.push({ label: "Kind", value: kind })
+    const labelsFact = changeFact("Labels", labels)
+    if (labelsFact) facts.push(labelsFact)
+    if (milestoneTitle)
+      facts.push(await milestoneFact(context.repo, milestoneTitle, Boolean(args.create_milestone), ctx))
+
+    const body = item.content.body ?? ""
+    return {
+      headline: { text: "About to turn the draft {title} into an issue", values: { title: item.content.title } },
+      facts,
+      ...(body ? { text: { label: "Issue body", body } } : {}),
+    }
+  },
   input,
   output,
   async execute(args, ctx) {

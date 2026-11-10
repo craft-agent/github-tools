@@ -302,6 +302,10 @@ const STATE_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owne
   closingIssuesReferences(first:${MAX_LINKED}){nodes{number title url state repository{nameWithOwner}}}
 }}}`
 
+const HEADING_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){pullRequest(number:$n){
+  id title state isDraft headRefOid baseRefName headRefName
+}}}`
+
 const HEAD_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){pullRequest(number:$n){headRefOid changedFiles state}}}`
 
 const MERGE_STATE_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){pullRequest(number:$n){
@@ -494,6 +498,27 @@ export async function readPullRequestState(ref: PullRequestRef, ctx: RefContext)
     head: pull.headRefName,
     head_sha: pull.headRefOid,
     closing_issues: closingIssues(pull),
+  }
+}
+
+/** What a description of a write names a pull request by: its node id, real title, state (as `stateWord` gives it), draft flag, head commit and branches. */
+export type PullRequestHeading = Pick<PullRequestState, "id" | "state" | "draft" | "head_sha" | "base" | "head"> & {
+  title: string
+}
+
+/** The node id, title, state, draft flag, head commit and branches of one pull request, in one small read. */
+export async function readPullRequestHeading(ref: PullRequestRef, ctx: RefContext): Promise<PullRequestHeading> {
+  const pull = await readPullRequestNode<
+    Pick<RawPullRequest, "id" | "title" | "state" | "isDraft" | "headRefOid" | "baseRefName" | "headRefName">
+  >(HEADING_QUERY, ref, {}, ctx)
+  return {
+    id: pull.id,
+    title: pull.title,
+    state: stateWord(pull.state),
+    draft: pull.isDraft,
+    head_sha: pull.headRefOid,
+    base: pull.baseRefName,
+    head: pull.headRefName,
   }
 }
 
