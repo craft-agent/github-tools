@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import {
   RELEASE_COMMIT,
+  branchRule,
   gitRefTagRule,
   rawRelease,
   releaseByTagRule,
@@ -11,8 +12,10 @@ import {
 import { queryOf } from "../../testing/setup-fixtures"
 import { repositoryRule } from "../../testing/write-fixtures"
 import { MAX_FACTS, MAX_HEADLINE_LENGTH, MAX_LABEL_LENGTH } from "../describe"
+import { shortSha } from "../refs"
 import { NOTHING_CHANGED, digest } from "../write-facts"
 import {
+  BRANCH_SHA,
   DESCRIBE_CASES,
   TAG,
   draftRules,
@@ -177,6 +180,106 @@ describe("github_release_edit", () => {
     ["a repository the viewer cannot write to", edit.args, [NOT_WRITABLE, ...edit.rules.slice(1)]],
   ])("%s: no description", async (_name, args, rules) => {
     expect(await describeCase({ ...edit, args, rules })).toBeUndefined()
+  })
+})
+
+describe("github_release_publish", () => {
+  const headline = named("About to publish the release {name}")
+
+  test("a new tag: the commit it will name, short, with the full commit pinned", async () => {
+    expect(await describeCase(DESCRIBE_CASES.publishNewTag)).toEqual({
+      headline,
+      facts: [{ label: "Tag", value: TAG }, { label: "Commit", value: shortSha(BRANCH_SHA) }, on("Latest")],
+      pins: { head_sha: BRANCH_SHA },
+    })
+  })
+
+  test("an existing tag says so, with its commit, and a latest flag turned off", async () => {
+    expect(await describeCase(DESCRIBE_CASES.publishExistingTag)).toEqual({
+      headline,
+      facts: [
+        { label: "Tag", value: TAG },
+        { label: "Commit", value: { text: "{sha} (existing tag)", values: { sha: shortSha(RELEASE_COMMIT) } } },
+        off("Latest"),
+      ],
+      pins: { head_sha: RELEASE_COMMIT },
+    })
+  })
+
+  test("a prerelease is not the latest by default, and a matching head_sha is accepted", async () => {
+    expect(await describeCase(DESCRIBE_CASES.publishPrerelease)).toEqual({
+      headline,
+      facts: [
+        { label: "Tag", value: TAG },
+        { label: "Commit", value: shortSha(RELEASE_COMMIT) },
+        off("Latest"),
+        on("Prerelease"),
+      ],
+      pins: { head_sha: RELEASE_COMMIT },
+    })
+  })
+
+  test("the pin follows the commit the tag would name", async () => {
+    const item = DESCRIBE_CASES.publishNewTag
+    const moved = "9999999999888888888877777777776666666666"
+    const rules = [...draftRules(), restNotFound("git/ref/tags/v1.0.0"), branchRule("main", moved)]
+    const description = await describeCase({ ...item, rules })
+    expect(description?.pins).toEqual({ head_sha: moved })
+    expect(description?.facts[1]).toEqual({ label: "Commit", value: shortSha(moved) })
+  })
+
+  const publish = DESCRIBE_CASES.publishNewTag
+  test.each([
+    ["a head_sha that is not a SHA", { tag: TAG, head_sha: "abc" }, publish.rules],
+    ["a head_sha the tag would not name (stale)", { tag: TAG, head_sha: "5".repeat(40) }, publish.rules],
+    ["a release that does not exist", publish.args, [repositoryRule(), ...noReleaseRules(TAG)]],
+    ["a release that is published already", publish.args, publishedRules()],
+    [
+      "latest for a prerelease",
+      { tag: TAG, latest: true },
+      [...draftRules({ prerelease: true }), ...publish.rules.slice(3)],
+    ],
+    [
+      "a target branch that is gone",
+      publish.args,
+      [...draftRules(), restNotFound("git/ref/tags/v1.0.0"), restNotFound("branches/main")],
+    ],
+    ["a repository the viewer cannot write to", publish.args, [NOT_WRITABLE, ...publish.rules.slice(1)]],
+  ])("%s: no description", async (_name, args, rules) => {
+    expect(await describeCase({ ...publish, args, rules })).toBeUndefined()
+  })
+})
+
+describe("github_release_delete", () => {
+  const pins = { release_id: "101" }
+
+  test("a draft is shown as one, with the release pinned", async () => {
+    expect(await describeCase(DESCRIBE_CASES.deleteDraft)).toEqual({
+      headline: named("About to delete the release {name}"),
+      facts: [state("Draft")],
+      pins,
+    })
+  })
+
+  test("a published release is called by its tag when it has no name, and shows its assets", async () => {
+    expect(await describeCase(DESCRIBE_CASES.deletePublished)).toEqual({
+      headline: named("About to delete the release {name}", TAG),
+      facts: [state("Published"), { label: "Assets", value: { text: "{count} assets", values: { count: 2 } } }],
+      pins,
+    })
+  })
+
+  test("one asset is singular", async () => {
+    const description = await describeCase(DESCRIBE_CASES.deleteOneAsset)
+    expect(description?.facts[1]).toEqual({ label: "Assets", value: { text: "{count} asset", values: { count: 1 } } })
+  })
+
+  const item = DESCRIBE_CASES.deleteDraft
+  test.each([
+    ["a release that does not exist", item.args, [repositoryRule(), ...noReleaseRules(TAG)]],
+    ["a repository the viewer cannot write to", item.args, [NOT_WRITABLE, ...item.rules.slice(1)]],
+  ])("%s: no description", async (_name, args, rules) => {
+    expect(await describeCase({ ...item, args, rules })).toBeUndefined()
   })
 })
 

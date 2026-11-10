@@ -4,6 +4,7 @@ import { deleteRelease, findRelease, releaseNotFound, releaseTagInput } from "..
 import { REPO_DESCRIPTION, writableContext } from "../write-support"
 import { resolveRepo } from "../refs"
 import { confirmWrite, defineTool } from "../tool"
+import { describedRelease, releaseHeadline } from "./describe-support"
 
 const input = z.object({
   repo: z.string().optional().describe(REPO_DESCRIPTION),
@@ -26,6 +27,25 @@ export const releaseDelete = defineTool({
   toolset: "releases",
   class: "administrative",
   targets: { repo: "repo" },
+  async describe(args, ctx) {
+    const { current } = await describedRelease(args, ctx)
+    const assets = current.assets?.length ?? 0
+    return {
+      ...releaseHeadline("About to delete the release {name}", current),
+      facts: [
+        { label: "State", value: { text: current.draft ? "Draft" : "Published" } },
+        ...(assets > 0
+          ? [
+              {
+                label: "Assets",
+                value: { text: assets === 1 ? "{count} asset" : "{count} assets", values: { count: assets } },
+              },
+            ]
+          : []),
+      ],
+      pins: { release_id: String(current.id) },
+    }
+  },
   input,
   output,
   async execute(args, ctx) {

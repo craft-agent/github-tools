@@ -12,7 +12,8 @@ import {
 } from "../github/releases"
 import { REPO_DESCRIPTION, given, invalid, writableContext } from "../write-support"
 import { resolveRepo, SHA_PATTERN, shortSha } from "../refs"
-import { confirmWrite, defineTool } from "../tool"
+import { confirmWrite, defineTool, type CallFact } from "../tool"
+import { describedRelease, releaseHeadline, switchValue } from "./describe-support"
 
 const input = z.object({
   repo: z.string().optional().describe(REPO_DESCRIPTION),
@@ -49,6 +50,48 @@ export const releasePublish = defineTool({
   toolset: "releases",
   class: "administrative",
   targets: { repo: "repo" },
+  async describe(args, ctx) {
+    const expectedSha = given(args.head_sha)
+    if (args.head_sha !== undefined && (!expectedSha || !SHA_PATTERN.test(expectedSha))) {
+      throw invalid("head_sha must be a full commit SHA of 40 hexadecimal characters.")
+    }
+
+    const { repo, current } = await describedRelease(args, ctx)
+    if (!current.draft) {
+      throw invalid(`Release ${args.tag} of ${repo.full} is published already.`)
+    }
+    if (args.latest === true && current.prerelease) {
+      throw invalid(PRERELEASE_CANNOT_BE_LATEST)
+    }
+
+    const { commit, tagExists } = await publishCommit(repo, current, ctx)
+    if (!commit) {
+      throw invalid(
+        `Release ${args.tag} of ${repo.full} targets ${current.target_commitish}, which is no longer a branch; set target with github_release_edit.`,
+      )
+    }
+    if (expectedSha && commit.toLowerCase() !== expectedSha.toLowerCase()) {
+      throw new ToolError(
+        "stale",
+        `Release ${args.tag} of ${repo.full} would tag ${shortSha(commit)}, not ${shortSha(expectedSha)}: its target moved since it was read. Nothing was published.`,
+      )
+    }
+
+    const facts: (CallFact | undefined)[] = [
+      { label: "Tag", value: current.tag_name },
+      {
+        label: "Commit",
+        value: tagExists ? { text: "{sha} (existing tag)", values: { sha: shortSha(commit) } } : shortSha(commit),
+      },
+      { label: "Latest", value: switchValue(args.latest ?? !current.prerelease) },
+      current.prerelease ? { label: "Prerelease", value: switchValue(true) } : undefined,
+    ]
+    return {
+      ...releaseHeadline("About to publish the release {name}", current),
+      facts: facts.filter((fact): fact is CallFact => fact !== undefined),
+      pins: { head_sha: commit },
+    }
+  },
   input,
   output,
   async execute(args, ctx) {
