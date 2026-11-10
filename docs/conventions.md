@@ -387,9 +387,11 @@ nothing is sent` as its only fact and no text.
     other repositories), `Reviewers`, `Attachments` (the file names), `Commit`
     and `Line comments` (review), `Method` (`Merge commit`, `Squash` or
     `Rebase`), `Also merges` (the lower layers a merge takes along) and
-    `Branch` (`Deleted after merge`) (merge). A review's text is its body
-    followed by each line comment under its `path:line`. A call that is
-    refused before it writes gets no description at all.
+    `Branch` (`Deleted after merge`) (merge), `Layers` (a stack's pull
+    requests by their real titles, bottom to top), `Stack` (`New stack` or
+    `Extends a stack of N`) and `Stays` (stack link and unlink). A review's
+    text is its body followed by each line comment under its `path:line`. A
+    call that is refused before it writes gets no description at all.
   - A replacing body is pinned by the digest of the body it replaces, a new
     development branch by the head commit of its base, a new pull request, a
     review and a merge by the head commit of the pull request, and a merge
