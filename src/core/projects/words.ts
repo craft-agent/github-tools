@@ -51,7 +51,6 @@ export const PROJECT_TRANSLATIONS: Translations = {
     "About to make sure the view {name} is on the project board":
       "ビュー「{name}」がプロジェクトボードにあることを確かめようとしています",
     Owner: "オーナー",
-    Template: "テンプレート",
     Link: "リンク先",
     "Default view": "既定のビュー",
     Views: "ビュー",
@@ -75,7 +74,6 @@ export const PROJECT_TRANSLATIONS: Translations = {
     "Not linked to the repository; nothing is sent": "リポジトリにリンクされていません（何も送信されません）",
     Fields: "フィールド",
     "Cleared fields": "クリアするフィールド",
-    "Already in place; nothing is sent": "すでに反映済みです（何も送信されません）",
     "Already archived; nothing is sent": "アーカイブ済みです（何も送信されません）",
   },
 }

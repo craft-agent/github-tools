@@ -1,13 +1,21 @@
 import { describe, expect, test } from "bun:test"
+import { repositoryFactsRule, repositoryOwnerRule, restFailure } from "../../testing/repos-fixtures"
 import { queryOf } from "../../testing/setup-fixtures"
 import { MAX_FACTS, MAX_HEADLINE_LENGTH, MAX_LABEL_LENGTH } from "../describe"
-import { NOT_ARCHIVED } from "../write-facts"
-import { DESCRIBE_CASES, describeCase, repoRules, type DescribeCase } from "./describe.fixtures"
+import { NOTHING_CHANGED, NOT_ARCHIVED } from "../write-facts"
+import {
+  DESCRIBE_CASES,
+  branchRule,
+  createRules,
+  describeCase,
+  repoRules,
+  type DescribeCase,
+} from "./describe.fixtures"
 
 /** The methods of a `gh api` call that change something. */
 const WRITE_METHODS = ["POST", "PUT", "PATCH", "DELETE"]
 
-const named = (text: string) => ({ text, values: { name: "octo/hello" } })
+const named = (text: string, name = "octo/hello") => ({ text, values: { name } })
 const visibility = (word: string) => ({ label: "Visibility", value: { text: word } })
 
 describe("github_repo_archive", () => {
@@ -91,6 +99,150 @@ describe("github_repo_visibility", () => {
     ["no visibility", {}, change.rules],
   ])("%s: no description", async (_name, args, rules) => {
     expect(await describeCase({ ...change, args, rules })).toBeUndefined()
+  })
+})
+
+describe("github_repo_create", () => {
+  const headline = named("About to create the repository {name}", "octo/new")
+
+  test("a repository is private by default, and the headline names it", async () => {
+    expect(await describeCase(DESCRIBE_CASES.createPrivate)).toEqual({ headline, facts: [visibility("Private")] })
+  })
+
+  test("a public repository shows Public first", async () => {
+    expect(await describeCase(DESCRIBE_CASES.createPublic)).toEqual({ headline, facts: [visibility("Public")] })
+  })
+
+  test("an internal repository shows the description verbatim, trimmed as it is sent", async () => {
+    expect(await describeCase(DESCRIBE_CASES.createInternal)).toEqual({
+      headline,
+      facts: [visibility("Internal")],
+      text: { label: "Description", body: "Internal tool" },
+    })
+  })
+
+  test("a template is shown as owner/name", async () => {
+    expect(await describeCase(DESCRIBE_CASES.createFromTemplate)).toEqual({
+      headline,
+      facts: [visibility("Private"), { label: "Template", value: "octo/hello-template" }],
+      text: { label: "Description", body: "From a template" },
+    })
+  })
+
+  test("every optional piece is a fact, and the owner is the login GitHub knows", async () => {
+    expect(await describeCase(DESCRIBE_CASES.createWithEverything)).toEqual({
+      headline: named("About to create the repository {name}", "alice/new"),
+      facts: [
+        visibility("Public"),
+        { label: "License", value: "mit" },
+        { label: "Gitignore", value: "Node" },
+        { label: "README", value: { text: "Added" } },
+        { label: "Homepage", value: "https://tool.example" },
+      ],
+      text: { label: "Description", body: "A tool" },
+    })
+  })
+
+  const create = DESCRIBE_CASES.createPrivate
+  const template = DESCRIBE_CASES.createFromTemplate
+  test.each([
+    ["a bad repository name", { repo: "new" }, create.rules],
+    ["an unknown visibility", { repo: "octo/new", visibility: "secret" }, create.rules],
+    [
+      "a repository that exists already",
+      create.args,
+      [repositoryOwnerRule("octo", { type: "Organization" }), repositoryFactsRule("octo/new", { isTemplate: false })],
+    ],
+    ["another user's account", { repo: "bob/new" }, createRules("bob/new", { type: "User" })],
+    ["an owner that does not exist", { repo: "ghost/new" }, [repositoryOwnerRule("ghost", { type: null })]],
+    [
+      "internal for the viewer's own repository",
+      { repo: "alice/new", visibility: "internal" },
+      createRules("alice/new", { viewer: "Alice", type: "User" }),
+    ],
+    ["a template with a license", { ...template.args, license: "mit" }, template.rules],
+    ["a template with a homepage", { ...template.args, homepage: "https://x.example" }, template.rules],
+    ["an internal repository from a template", { ...template.args, visibility: "internal" }, template.rules],
+    [
+      "a template that does not exist",
+      template.args,
+      [...createRules("octo/new"), repositoryFactsRule("octo/hello-template", null)],
+    ],
+    [
+      "a repository that is not a template",
+      template.args,
+      [...createRules("octo/new"), repositoryFactsRule("octo/hello-template", { isTemplate: false })],
+    ],
+  ])("%s: no description", async (_name, args, rules) => {
+    expect(await describeCase({ ...create, args, rules })).toBeUndefined()
+  })
+})
+
+describe("github_repo_edit", () => {
+  const headline = named("About to edit the settings of the repository {name}")
+
+  test("shows only what changes, most decisive first, with the new description as text", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editEverything)).toEqual({
+      headline,
+      facts: [
+        { label: "Default branch", value: "dev" },
+        { label: "Topics", value: "+rust \u2212cli" },
+        { label: "Features", value: "+wiki \u2212issues" },
+        { label: "Merge methods", value: "+rebase \u2212squash" },
+        { label: "Merge options", value: "+update_branch \u2212auto_merge" },
+        { label: "Template repository", value: { text: "On" } },
+        { label: "Homepage", value: { text: "Cleared" } },
+      ],
+      text: { label: "Description", body: "A new description" },
+    })
+  })
+
+  test("a new homepage is shown as it is", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editHomepage)).toEqual({
+      headline,
+      facts: [{ label: "Homepage", value: "https://new.example" }],
+    })
+  })
+
+  test("a cleared description is a fact, not text", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editClearDescription)).toEqual({
+      headline,
+      facts: [{ label: "Description", value: { text: "Cleared" } }],
+    })
+  })
+
+  test("a repository that stops being a template shows Off", async () => {
+    expect((await describeCase(DESCRIBE_CASES.editTemplateOff))?.facts).toEqual([
+      { label: "Template repository", value: { text: "Off" } },
+    ])
+  })
+
+  test("what is in place already says nothing is sent, with no text", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editNothing)).toEqual({
+      headline,
+      facts: [{ label: "State", value: { text: NOTHING_CHANGED } }],
+    })
+  })
+
+  const edit = DESCRIBE_CASES.editEverything
+  test.each([
+    ["no setting at all", {}, edit.rules],
+    ["an archived repository", edit.args, [...repoRules({ isArchived: true }), branchRule("dev")]],
+    [
+      "a repository the viewer does not administer",
+      edit.args,
+      [...repoRules({ viewerPermission: "WRITE" }), branchRule("dev")],
+    ],
+    [
+      "a default branch that does not exist",
+      { default_branch: "nope" },
+      [restFailure("branches/nope", "Not Found (HTTP 404)"), ...repoRules()],
+    ],
+    ["a topic that is not one", { add_topics: ["Not A Topic"] }, edit.rules],
+    ["a topic in both lists", { add_topics: ["x"], remove_topics: ["x"] }, edit.rules],
+    ["every merge method off", { allow_merge_commit: false, allow_squash_merge: false }, edit.rules],
+  ])("%s: no description", async (_name, args, rules) => {
+    expect(await describeCase({ ...edit, args, rules })).toBeUndefined()
   })
 })
 

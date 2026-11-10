@@ -4,7 +4,9 @@ import { patchRepository, readAdministeredRepository, replaceTopics, type Reposi
 import { repositoryContext } from "../github/repository"
 import { REPO_DESCRIPTION, invalid } from "../write-support"
 import { resolveRepo } from "../refs"
-import { defineTool } from "../tool"
+import { defineTool, type CallDescription, type CallFact, type ToolContext } from "../tool"
+import { NOTHING_CHANGED, changeFact } from "../write-facts"
+import { describedRepo, repoHeadline } from "./describe-support"
 
 const TOPIC_PATTERN = /^[a-z0-9][a-z0-9-]{0,49}$/
 const MERGE_METHOD_SETTINGS = ["allow_merge_commit", "allow_squash_merge", "allow_rebase_merge"] as const
@@ -88,6 +90,94 @@ function topicList(argument: string, values: string[] | undefined): string[] {
   return topics
 }
 
+/** The names the `Features`, `Merge methods` and `Merge options` facts list, by the setting that turns each on or off. */
+const FEATURE_NAMES: Partial<Record<Setting, string>> = {
+  has_issues: "issues",
+  has_wiki: "wiki",
+  has_projects: "projects",
+  has_discussions: "discussions",
+}
+const METHOD_NAMES: Partial<Record<Setting, string>> = {
+  allow_merge_commit: "merge_commit",
+  allow_squash_merge: "squash",
+  allow_rebase_merge: "rebase",
+}
+const OPTION_NAMES: Partial<Record<Setting, string>> = {
+  allow_auto_merge: "auto_merge",
+  delete_branch_on_merge: "delete_branch_on_merge",
+  allow_update_branch: "update_branch",
+}
+
+/** Describes the call: what differs from the repository's settings, as `execute` weighs it, and nothing sent when nothing does. */
+async function describeEdit(args: z.output<typeof input>, ctx: ToolContext): Promise<CallDescription> {
+  const add = topicList("add_topics", args.add_topics)
+  const remove = topicList("remove_topics", args.remove_topics)
+  const both = add.find((topic) => remove.includes(topic))
+  if (both !== undefined) throw invalid(`The topic "${both}" is in both add_topics and remove_topics.`)
+  if (
+    args.add_topics === undefined &&
+    args.remove_topics === undefined &&
+    SETTING_NAMES.every((name) => args[name] === undefined)
+  ) {
+    throw invalid("Pass at least one setting to change, or topics to add or remove.")
+  }
+
+  const { view, target } = await describedRepo(args, ctx)
+  if (view.archived) {
+    throw invalid(
+      `${view.repo} is archived, so its settings cannot change; unarchive it with github_repo_unarchive first.`,
+    )
+  }
+  const effective = (name: Setting) => args[name] ?? CURRENT[name](view)
+  if (MERGE_METHOD_SETTINGS.some((name) => args[name] !== undefined) && !MERGE_METHOD_SETTINGS.some(effective)) {
+    throw invalid(
+      `That would turn off every merge method of ${view.repo}; keep at least one of ${MERGE_METHOD_SETTINGS.join(", ")} on.`,
+    )
+  }
+  if (
+    args.default_branch !== undefined &&
+    args.default_branch !== view.default_branch &&
+    (await branchHead(target, args.default_branch, ctx)) === null
+  ) {
+    throw invalid(`${view.repo} has no branch "${args.default_branch}" to make the default; push it first.`)
+  }
+
+  const changed = SETTING_NAMES.filter((name) => args[name] !== undefined && args[name] !== CURRENT[name](view))
+  const added = add.filter((topic) => !view.topics.includes(topic))
+  const removed = remove.filter((topic) => view.topics.includes(topic))
+  const headline = repoHeadline("About to edit the settings of the repository {name}", view.repo)
+  if (changed.length === 0 && added.length === 0 && removed.length === 0) {
+    return { ...headline, facts: [{ label: "State", value: { text: NOTHING_CHANGED } }] }
+  }
+
+  const toggles = (label: string, names: Partial<Record<Setting, string>>) =>
+    changeFact(
+      label,
+      changed.flatMap((name) => (names[name] !== undefined && args[name] === true ? [names[name]] : [])),
+      changed.flatMap((name) => (names[name] !== undefined && args[name] === false ? [names[name]] : [])),
+    )
+  const description = changed.includes("description") ? args.description : undefined
+  const facts = [
+    changed.includes("default_branch") ? { label: "Default branch", value: args.default_branch! } : undefined,
+    changeFact("Topics", added, removed),
+    toggles("Features", FEATURE_NAMES),
+    toggles("Merge methods", METHOD_NAMES),
+    toggles("Merge options", OPTION_NAMES),
+    changed.includes("is_template")
+      ? { label: "Template repository", value: { text: args.is_template ? "On" : "Off" } }
+      : undefined,
+    changed.includes("homepage")
+      ? { label: "Homepage", value: args.homepage === "" ? { text: "Cleared" } : args.homepage! }
+      : undefined,
+    description === "" ? { label: "Description", value: { text: "Cleared" } } : undefined,
+  ].filter((fact): fact is CallFact => fact !== undefined)
+  return {
+    ...headline,
+    facts,
+    ...(description ? { text: { label: "Description", body: description } } : {}),
+  }
+}
+
 export const repoEdit = defineTool({
   id: "github_repo_edit",
   title: "Edit a GitHub repository's settings",
@@ -101,6 +191,7 @@ export const repoEdit = defineTool({
   toolset: "repos",
   class: "overwrite",
   targets: { repo: "repo" },
+  describe: describeEdit,
   input,
   output,
   async execute(args, ctx) {

@@ -6,7 +6,7 @@ import { clearFieldValue, setFieldValue, updateDraft } from "../github/board-ite
 import { assertBoardWritable, given, sameTitle } from "../github/projects"
 import { appended, invalid } from "../write-support"
 import { defineTool, type CallFact, type CallText } from "../tool"
-import { changeFact, digest } from "../write-facts"
+import { NOTHING_CHANGED, changeFact, digest } from "../write-facts"
 import { describedItem, fieldText, itemHeadline } from "./describe-support"
 import { resolveBoardItem } from "./item-resolve"
 import {
@@ -18,9 +18,6 @@ import {
   itemArgument,
 } from "./item-support"
 import { BOARD_LOOKUP_NOTE, PROJECT_SCOPE_NOTE, boardSummary, boardSummarySchema } from "./support"
-
-/** How the `State` fact words an edit that finds everything in place. */
-const NOTHING_CHANGED = "Already in place; nothing is sent"
 
 const input = z.object({
   item: itemArgument,

@@ -1,10 +1,12 @@
 import { installFakeGh, type GhRule } from "../../testing/fake-gh"
 import { tempRepo } from "../../testing/git-repo"
-import { repositoryViewRule } from "../../testing/repos-fixtures"
+import { repositoryFactsRule, repositoryOwnerRule, repositoryViewRule } from "../../testing/repos-fixtures"
 import { ORIGIN } from "../../testing/write-fixtures"
 import { callDescription } from "../describe"
 import type { CallDescription, ToolSpec } from "../tool"
 import { repoArchive } from "./repo-archive"
+import { repoCreate } from "./repo-create"
+import { repoEdit } from "./repo-edit"
 import { repoUnarchive } from "./repo-unarchive"
 import { repoVisibility } from "./repo-visibility"
 
@@ -21,8 +23,104 @@ const visibilityCase = (from: string, to: string) => ({
   rules: repoRules({ visibility: from }),
 })
 
+/** The replies for creating `full` under `owner` (an organization unless `type` says otherwise): the owner exists and the repository does not. */
+export const createRules = (
+  full: string,
+  owner: Parameters<typeof repositoryOwnerRule>[1] = { type: "Organization" },
+): GhRule[] => [repositoryOwnerRule(full.split("/")[0]!, owner), repositoryFactsRule(full, null)]
+
+/** The reply of GitHub for a branch `branch` that exists. */
+export const branchRule = (branch: string): GhRule => ({
+  match: `branches/${branch}`,
+  stdout: JSON.stringify({ commit: { sha: "a".repeat(40) } }),
+})
+
+const TEMPLATE = "octo/hello-template"
+
 /** Representative calls of the repository write tools, which the description tests and the words test share. */
 export const DESCRIBE_CASES = {
+  createPrivate: {
+    name: "create a repository, private by default",
+    tool: repoCreate,
+    args: { repo: "octo/new" },
+    rules: createRules("octo/new"),
+  },
+  createPublic: {
+    name: "create a public repository",
+    tool: repoCreate,
+    args: { repo: "octo/new", visibility: "public" },
+    rules: createRules("octo/new"),
+  },
+  createInternal: {
+    name: "create an internal repository in an organization",
+    tool: repoCreate,
+    args: { repo: "octo/new", visibility: "internal", description: "  Internal tool  " },
+    rules: createRules("octo/new"),
+  },
+  createFromTemplate: {
+    name: "create a repository from a template",
+    tool: repoCreate,
+    args: { repo: "octo/new", template: TEMPLATE, description: "From a template" },
+    rules: [...createRules("octo/new"), repositoryFactsRule(TEMPLATE, { isTemplate: true })],
+  },
+  createWithEverything: {
+    name: "create a viewer's repository with every optional piece",
+    tool: repoCreate,
+    args: {
+      repo: "alice/new",
+      visibility: "public",
+      description: "A tool",
+      homepage: "https://tool.example",
+      license: "mit",
+      gitignore: "Node",
+      add_readme: true,
+    },
+    rules: createRules("alice/new", { viewer: "Alice", type: "User" }),
+  },
+  editEverything: {
+    name: "edit every kind of setting",
+    tool: repoEdit,
+    args: {
+      description: "A new description",
+      homepage: "",
+      default_branch: "dev",
+      add_topics: ["rust", "git"],
+      remove_topics: ["cli", "absent"],
+      has_issues: false,
+      has_wiki: true,
+      has_projects: true,
+      allow_rebase_merge: true,
+      allow_squash_merge: false,
+      allow_auto_merge: false,
+      allow_update_branch: true,
+      is_template: true,
+    },
+    rules: [...repoRules(), branchRule("dev")],
+  },
+  editHomepage: {
+    name: "edit the homepage",
+    tool: repoEdit,
+    args: { repo: "octo/hello", homepage: "https://new.example" },
+    rules: repoRules(),
+  },
+  editClearDescription: {
+    name: "clear the description",
+    tool: repoEdit,
+    args: { description: "" },
+    rules: repoRules(),
+  },
+  editTemplateOff: {
+    name: "stop being a template",
+    tool: repoEdit,
+    args: { is_template: false },
+    rules: repoRules({ isTemplate: true }),
+  },
+  editNothing: {
+    name: "edit what is in place already",
+    tool: repoEdit,
+    args: { description: "Says hello", has_issues: true, default_branch: "main", add_topics: ["cli"] },
+    rules: repoRules(),
+  },
   archive: {
     name: "archive a public repository",
     tool: repoArchive,

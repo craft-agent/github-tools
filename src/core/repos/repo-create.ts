@@ -8,7 +8,8 @@ import {
 } from "../github/repos"
 import { given, invalid } from "../write-support"
 import { parseRepo } from "../refs"
-import { confirmWrite, defineTool } from "../tool"
+import { confirmWrite, defineTool, type CallDescription, type CallFact, type ToolContext } from "../tool"
+import { repoHeadline, visibilityFact } from "./describe-support"
 
 const DEFAULT_VISIBILITY: Visibility = "private"
 
@@ -47,6 +48,61 @@ function confirmation(repo: string, visibility: Visibility, template: string | u
   return `Create the ${visibility} repository ${repo}${from}?${exposure}`
 }
 
+/** Describes the call: the repository it makes under the owner GitHub knows, its visibility and the settings it starts with. */
+async function describeCreate(args: z.output<typeof input>, ctx: ToolContext): Promise<CallDescription> {
+  const target = parseRepo(args.repo)
+  const visibility = args.visibility ?? DEFAULT_VISIBILITY
+  const description = given(args.description)
+  const homepage = given(args.homepage)
+  const license = given(args.license)
+  const gitignore = given(args.gitignore)
+  const template = args.template === undefined ? undefined : parseRepo(args.template)
+  if (template) {
+    if (license || gitignore || args.add_readme) {
+      throw invalid(
+        "A repository created from a template takes its files from it; leave out license, gitignore and add_readme.",
+      )
+    }
+    if (homepage)
+      throw invalid(
+        "A repository created from a template cannot be given a homepage; set it with github_repo_edit afterwards.",
+      )
+    if (visibility === "internal") {
+      throw invalid(
+        "A repository created from a template is public or private; create it private, then change it with github_repo_visibility.",
+      )
+    }
+  }
+
+  const owner = await readRepositoryOwner(target.owner, ctx)
+  if (owner.kind === "user") {
+    throw invalid(`${target.owner} is another user's account; create the repository as yourself or in an organization.`)
+  }
+  if (visibility === "internal" && owner.kind !== "organization") {
+    throw invalid("internal is for an organization's repository; pick public or private.")
+  }
+  if (await findRepository(target, ctx)) throw invalid(`Repository ${target.full} exists already.`)
+  if (template) {
+    const found = await findRepository(template, ctx)
+    if (!found) throw invalid(`Template ${template.full} was not found, or the viewer cannot see it.`)
+    if (!found.is_template) throw invalid(`${template.full} is not a template repository.`)
+  }
+
+  const facts: (CallFact | undefined)[] = [
+    visibilityFact(visibility),
+    template ? { label: "Template", value: template.full } : undefined,
+    license ? { label: "License", value: license } : undefined,
+    gitignore ? { label: "Gitignore", value: gitignore } : undefined,
+    args.add_readme ? { label: "README", value: { text: "Added" } } : undefined,
+    homepage ? { label: "Homepage", value: homepage } : undefined,
+  ]
+  return {
+    ...repoHeadline("About to create the repository {name}", `${owner.login}/${target.name}`),
+    facts: facts.filter((fact): fact is CallFact => fact !== undefined),
+    ...(description ? { text: { label: "Description", body: description } } : {}),
+  }
+}
+
 export const repoCreate = defineTool({
   id: "github_repo_create",
   title: "Create a GitHub repository",
@@ -60,6 +116,7 @@ export const repoCreate = defineTool({
   toolset: "repos",
   class: "administrative",
   targets: { repo: "repo" },
+  describe: describeCreate,
   input,
   output,
   async execute(args, ctx) {
