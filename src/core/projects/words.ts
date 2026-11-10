@@ -48,6 +48,8 @@ export const PROJECT_TRANSLATIONS: Translations = {
       "GitHub のプロジェクトボード「{title}」とリポジトリのリンクを解除しようとしています",
     "About to make sure the field {name} is on the project board":
       "フィールド「{name}」がプロジェクトボードにあることを確かめようとしています",
+    "About to make sure the view {name} is on the project board":
+      "ビュー「{name}」がプロジェクトボードにあることを確かめようとしています",
     Owner: "オーナー",
     Template: "テンプレート",
     Link: "リンク先",
@@ -60,6 +62,14 @@ export const PROJECT_TRANSLATIONS: Translations = {
     Date: "日付",
     "Single select": "単一選択",
     "Issue field": "Issue フィールド",
+    Layout: "レイアウト",
+    Table: "テーブル",
+    Roadmap: "ロードマップ",
+    Filter: "フィルター",
+    "Grouped by": "グループ化",
+    "Columns by": "列の基準",
+    "Sorted by": "並べ替え",
+    "{field} (descending)": "{field}（降順）",
     "Already there; nothing is sent": "すでにあります（何も送信されません）",
     "Already linked to the repository; nothing is sent": "すでにリポジトリにリンク済みです（何も送信されません）",
     "Not linked to the repository; nothing is sent": "リポジトリにリンクされていません（何も送信されません）",

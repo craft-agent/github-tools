@@ -17,7 +17,7 @@ import {
   rawBoard,
   viewsRule,
 } from "../../testing/project-fixtures"
-import { boardOwnerRule, organizationIssueFieldsRule } from "../../testing/setup-fixtures"
+import { boardOwnerRule, organizationIssueFieldsRule, restFieldsRule } from "../../testing/setup-fixtures"
 import { pullHeadingRule } from "../../testing/pull-request-write-fixtures"
 import {
   ISSUE_FIELD_NODES,
@@ -36,6 +36,7 @@ import { projectItemEdit } from "./item-edit"
 import { projectCreate } from "./create"
 import { projectFieldEnsure } from "./field-ensure"
 import { projectLink, projectUnlink } from "./link"
+import { projectViewEnsure } from "./view-ensure"
 
 /** One call of a project board write tool to describe, and the replies of GitHub it meets. */
 export type DescribeCase = { name: string; tool: ToolSpec; args: Record<string, unknown>; rules: GhRule[] }
@@ -122,6 +123,15 @@ export const linkRules = (linked: boolean): GhRule[] => [
 export const issueColumnRules = (present: boolean): GhRule[] => [
   ...boardWithFields(present ? BOARD_FIELD_NODES : BOARD_FIELD_NODES.filter((node) => node.name !== "Target date")),
   organizationIssueFieldsRule("octo", ISSUE_FIELD_NODES),
+]
+
+const VIEW_FIELDS = ["Title", "Assignees", "Status", "Start", "Target", "Sub-issues progress"]
+
+/** The replies of making a view on board 3, which has a view Backlog. */
+export const viewRules = (): GhRule[] => [
+  ...octoBoardRules(3),
+  viewsRule([view(1, "Backlog")]),
+  restFieldsRule("orgs", "octo", 3, VIEW_FIELDS),
 ]
 
 /** Representative calls of the board item write tools, which the description tests and the words test share. */
@@ -394,6 +404,40 @@ export const DESCRIBE_CASES = {
     tool: projectFieldEnsure,
     args: { project: "octo/3", name: "NOTES", type: "text" },
     rules: boardWithFields(),
+  },
+  viewNew: {
+    name: "ensure a view with every setting",
+    tool: projectViewEnsure,
+    args: {
+      project: "octo/3",
+      name: " Kanban ",
+      layout: "board",
+      filter: " -status:Done ",
+      fields: ["Assignees", "title", "TITLE"],
+      column_by: "status",
+      group_by: "Assignees",
+      sort_by: "Target",
+      sort_desc: true,
+    },
+    rules: viewRules(),
+  },
+  viewTable: {
+    name: "ensure a table view",
+    tool: projectViewEnsure,
+    args: { project: "octo/3", name: "Open work", layout: "table", fields: ["Title", "Status"] },
+    rules: viewRules(),
+  },
+  viewBare: {
+    name: "ensure a view with only a layout",
+    tool: projectViewEnsure,
+    args: { project: "octo/3", name: "Plan", layout: "roadmap", sort_by: "Start" },
+    rules: viewRules(),
+  },
+  viewExisting: {
+    name: "ensure a view that is on the board",
+    tool: projectViewEnsure,
+    args: { project: "octo/3", name: "backlog", layout: "table", filter: "is:open" },
+    rules: viewRules(),
   },
   convertEmptyDraft: {
     name: "convert a draft that has no body",

@@ -1,9 +1,20 @@
 import { z } from "zod"
-import { VIEW_LAYOUTS, checkViewRequest, createView, viewFieldReaders } from "../github/board-view-setup"
+import { ToolError } from "../errors"
+import {
+  VIEW_LAYOUTS,
+  checkViewRequest,
+  createView,
+  viewFieldReaders,
+  type ViewLayout,
+} from "../github/board-view-setup"
 import { boardViewSchema, readBoardViews } from "../github/board-fields"
 import { assertBoardWritable, resolveBoard, sameTitle } from "../github/projects"
-import { defineTool } from "../tool"
+import { defineTool, type CallFact, type CallValue } from "../tool"
+import { ALREADY_THERE } from "./describe-support"
 import { BOARD_LOOKUP_NOTE, BOARD_SELECTION, PROJECT_SCOPE_NOTE, boardSummary, boardSummarySchema } from "./support"
+
+/** The `Layout` fact's words for the layouts. */
+const LAYOUT_WORDS: Readonly<Record<ViewLayout, string>> = { table: "Table", board: "Board", roadmap: "Roadmap" }
 
 const input = z.object({
   ...BOARD_SELECTION,
@@ -45,6 +56,45 @@ export const projectViewEnsure = defineTool({
   toolset: "projects",
   class: "idempotent",
   targets: { project: "board" },
+  async describe(args, ctx) {
+    const request = checkViewRequest(args)
+    const { project } = await resolveBoard(args, ctx)
+    assertBoardWritable(project)
+    const headline = {
+      text: "About to make sure the view {name} is on the project board",
+      values: { name: request.name },
+    }
+    const existing = (await readBoardViews(project.id, ctx)).find((view) => sameTitle(view.name, request.name))
+    if (existing) return { headline, facts: [{ label: "State", value: { text: ALREADY_THERE } }] }
+
+    const wanted = [...(request.fields ?? []), request.group_by, request.column_by, request.sort_by].filter(
+      (name) => name !== undefined,
+    )
+    const known = await viewFieldReaders(project, ctx).rest()
+    const unknown = wanted.filter((name) => !known.some((field) => sameTitle(field.name, name)))
+    if (unknown.length > 0) {
+      throw new ToolError(
+        "invalid_argument",
+        `The board has no field ${unknown.map((name) => `"${name}"`).join(", ")}; its fields are ${known.map((field) => field.name).join(", ")}.`,
+      )
+    }
+
+    const facts: CallFact[] = [
+      { label: "Board", value: project.title },
+      { label: "Layout", value: { text: LAYOUT_WORDS[request.layout] } },
+    ]
+    if (request.filter) facts.push({ label: "Filter", value: request.filter })
+    if (request.fields?.length) facts.push({ label: "Fields", value: request.fields.join(", ") })
+    if (request.group_by) facts.push({ label: "Grouped by", value: request.group_by })
+    if (request.column_by) facts.push({ label: "Columns by", value: request.column_by })
+    if (request.sort_by) {
+      const sort: CallValue | string = request.sort_desc
+        ? { text: "{field} (descending)", values: { field: request.sort_by } }
+        : request.sort_by
+      facts.push({ label: "Sorted by", value: sort })
+    }
+    return { headline, facts }
+  },
   input,
   output,
   async execute(args, ctx) {

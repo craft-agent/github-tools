@@ -643,6 +643,66 @@ describe("github_project_field_ensure", () => {
   })
 })
 
+describe("github_project_view_ensure", () => {
+  const onBoard = { label: "Board", value: "Roadmap" }
+
+  test("a new view shows its layout and every setting that shapes it, in order", async () => {
+    expect(await describeCase(DESCRIBE_CASES.viewNew)).toEqual({
+      headline: named("About to make sure the view {name} is on the project board", "Kanban"),
+      facts: [
+        onBoard,
+        { label: "Layout", value: word("Board") },
+        { label: "Filter", value: "-status:Done" },
+        { label: "Fields", value: "Assignees, title" },
+        { label: "Grouped by", value: "Assignees" },
+        { label: "Columns by", value: "status" },
+        { label: "Sorted by", value: { text: "{field} (descending)", values: { field: "Target" } } },
+      ],
+    })
+  })
+
+  test("a bare view shows the board and the layout, and an ascending sort by name", async () => {
+    expect((await describeCase(DESCRIBE_CASES.viewBare))?.facts).toEqual([
+      onBoard,
+      { label: "Layout", value: word("Roadmap") },
+      { label: "Sorted by", value: "Start" },
+    ])
+  })
+
+  test("a view that is on the board says nothing is sent, whatever the call asks of it", async () => {
+    const description = await describeCase(DESCRIBE_CASES.viewExisting)
+    expect(description?.facts).toEqual([{ label: "State", value: word("Already there; nothing is sent") }])
+    expect(description?.headline).toEqual(
+      named("About to make sure the view {name} is on the project board", "backlog"),
+    )
+  })
+
+  const view = DESCRIBE_CASES.viewNew
+  test.each([
+    ["a blank name", { project: "octo/3", name: " ", layout: "table" }, view.rules],
+    ["fields on a roadmap", { project: "octo/3", name: "R", layout: "roadmap", fields: ["Title"] }, view.rules],
+    ["column_by on a table", { project: "octo/3", name: "T", layout: "table", column_by: "Status" }, view.rules],
+    ["sort_desc without sort_by", { project: "octo/3", name: "T", layout: "table", sort_desc: true }, view.rules],
+    [
+      "a field GitHub cannot group by",
+      { project: "octo/3", name: "T", layout: "table", group_by: "Sub-issues progress" },
+      view.rules,
+    ],
+    [
+      "a field the board does not have",
+      { project: "octo/3", name: "T", layout: "table", fields: ["Nope"] },
+      view.rules,
+    ],
+    [
+      "a board the viewer cannot update",
+      view.args,
+      [...octoBoardRules(3, { viewerCanUpdate: false }), ...view.rules.slice(2)],
+    ],
+  ])("%s: no description", async (_name, args, rules) => {
+    expect(await describeCase({ ...view, args, rules })).toBeUndefined()
+  })
+})
+
 describe("every description", () => {
   const cases = Object.values<DescribeCase>(DESCRIBE_CASES)
 
