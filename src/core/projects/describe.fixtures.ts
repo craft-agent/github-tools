@@ -1,5 +1,6 @@
 import { rawDraftContent, rawIssueContent, rawItem, statusValue } from "../../testing/board-item-fixtures"
 import {
+  BOARD_FIELD_NODES,
   blockersRule,
   boardWithFields,
   contentRule,
@@ -16,9 +17,15 @@ import {
   rawBoard,
   viewsRule,
 } from "../../testing/project-fixtures"
-import { boardOwnerRule } from "../../testing/setup-fixtures"
+import { boardOwnerRule, organizationIssueFieldsRule } from "../../testing/setup-fixtures"
 import { pullHeadingRule } from "../../testing/pull-request-write-fixtures"
-import { ORIGIN, issueHeadingRule, milestonesRule, repositoryRule } from "../../testing/write-fixtures"
+import {
+  ISSUE_FIELD_NODES,
+  ORIGIN,
+  issueHeadingRule,
+  milestonesRule,
+  repositoryRule,
+} from "../../testing/write-fixtures"
 import { callDescription } from "../describe"
 import type { CallDescription, ToolSpec } from "../tool"
 import { projectItemAdd } from "./item-add"
@@ -27,6 +34,7 @@ import { projectItemConvert } from "./item-convert"
 import { projectItemCreate } from "./item-create"
 import { projectItemEdit } from "./item-edit"
 import { projectCreate } from "./create"
+import { projectFieldEnsure } from "./field-ensure"
 import { projectLink, projectUnlink } from "./link"
 
 /** One call of a project board write tool to describe, and the replies of GitHub it meets. */
@@ -108,6 +116,12 @@ export const linkRules = (linked: boolean): GhRule[] => [
   ...octoBoardRules(3),
   repositoryRule(),
   linkedBoardsRule("octo", "hello", linked ? [rawBoard(3)] : []),
+]
+
+/** The replies of ensuring the column that mirrors the issue field Target date on board 3; `present` says whether the board has it. */
+export const issueColumnRules = (present: boolean): GhRule[] => [
+  ...boardWithFields(present ? BOARD_FIELD_NODES : BOARD_FIELD_NODES.filter((node) => node.name !== "Target date")),
+  organizationIssueFieldsRule("octo", ISSUE_FIELD_NODES),
 ]
 
 /** Representative calls of the board item write tools, which the description tests and the words test share. */
@@ -332,6 +346,54 @@ export const DESCRIBE_CASES = {
     tool: projectUnlink,
     args: { project: "octo/3" },
     rules: linkRules(false),
+  },
+  fieldNew: {
+    name: "ensure a new single select field",
+    tool: projectFieldEnsure,
+    args: { project: "octo/3", name: " Effort ", type: "single_select", options: ["S:GREEN", "M", "L:RED:Large"] },
+    rules: boardWithFields(),
+  },
+  fieldNewText: {
+    name: "ensure a new text field",
+    tool: projectFieldEnsure,
+    args: { project: "octo/3", name: "Remarks", type: "text" },
+    rules: boardWithFields(),
+  },
+  fieldNewNumber: {
+    name: "ensure a new number field",
+    tool: projectFieldEnsure,
+    args: { project: "octo/3", name: "Points", type: "number" },
+    rules: boardWithFields(),
+  },
+  fieldNewDate: {
+    name: "ensure a new date field",
+    tool: projectFieldEnsure,
+    args: { project: "octo/3", name: "Due", type: "date" },
+    rules: boardWithFields(),
+  },
+  fieldIssueColumn: {
+    name: "ensure a column that mirrors an issue field",
+    tool: projectFieldEnsure,
+    args: { project: "octo/3", name: " target DATE ", issue_field: true },
+    rules: issueColumnRules(false),
+  },
+  fieldNewOptions: {
+    name: "ensure an existing single select with new options",
+    tool: projectFieldEnsure,
+    args: { project: "octo/3", name: "status", type: "single_select", options: ["Todo", "Cancelled:RED", "Blocked"] },
+    rules: boardWithFields(),
+  },
+  fieldComplete: {
+    name: "ensure a single select that has every option",
+    tool: projectFieldEnsure,
+    args: { project: "octo/3", name: "Status", type: "single_select", options: ["todo", "Done"] },
+    rules: boardWithFields(),
+  },
+  fieldExisting: {
+    name: "ensure a field that is on the board",
+    tool: projectFieldEnsure,
+    args: { project: "octo/3", name: "NOTES", type: "text" },
+    rules: boardWithFields(),
   },
   convertEmptyDraft: {
     name: "convert a draft that has no body",

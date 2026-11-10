@@ -30,6 +30,9 @@ export async function describedItem(
   return { ...resolved, title: content?.title, type: content?.type }
 }
 
+/** How the `State` fact words a field or view that is on the board already. */
+export const ALREADY_THERE = "Already there; nothing is sent"
+
 /** The headline of a call on the item, `text` with the item's real title for `{title}`; none when the title is unknown, so the tool's title stands. */
 export function itemHeadline(text: string, title: string | undefined): { headline?: CallHeadline } {
   return title === undefined ? {} : { headline: { text, values: { title } } }

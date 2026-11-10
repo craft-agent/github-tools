@@ -32,6 +32,7 @@ import {
   archivedItem,
   describeCase,
   itemRules,
+  issueColumnRules,
   linkRules,
   type DescribeCase,
 } from "./describe.fixtures"
@@ -553,6 +554,92 @@ describe("github_project_link and github_project_unlink", () => {
       rules: [...octoBoardRules(3, { viewerCanUpdate: false }), repositoryRule()],
     }
     expect(await describeCase(readOnly)).toBeUndefined()
+  })
+})
+
+describe("github_project_field_ensure", () => {
+  const onBoard = { label: "Board", value: "Roadmap" }
+
+  test("a new single select shows its type and every option it starts with", async () => {
+    expect(await describeCase(DESCRIBE_CASES.fieldNew)).toEqual({
+      headline: { text: "About to make sure the field {name} is on the project board", values: { name: "Effort" } },
+      facts: [onBoard, { label: "Type", value: word("Single select") }, { label: "Options", value: "+S +M +L" }],
+    })
+  })
+
+  test("a new field of another type shows its type only", async () => {
+    expect((await describeCase(DESCRIBE_CASES.fieldNewText))?.facts).toEqual([
+      onBoard,
+      { label: "Type", value: word("Text") },
+    ])
+  })
+
+  test("an existing single select shows only the options it lacks", async () => {
+    expect((await describeCase(DESCRIBE_CASES.fieldNewOptions))?.facts).toEqual([
+      onBoard,
+      { label: "Options", value: "+Cancelled +Blocked" },
+    ])
+  })
+
+  test("a field that has everything says nothing is sent", async () => {
+    for (const item of [DESCRIBE_CASES.fieldComplete, DESCRIBE_CASES.fieldExisting]) {
+      expect((await describeCase(item))?.facts).toEqual([
+        { label: "State", value: word("Already there; nothing is sent") },
+      ])
+    }
+  })
+
+  test("an issue field column is shown as one, and says nothing is sent when the board has it", async () => {
+    const item = DESCRIBE_CASES.fieldIssueColumn
+    expect(await describeCase(item)).toEqual({
+      headline: named("About to make sure the field {name} is on the project board", "target DATE"),
+      facts: [onBoard, { label: "Type", value: word("Issue field") }],
+    })
+    expect((await describeCase({ ...item, rules: issueColumnRules(true) }))?.facts).toEqual([
+      { label: "State", value: word("Already there; nothing is sent") },
+    ])
+  })
+
+  const field = DESCRIBE_CASES.fieldNew
+  const withoutStatus = boardWithFields(BOARD_FIELD_NODES.filter((node) => node.name !== "Status"))
+  test.each([
+    ["no type", { project: "octo/3", name: "Effort" }, field.rules],
+    ["a blank name", { project: "octo/3", name: " ", type: "text" }, field.rules],
+    ["options on a text field", { project: "octo/3", name: "Remarks", type: "text", options: ["a"] }, field.rules],
+    [
+      "a repeated option",
+      { project: "octo/3", name: "Effort", type: "single_select", options: ["a", "A"] },
+      field.rules,
+    ],
+    [
+      "a color GitHub does not list",
+      { project: "octo/3", name: "Effort", type: "single_select", options: ["a:PUCE"] },
+      field.rules,
+    ],
+    [
+      "options with issue_field",
+      { project: "octo/3", name: "Priority", issue_field: true, options: ["a"] },
+      field.rules,
+    ],
+    ["a new single select without options", { project: "octo/3", name: "Effort", type: "single_select" }, field.rules],
+    [
+      "a Status that has to be created",
+      { project: "octo/3", name: "Status", type: "single_select", options: ["a"] },
+      withoutStatus,
+    ],
+    ["a field of another type", { project: "octo/3", name: "Notes", type: "number" }, field.rules],
+    [
+      "a column that mirrors an issue field of the viewer's own name",
+      { project: "octo/3", name: "Notes", issue_field: true },
+      field.rules,
+    ],
+    [
+      "a board the viewer cannot update",
+      field.args,
+      [...octoBoardRules(3, { viewerCanUpdate: false }), ...field.rules.slice(2)],
+    ],
+  ])("%s: no description", async (_name, args, rules) => {
+    expect(await describeCase({ ...field, args, rules })).toBeUndefined()
   })
 })
 
