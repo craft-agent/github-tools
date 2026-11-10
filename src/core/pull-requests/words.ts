@@ -53,7 +53,6 @@ export const PULL_REQUEST_TRANSLATIONS: Translations = {
     "In no stack; nothing is sent": "スタックに属していません（何も送信されません）",
     "No layer can leave; nothing is sent": "外せるレイヤーがありません（何も送信されません）",
     Head: "ヘッド",
-    Commit: "コミット",
     "Line comments": "行コメント",
     "{count} comment": "{count} 件のコメント",
     "{count} comments": "{count} 件のコメント",
