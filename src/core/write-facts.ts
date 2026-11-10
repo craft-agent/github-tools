@@ -7,7 +7,7 @@ import type { Translations } from "./words"
 const MINUS = "\u2212"
 
 /** The states a fact shows as a word of the tool's, by the lower-case word GitHub's state becomes. */
-const STATE_WORDS: Readonly<Record<string, string>> = {
+export const STATE_WORDS: Readonly<Record<string, string>> = {
   open: "Open",
   closed: "Closed",
   merged: "Merged",
