@@ -94,6 +94,18 @@ describe("defineTool", () => {
     expect(() => defineTool(given as unknown as Parameters<typeof defineTool>[0])).toThrow(/object output schema/)
   })
 
+  test("accepts an intent that is a fixed phrase", () => {
+    expect(() => defineTool({ ...base, id: "github_issue_create", intent: "About to create an issue" })).not.toThrow()
+  })
+
+  test.each(["", "   "])("rejects the blank intent %j", (intent) => {
+    expect(() => defineTool({ ...base, id: "github_issue_create", intent })).toThrow(/intent that is not blank/)
+  })
+
+  test.each(["About to create {name}", "About } to create", "About { to create"])("rejects the intent %j", (intent) => {
+    expect(() => defineTool({ ...base, id: "github_issue_create", intent })).toThrow(/intent without braces/)
+  })
+
   test("accepts targets that are arguments of the input and rejects any other", () => {
     const id = "github_issue_create"
     expect(() => defineTool({ ...base, id, targets: { label: "repo" } })).not.toThrow()

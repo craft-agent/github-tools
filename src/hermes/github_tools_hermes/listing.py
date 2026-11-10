@@ -20,7 +20,7 @@ _TEXT_FIELDS = ("id", "title", "description", "toolset", "class")
 
 @dataclass(frozen=True)
 class ToolInfo:
-    """One tool as ``list`` describes it."""
+    """One tool as ``list`` describes it; ``intent`` is its English approval line, ``None`` when it has none or a bad one."""
 
     id: str
     title: str
@@ -28,6 +28,7 @@ class ToolInfo:
     toolset: str
     write_class: str
     input_schema: dict[str, Any]
+    intent: str | None = None
 
     @classmethod
     def from_listing(cls, entry: Any) -> ToolInfo:
@@ -42,7 +43,9 @@ class ToolInfo:
             or not isinstance(entry.get("input_schema"), dict)
         ):
             raise Unavailable(f"github-tools-cli listed a tool the plugin cannot read: {entry!r}")
+        intent = entry.get("intent")
         return cls(
+            intent=intent if isinstance(intent, str) and intent.strip() else None,
             id=entry["id"],
             title=entry["title"],
             description=entry["description"],
