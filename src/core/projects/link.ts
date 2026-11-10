@@ -2,9 +2,13 @@ import { z } from "zod"
 import { assertSameOwner, isLinked, setLinked } from "../github/board-setup"
 import { assertBoardWritable, boardResource, resolveBoard } from "../github/projects"
 import { resolveRepo } from "../refs"
-import { defineTool, type ToolContext } from "../tool"
+import { defineTool, type CallDescription, type ToolContext } from "../tool"
 import { writableContext } from "../write-support"
 import { BOARD_LOOKUP_NOTE, BOARD_SELECTION, PROJECT_SCOPE_NOTE, boardSummary, boardSummarySchema } from "./support"
+
+/** How the `State` fact words a board that is in the wanted state already. The stack tools' `Already linked; nothing is sent` is another thing, so these say what is linked. */
+const ALREADY_LINKED = "Already linked to the repository; nothing is sent"
+const NOT_LINKED = "Not linked to the repository; nothing is sent"
 
 const input = z.object({
   ...BOARD_SELECTION,
@@ -36,6 +40,26 @@ async function setLink(args: Args, linked: boolean, ctx: ToolContext) {
   return { project: boardSummary(project), repo: context.repo.full, changed }
 }
 
+/** What a call that puts the board in the wanted state will do: nothing is sent when it is in it already. */
+async function describeLink(
+  args: Args,
+  linked: boolean,
+  headline: string,
+  nothingSent: string,
+  ctx: ToolContext,
+): Promise<CallDescription> {
+  const repo = await resolveRepo(args.repo, ctx)
+  const { project } = await resolveBoard({ ...args, repo: repo.full }, ctx)
+  if (linked) assertSameOwner({ name: boardResource(project), owner: project.owner }, repo)
+  assertBoardWritable(project)
+  const context = await writableContext(repo, ctx)
+  const inState = (await isLinked(project, context.repo, ctx)) === linked
+  return {
+    headline: { text: headline, values: { title: project.title } },
+    facts: inState ? [{ label: "State", value: { text: nothingSent } }] : [],
+  }
+}
+
 export const projectLink = defineTool({
   id: "github_project_link",
   title: "Link a GitHub project to a repository",
@@ -48,6 +72,8 @@ export const projectLink = defineTool({
   toolset: "projects",
   class: "idempotent",
   targets: { project: "board", repo: "repo" },
+  describe: (args, ctx) =>
+    describeLink(args, true, "About to link the project board {title} to the repository", ALREADY_LINKED, ctx),
   input,
   output,
   execute: (args, ctx) => setLink(args, true, ctx),
@@ -65,6 +91,8 @@ export const projectUnlink = defineTool({
   toolset: "projects",
   class: "idempotent",
   targets: { project: "board", repo: "repo" },
+  describe: (args, ctx) =>
+    describeLink(args, false, "About to unlink the project board {title} from the repository", NOT_LINKED, ctx),
   input,
   output,
   execute: (args, ctx) => setLink(args, false, ctx),

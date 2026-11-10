@@ -8,7 +8,7 @@ import {
 } from "../../testing/board-write-fixtures"
 import { installFakeGh, type GhRule } from "../../testing/fake-gh"
 import { tempRepo } from "../../testing/git-repo"
-import { itemBoardRule, octoBoardRules, rawBoard } from "../../testing/project-fixtures"
+import { itemBoardRule, linkedBoardsRule, octoBoardRules, rawBoard } from "../../testing/project-fixtures"
 import { pullHeadingRule } from "../../testing/pull-request-write-fixtures"
 import { ORIGIN, issueHeadingRule, milestonesRule, repositoryRule } from "../../testing/write-fixtures"
 import { callDescription } from "../describe"
@@ -18,6 +18,7 @@ import { projectItemArchive, projectItemUnarchive } from "./item-archive"
 import { projectItemConvert } from "./item-convert"
 import { projectItemCreate } from "./item-create"
 import { projectItemEdit } from "./item-edit"
+import { projectLink, projectUnlink } from "./link"
 
 /** One call of a project board write tool to describe, and the replies of GitHub it meets. */
 export type DescribeCase = { name: string; tool: ToolSpec; args: Record<string, unknown>; rules: GhRule[] }
@@ -67,6 +68,13 @@ export const addRules = (onBoard = false, ...states: string[]): GhRule[] => [
   addedContent("Issue", onBoard),
   issueHeadingRule({ title: ADDED_TITLE }),
   blockersRule(...states),
+]
+
+/** The replies of linking or unlinking board 3 and `octo/hello`; `linked` says whether the repository lists the board. */
+export const linkRules = (linked: boolean): GhRule[] => [
+  ...octoBoardRules(3),
+  repositoryRule(),
+  linkedBoardsRule("octo", "hello", linked ? [rawBoard(3)] : []),
 ]
 
 /** Representative calls of the board item write tools, which the description tests and the words test share. */
@@ -231,6 +239,30 @@ export const DESCRIBE_CASES = {
     tool: projectItemConvert,
     args: { item: "PVTI_1", milestone: "v9", create_milestone: true },
     rules: itemRules(DRAFT_ITEM, repositoryRule(), milestonesRule("v0")),
+  },
+  link: {
+    name: "link a board",
+    tool: projectLink,
+    args: { project: "octo/3" },
+    rules: linkRules(false),
+  },
+  linkAlready: {
+    name: "link a board that is linked already",
+    tool: projectLink,
+    args: { project: "octo/3" },
+    rules: linkRules(true),
+  },
+  unlink: {
+    name: "unlink a board",
+    tool: projectUnlink,
+    args: { project: "octo/3" },
+    rules: linkRules(true),
+  },
+  unlinkAlready: {
+    name: "unlink a board that is not linked",
+    tool: projectUnlink,
+    args: { project: "octo/3" },
+    rules: linkRules(false),
   },
   convertEmptyDraft: {
     name: "convert a draft that has no body",

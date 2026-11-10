@@ -8,7 +8,7 @@ import {
   rawBoardContent,
 } from "../../testing/board-write-fixtures"
 import { DEPENDENCIES } from "../../testing/issue-fixtures"
-import { itemBoardRule, octoBoardRules, rawBoard } from "../../testing/project-fixtures"
+import { itemBoardRule, linkedBoardsRule, octoBoardRules, rawBoard } from "../../testing/project-fixtures"
 import { milestonesRule, repositoryRule } from "../../testing/write-fixtures"
 import { queryOf } from "../../testing/setup-fixtures"
 import { MAX_FACTS, MAX_HEADLINE_LENGTH, MAX_LABEL_LENGTH } from "../describe"
@@ -24,6 +24,7 @@ import {
   archivedItem,
   describeCase,
   itemRules,
+  linkRules,
   type DescribeCase,
 } from "./describe.fixtures"
 
@@ -31,6 +32,7 @@ import {
 const WRITE_METHODS = ["POST", "PUT", "PATCH", "DELETE"]
 
 const headline = (text: string, title = ISSUE_TITLE) => ({ text, values: { title } })
+const named = (text: string, name: string) => ({ text, values: { name } })
 const word = (text: string) => ({ text })
 const board = { label: "Board", value: "Roadmap" }
 
@@ -377,6 +379,75 @@ describe("github_project_item_convert", () => {
     ["an item that does not exist", { item: "PVTI_1" }, itemRules(null, repositoryRule())],
   ])("%s: no description", async (_name, args, rules) => {
     expect(await describeCase({ ...convert, args, rules })).toBeUndefined()
+  })
+})
+
+describe("github_project_link and github_project_unlink", () => {
+  const link = (text: string) => headline(text, "Roadmap")
+
+  test("link names the board by its real title and has no fact, the repository being a target", async () => {
+    expect(await describeCase(DESCRIBE_CASES.link)).toEqual({
+      headline: link("About to link the project board {title} to the repository"),
+      facts: [],
+    })
+  })
+
+  test("a board that is linked already says nothing is sent", async () => {
+    expect(await describeCase(DESCRIBE_CASES.linkAlready)).toEqual({
+      headline: link("About to link the project board {title} to the repository"),
+      facts: [{ label: "State", value: word("Already linked to the repository; nothing is sent") }],
+    })
+  })
+
+  test("unlink names the board and has no fact", async () => {
+    expect(await describeCase(DESCRIBE_CASES.unlink)).toEqual({
+      headline: link("About to unlink the project board {title} from the repository"),
+      facts: [],
+    })
+  })
+
+  test("a board that is not linked says nothing is sent", async () => {
+    expect(await describeCase(DESCRIBE_CASES.unlinkAlready)).toEqual({
+      headline: link("About to unlink the project board {title} from the repository"),
+      facts: [{ label: "State", value: word("Not linked to the repository; nothing is sent") }],
+    })
+  })
+
+  test.each([
+    [
+      "a board of another owner than the repository's",
+      { project: "octo/3", repo: "acme/widgets" },
+      [...linkRules(false), repositoryRule({ repo: "acme/widgets" })],
+    ],
+    [
+      "a board the viewer cannot update",
+      DESCRIBE_CASES.link.args,
+      [...octoBoardRules(3, { viewerCanUpdate: false }), repositoryRule()],
+    ],
+    [
+      "a repository the viewer cannot write to",
+      DESCRIBE_CASES.link.args,
+      [...octoBoardRules(3), repositoryRule({ permission: "READ" })],
+    ],
+  ])("%s: no link description", async (_name, args, rules) => {
+    expect(await describeCase({ ...DESCRIBE_CASES.link, args, rules })).toBeUndefined()
+  })
+
+  test("a board of another owner can still be unlinked, and a board the viewer cannot update cannot", async () => {
+    const other = { ...DESCRIBE_CASES.unlink, args: { project: "octo/3", repo: "acme/widgets" } }
+    const rules = [
+      ...octoBoardRules(3),
+      repositoryRule({ repo: "acme/widgets" }),
+      linkedBoardsRule("acme", "widgets", []),
+    ]
+    expect((await describeCase({ ...other, rules }))?.facts).toEqual([
+      { label: "State", value: word("Not linked to the repository; nothing is sent") },
+    ])
+    const readOnly = {
+      ...DESCRIBE_CASES.unlink,
+      rules: [...octoBoardRules(3, { viewerCanUpdate: false }), repositoryRule()],
+    }
+    expect(await describeCase(readOnly)).toBeUndefined()
   })
 })
 
