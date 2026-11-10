@@ -2,6 +2,7 @@ import { z } from "zod"
 import { cancelRun, parseRunRef, readRun } from "../github/workflow-runs"
 import { REPO_DESCRIPTION, invalid, writableContext } from "../write-support"
 import { confirmWrite, defineTool } from "../tool"
+import { describedRun, statusFact } from "./describe-support"
 
 const CANCELLATION_HINT = "Cancelling takes a moment; read the run with github_run_read view to see it end."
 
@@ -28,6 +29,22 @@ export const runCancel = defineTool({
   toolset: "actions",
   class: "administrative",
   targets: { run: "run", repo: "repo" },
+  async describe(args, ctx) {
+    const { repo, current } = await describedRun(args, ctx)
+    if (current.status === "completed") {
+      throw invalid(
+        `Workflow run ${current.id} of ${repo.full} ended ${current.conclusion ?? "completed"}; nothing to cancel.`,
+      )
+    }
+    return {
+      headline: { text: "About to cancel the run of the workflow {name}", values: { name: current.workflow } },
+      facts: [
+        { label: "Branch", value: current.branch },
+        { label: "Event", value: current.event },
+        statusFact(current.status),
+      ],
+    }
+  },
   input,
   output,
   async execute(args, ctx) {
