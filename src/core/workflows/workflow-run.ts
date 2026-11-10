@@ -108,6 +108,46 @@ export const workflowRun = defineTool({
   toolset: "actions",
   class: "administrative",
   targets: { repo: "repo" },
+  async describe(args, ctx) {
+    const expectedSha = given(args.head_sha)
+    if (args.head_sha !== undefined && (!expectedSha || !SHA_PATTERN.test(expectedSha))) {
+      throw invalid("head_sha must be a full commit SHA of 40 hexadecimal characters.")
+    }
+
+    const context = await writableContext(await resolveRepo(args.repo, ctx), ctx)
+    const repo = context.repo
+    const workflow = await resolveWorkflow(repo, args.workflow, ctx)
+    if (workflow.state !== ACTIVE_STATE) {
+      throw invalid(
+        `Workflow "${workflow.name}" (${workflow.path}) of ${repo.full} is ${workflow.state}, not ${ACTIVE_STATE}; enable it on GitHub first.`,
+      )
+    }
+
+    const ref = given(args.ref) ?? (await defaultBranch(repo, ctx))
+    if (!ref) {
+      throw invalid(`${repo.full} has no default branch (it may be empty); give a ref.`)
+    }
+    const commit = await refCommit(repo, ref, ctx)
+    if (expectedSha && commit.toLowerCase() !== expectedSha.toLowerCase()) {
+      throw new ToolError(
+        "stale",
+        `${ref} of ${repo.full} is at ${shortSha(commit)}, not ${shortSha(expectedSha)}: it moved since it was read. Nothing was started.`,
+      )
+    }
+
+    const inputs = Object.entries(inputStrings(args.inputs))
+    return {
+      headline: { text: "About to start the workflow {name}", values: { name: workflow.name } },
+      facts: [
+        { label: "Ref", value: ref },
+        { label: "Commit", value: shortSha(commit) },
+        ...(inputs.length > 0
+          ? [{ label: "Inputs", value: inputs.map(([name, value]) => `${name}: ${value}`).join("; ") }]
+          : []),
+      ],
+      pins: { head_sha: commit },
+    }
+  },
   input,
   output,
   async execute(args, ctx) {
