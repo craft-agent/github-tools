@@ -20,6 +20,9 @@ export function stateFact(state: string): CallFact {
   return { label: "State", value: word === undefined ? state : { text: word } }
 }
 
+/** How the `State` fact words a project item or a repository that is not archived, when the call would unarchive it. */
+export const NOT_ARCHIVED = "Not archived; nothing is sent"
+
 /** A fact that lists a change as `+added −removed`, or `undefined` when nothing is added or removed. */
 export function changeFact(
   label: string,
@@ -63,5 +66,6 @@ export const WRITE_FACT_TRANSLATIONS: Translations = {
     Removed: "解除",
     "Already closed; nothing is sent": "すでにクローズ済みです（何も送信されません）",
     "Already open; nothing is sent": "すでにオープン中です（何も送信されません）",
+    [NOT_ARCHIVED]: "アーカイブされていません（何も送信されません）",
   },
 }

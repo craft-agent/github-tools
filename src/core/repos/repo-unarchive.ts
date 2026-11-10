@@ -3,6 +3,8 @@ import { patchRepository, readAdministeredRepository } from "../github/repos"
 import { REPO_DESCRIPTION } from "../write-support"
 import { resolveRepo } from "../refs"
 import { defineTool } from "../tool"
+import { NOT_ARCHIVED } from "../write-facts"
+import { describedRepo, repoHeadline, visibilityFact } from "./describe-support"
 
 export const repoUnarchive = defineTool({
   id: "github_repo_unarchive",
@@ -13,6 +15,13 @@ export const repoUnarchive = defineTool({
   toolset: "repos",
   class: "overwrite",
   targets: { repo: "repo" },
+  async describe(args, ctx) {
+    const { view } = await describedRepo(args, ctx)
+    return {
+      ...repoHeadline("About to unarchive the repository {name}", view.repo),
+      facts: [view.archived ? visibilityFact(view.visibility) : { label: "State", value: { text: NOT_ARCHIVED } }],
+    }
+  },
   input: z.object({ repo: z.string().optional().describe(REPO_DESCRIPTION) }),
   output: z.object({
     repo: z.string().describe("The repository, as owner/name."),

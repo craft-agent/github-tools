@@ -2,14 +2,14 @@ import { z } from "zod"
 import { setItemArchived } from "../github/board-item-write"
 import { assertBoardWritable } from "../github/projects"
 import { defineTool, type CallDescription, type CallFact, type ToolContext } from "../tool"
+import { NOT_ARCHIVED } from "../write-facts"
 import { describedItem, itemHeadline } from "./describe-support"
 import { ITEM_BOARD_SELECTION, ITEM_NOTE, itemArgument } from "./item-support"
 import { resolveBoardItem } from "./item-resolve"
 import { BOARD_LOOKUP_NOTE, PROJECT_SCOPE_NOTE, boardSummary, boardSummarySchema } from "./support"
 
-/** How the `State` fact words an item that is in the wanted state already. */
+/** How the `State` fact words an item that is archived already. */
 const ALREADY_ARCHIVED = "Already archived; nothing is sent"
-const NOT_ARCHIVED = "Not archived; nothing is sent"
 
 const input = z.object({ item: itemArgument, ...ITEM_BOARD_SELECTION })
 

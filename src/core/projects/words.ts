@@ -77,6 +77,5 @@ export const PROJECT_TRANSLATIONS: Translations = {
     "Cleared fields": "クリアするフィールド",
     "Already in place; nothing is sent": "すでに反映済みです（何も送信されません）",
     "Already archived; nothing is sent": "アーカイブ済みです（何も送信されません）",
-    "Not archived; nothing is sent": "アーカイブされていません（何も送信されません）",
   },
 }

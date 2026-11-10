@@ -3,6 +3,7 @@ import { patchRepository, readAdministeredRepository, visibilitySchema, type Vis
 import { REPO_DESCRIPTION, invalid } from "../write-support"
 import { resolveRepo } from "../refs"
 import { confirmWrite, defineTool } from "../tool"
+import { describedRepo, repoHeadline, transitionFact } from "./describe-support"
 
 const input = z.object({
   repo: z.string().optional().describe(REPO_DESCRIPTION),
@@ -22,6 +23,13 @@ function consequence(from: Visibility, to: Visibility): string {
   return to === "internal" ? "Every member of the enterprise can read it." : "Only people given access can read it."
 }
 
+/** The headline by the visibility the call asks for. */
+const HEADLINES: Readonly<Record<Visibility, string>> = {
+  public: "About to make the repository {name} public",
+  private: "About to make the repository {name} private",
+  internal: "About to make the repository {name} internal",
+}
+
 export const repoVisibility = defineTool({
   id: "github_repo_visibility",
   title: "Change a GitHub repository's visibility",
@@ -31,6 +39,17 @@ export const repoVisibility = defineTool({
   toolset: "repos",
   class: "administrative",
   targets: { repo: "repo" },
+  async describe(args, ctx) {
+    const { view } = await describedRepo(args, ctx)
+    if (view.visibility === args.visibility) throw invalid(`${view.repo} is ${args.visibility} already.`)
+    if (args.visibility === "internal" && view.owner_type !== "organization") {
+      throw invalid(`internal is for an organization's repository; ${view.repo} belongs to a user.`)
+    }
+    return {
+      ...repoHeadline(HEADLINES[args.visibility], view.repo),
+      facts: [transitionFact(view.visibility, args.visibility)],
+    }
+  },
   input,
   output,
   async execute(args, ctx) {

@@ -3,6 +3,7 @@ import { patchRepository, readAdministeredRepository } from "../github/repos"
 import { REPO_DESCRIPTION, invalid } from "../write-support"
 import { resolveRepo } from "../refs"
 import { confirmWrite, defineTool } from "../tool"
+import { describedRepo, repoHeadline, visibilityFact } from "./describe-support"
 
 export const repoArchive = defineTool({
   id: "github_repo_archive",
@@ -13,6 +14,14 @@ export const repoArchive = defineTool({
   toolset: "repos",
   class: "administrative",
   targets: { repo: "repo" },
+  async describe(args, ctx) {
+    const { view } = await describedRepo(args, ctx)
+    if (view.archived) throw invalid(`${view.repo} is archived already.`)
+    return {
+      ...repoHeadline("About to archive the repository {name}", view.repo),
+      facts: [visibilityFact(view.visibility)],
+    }
+  },
   input: z.object({ repo: z.string().optional().describe(REPO_DESCRIPTION) }),
   output: z.object({ repo: z.string().describe("The repository, as owner/name."), archived: z.literal(true) }),
   async execute(args, ctx) {
