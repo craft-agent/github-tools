@@ -4,7 +4,9 @@ import { REPO_DESCRIPTION, invalid, writableContext } from "../write-support"
 import { parseNumberRef, resolveRepo } from "../refs"
 import { given } from "../search"
 import { defineTool } from "../tool"
-import { PR_DESCRIPTION } from "./write-support"
+import { PR_DESCRIPTION, layersFact } from "./write-support"
+
+const MERGED = "merged"
 
 const input = z.object({
   stack: z.number().int().min(1).optional().describe("The stack's number (not a pull request's)."),
@@ -41,6 +43,34 @@ export const stackUnlink = defineTool({
   toolset: "pull_requests",
   class: "overwrite",
   targets: { pr: "pull", repo: "repo" },
+  async describe(args, ctx) {
+    const pr = given(args.pr)
+    if ((args.stack === undefined) === (pr === undefined)) {
+      throw invalid("Give exactly one of `stack` (a stack number) or `pr` (a pull request in the stack).")
+    }
+    const named = pr === undefined ? undefined : await parseNumberRef(pr, args.repo, ctx, { accept: "pull" })
+    const repo = named?.repo ?? (await resolveRepo(args.repo, ctx))
+
+    const headline = { text: "About to take the pull requests out of the stack" }
+    const number = named ? await stackOfPull(repo, named.number, ctx) : args.stack!
+    if (number === null)
+      return { headline, facts: [{ label: "State", value: { text: "In no stack; nothing is sent" } }] }
+
+    const { layers } = await readStack(repo, number, ctx)
+    const leaving = layers.filter((layer) => layer.state !== MERGED)
+    if (leaving.length === 0) {
+      return { headline, facts: [{ label: "State", value: { text: "No layer can leave; nothing is sent" } }] }
+    }
+    return {
+      headline,
+      facts: [
+        layersFact(leaving),
+        ...(leaving.length < layers.length
+          ? [{ label: "Stays", value: { text: "Merged and queued layers stay" } }]
+          : []),
+      ],
+    }
+  },
   input,
   output,
   async execute(args, ctx) {

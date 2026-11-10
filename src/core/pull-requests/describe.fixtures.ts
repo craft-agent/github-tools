@@ -3,8 +3,14 @@ import { installFakeGh, type GhRule } from "../../testing/fake-gh"
 import { tempRepo } from "../../testing/git-repo"
 import { ALL_METHODS, headSha, mergeStateRule, mergedState, methodsRule, stackedAt } from "../../testing/merge-fixtures"
 import { octoBoardRules, viewerRule } from "../../testing/project-fixtures"
-import { linkedIssues, pullHeadingRule, rawClosingIssue, stateRule } from "../../testing/pull-request-write-fixtures"
-import { rawFullStack, stackRule } from "../../testing/stack-fixtures"
+import {
+  PULL_HEADING,
+  linkedIssues,
+  pullHeadingRule,
+  rawClosingIssue,
+  stateRule,
+} from "../../testing/pull-request-write-fixtures"
+import { chainRules, inStack, pullRule, rawFullStack, stackRule } from "../../testing/stack-fixtures"
 import { ORIGIN, milestonesRule } from "../../testing/write-fixtures"
 import { callDescription } from "../describe"
 import type { CallDescription, ToolSpec } from "../tool"
@@ -16,6 +22,8 @@ import { prMerge } from "./merge"
 import { prReady } from "./ready"
 import { prReopen } from "./reopen"
 import { prReview } from "./review"
+import { stackLink } from "./stack-link"
+import { stackUnlink } from "./stack-unlink"
 
 /** One call of a pull request write tool to describe, and the replies of GitHub it meets. */
 export type DescribeCase = { name: string; tool: ToolSpec; args: Record<string, unknown>; rules: GhRule[] }
@@ -56,6 +64,14 @@ export const stackRules = (lower: { 3?: Record<string, unknown>; 4?: Record<stri
   mergeStateRule(3, { ...stackedAt(1, 1), ...lower[3] }),
   stackRule(1, rawFullStack(1, [3, 4, 5])),
 ]
+
+/** The heading of one layer of a stack, which a rule of the heading query picks by the pull request's number. */
+const layerRule = (number: number, title: string): GhRule => ({
+  ...pullHeadingRule({ title }),
+  match: `${PULL_HEADING}[\\s\\S]* n=${number}( |$)`,
+})
+
+const MERGED_AT = "2026-11-01T00:00:00Z"
 
 /** Representative calls of the pull request write tools, which the description tests and the words test share. */
 export const DESCRIBE_CASES = {
@@ -309,6 +325,69 @@ export const DESCRIBE_CASES = {
     tool: prMerge,
     args: { pr: "7", method: "squash" },
     rules: mergeRules(pullHeadingRule({ state: "MERGED" }), mergeStateRule(7, mergedState(7))),
+  },
+  linkNew: {
+    name: "link two pull requests into a new stack",
+    tool: stackLink,
+    args: { prs: [3, 4] },
+    rules: [...chainRules([3, 4]), layerRule(3, "Add retry"), layerRule(4, "Use it")],
+  },
+  linkExtending: {
+    name: "link a new layer on top of an existing stack",
+    tool: stackLink,
+    args: { prs: [102, 103] },
+    rules: [
+      ...chainRules([102, 103], { 102: inStack(5, 2, 2) }),
+      stackRule(5, rawFullStack(5, [101, 102])),
+      layerRule(103, "Third layer"),
+    ],
+  },
+  linkAlready: {
+    name: "link pull requests that are in the stack already",
+    tool: stackLink,
+    args: { prs: [101, 102] },
+    rules: [
+      ...chainRules([101, 102], { 101: inStack(5, 1, 2), 102: inStack(5, 2, 2) }),
+      stackRule(5, rawFullStack(5, [101, 102])),
+    ],
+  },
+  unlinkByStack: {
+    name: "unlink a stack named by its number",
+    tool: stackUnlink,
+    args: { stack: 5 },
+    rules: [stackRule(5, rawFullStack(5, [101, 102, 103]))],
+  },
+  unlinkByPull: {
+    name: "unlink the stack of a pull request",
+    tool: stackUnlink,
+    args: { pr: "102" },
+    rules: [pullRule(102, null, inStack(5, 2, 3)), stackRule(5, rawFullStack(5, [101, 102, 103]))],
+  },
+  unlinkWithMerged: {
+    name: "unlink a stack whose bottom layer is merged",
+    tool: stackUnlink,
+    args: { stack: 5 },
+    rules: [stackRule(5, rawFullStack(5, [101, 102, 103], { 101: { merged_at: MERGED_AT, state: "closed" } }))],
+  },
+  unlinkAllMerged: {
+    name: "unlink a stack whose layers are all merged",
+    tool: stackUnlink,
+    args: { stack: 5 },
+    rules: [
+      stackRule(
+        5,
+        rawFullStack(5, [101, 102], {
+          101: { merged_at: MERGED_AT, state: "closed" },
+          102: { merged_at: MERGED_AT, state: "closed" },
+        }),
+      ),
+    ],
+  },
+  unlinkInNone: {
+    name: "unlink a pull request that is in no stack",
+    tool: stackUnlink,
+    args: { pr: "102" },
+    rules: [pullRule(102, null)],
   },
 } satisfies Record<string, DescribeCase>
 

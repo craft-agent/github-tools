@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { HEAD_SHA, branchRule } from "../../testing/develop-fixtures"
 import { headSha, mergeStateRule, mergedState, methodsRule } from "../../testing/merge-fixtures"
 import { COMMIT_SHA, PULL_HEADING, pullHeadingRule, stateRule } from "../../testing/pull-request-write-fixtures"
+import { chainRules, inStack, pullRule, rawFullStack, stackFailureRule, stackRule } from "../../testing/stack-fixtures"
 import { milestonesRule } from "../../testing/write-fixtures"
 import { MAX_FACTS, MAX_HEADLINE_LENGTH, MAX_LABEL_LENGTH } from "../describe"
 import { shortSha } from "../refs"
@@ -531,6 +532,110 @@ describe("github_pr_merge", () => {
     ],
   ])("%s: no description", async (_name, args, rules) => {
     expect(await describeCase({ ...merging, args, rules })).toBeUndefined()
+  })
+})
+
+describe("github_stack_link", () => {
+  const onMain = { text: "About to link the pull requests into a stack on {base}", values: { base: "main" } }
+
+  test("a new stack names the trunk, lists the layers bottom to top with their real titles and says it is new", async () => {
+    expect(await describeCase(DESCRIBE_CASES.linkNew)).toEqual({
+      headline: onMain,
+      facts: [
+        { label: "Layers", value: "#3 Add retry, #4 Use it" },
+        { label: "Stack", value: word("New stack") },
+      ],
+    })
+  })
+
+  test("layers on top of an existing stack list the whole stack and count what it holds", async () => {
+    expect(await describeCase(DESCRIBE_CASES.linkExtending)).toEqual({
+      headline: onMain,
+      facts: [
+        { label: "Layers", value: "#101 Pull request 101, #102 Pull request 102, #103 Third layer" },
+        { label: "Stack", value: { text: "Extends a stack of {count}", values: { count: 2 } } },
+      ],
+    })
+  })
+
+  test("pull requests that are in the stack already say nothing is sent", async () => {
+    expect(await describeCase(DESCRIBE_CASES.linkAlready)).toEqual({
+      headline: onMain,
+      facts: [{ label: "State", value: word("Already linked; nothing is sent") }],
+    })
+  })
+
+  test.each([
+    ["a pull request listed twice", { prs: [3, 3] }, DESCRIBE_CASES.linkNew.rules],
+    ["a new stack of one", { prs: [3] }, DESCRIBE_CASES.linkNew.rules],
+    ["a pull request that is closed", { prs: [3, 4] }, [...chainRules([3, 4], { 4: { state: "closed" } })]],
+    ["a chain whose bases do not match", { prs: [3, 4] }, [pullRule(3, null), pullRule(4, 9)]],
+    [
+      "a head branch in a fork",
+      { prs: [3, 4] },
+      chainRules([3, 4], { 4: { head: { ref: "feature-4", sha: "sha-4", repo: { full_name: "fork/hello" } } } }),
+    ],
+    ["pull requests of two stacks", { prs: [3, 4] }, chainRules([3, 4], { 3: inStack(5, 1, 1), 4: inStack(6, 1, 1) })],
+    [
+      "a list that is not the top of the stack",
+      { prs: [101, 103] },
+      [...chainRules([101], { 101: inStack(5, 1, 2) }), pullRule(103, 101), stackRule(5, rawFullStack(5, [101, 102]))],
+    ],
+  ])("%s: no description", async (_name, args, rules) => {
+    expect(await describeCase({ ...DESCRIBE_CASES.linkNew, args, rules })).toBeUndefined()
+  })
+})
+
+describe("github_stack_unlink", () => {
+  const out = { text: "About to take the pull requests out of the stack" }
+
+  test("a stack named by its number lists its layers bottom to top", async () => {
+    expect(await describeCase(DESCRIBE_CASES.unlinkByStack)).toEqual({
+      headline: out,
+      facts: [{ label: "Layers", value: "#101 Pull request 101, #102 Pull request 102, #103 Pull request 103" }],
+    })
+  })
+
+  test("a pull request names the stack it is in", async () => {
+    const description = await describeCase(DESCRIBE_CASES.unlinkByPull)
+    expect(description?.facts).toEqual([
+      { label: "Layers", value: "#101 Pull request 101, #102 Pull request 102, #103 Pull request 103" },
+    ])
+  })
+
+  test("a merged layer is not listed, and the fact says it stays", async () => {
+    expect(await describeCase(DESCRIBE_CASES.unlinkWithMerged)).toEqual({
+      headline: out,
+      facts: [
+        { label: "Layers", value: "#102 Pull request 102, #103 Pull request 103" },
+        { label: "Stays", value: word("Merged and queued layers stay") },
+      ],
+    })
+  })
+
+  test("a stack of merged layers only says no layer can leave", async () => {
+    expect((await describeCase(DESCRIBE_CASES.unlinkAllMerged))?.facts).toEqual([
+      { label: "State", value: word("No layer can leave; nothing is sent") },
+    ])
+  })
+
+  test("a pull request in no stack says nothing is sent", async () => {
+    expect(await describeCase(DESCRIBE_CASES.unlinkInNone)).toEqual({
+      headline: out,
+      facts: [{ label: "State", value: word("In no stack; nothing is sent") }],
+    })
+  })
+
+  test.each([
+    ["neither a stack nor a pull request", {}, DESCRIBE_CASES.unlinkByStack.rules],
+    ["both a stack and a pull request", { stack: 5, pr: "102" }, DESCRIBE_CASES.unlinkByStack.rules],
+    [
+      "a stack that does not exist",
+      { stack: 9 },
+      [stackFailureRule("repos/octo/hello/stacks/9$", "HTTP 404 Not Found")],
+    ],
+  ])("%s: no description", async (_name, args, rules) => {
+    expect(await describeCase({ ...DESCRIBE_CASES.unlinkByStack, args, rules })).toBeUndefined()
   })
 })
 

@@ -12,7 +12,7 @@ import {
 import { given, lastUrl } from "../write-support"
 import { pause } from "../poll"
 import { parseNumberRef, type RepoName } from "../refs"
-import type { StepErrors, TargetKind, ToolContext } from "../tool"
+import type { CallFact, StepErrors, TargetKind, ToolContext } from "../tool"
 import { issueKey } from "./closes"
 
 /** What the pull request write tools share: their reference argument, `gh pr edit` and the notes about closing issues. */
@@ -29,6 +29,14 @@ export async function describedPull(
 ): Promise<{ ref: PullRequestRef; heading: PullRequestHeading }> {
   const ref = await parseNumberRef(args.pr, args.repo, ctx, { accept: "pull" })
   return { ref, heading: await readPullRequestHeading(ref, ctx) }
+}
+
+/** The `Layers` fact of a stack call: `#3 Add retry, #4 Use it`, bottom to top; a layer without a title is its number. */
+export function layersFact(layers: readonly { number: number; title: string | null }[]): CallFact {
+  return {
+    label: "Layers",
+    value: layers.map((layer) => (layer.title ? `#${layer.number} ${layer.title}` : `#${layer.number}`)).join(", "),
+  }
 }
 
 /** Runs `gh pr edit` on one pull request of `repo` with the given flags; `stdin` is the body for `--body-file -`. */

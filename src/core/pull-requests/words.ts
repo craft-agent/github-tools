@@ -40,6 +40,18 @@ export const PULL_REQUEST_TRANSLATIONS: Translations = {
     "About to review the pull request {title} with comments":
       "プルリクエスト「{title}」にコメント付きでレビューしようとしています",
     "About to merge the pull request {title}": "プルリクエスト「{title}」をマージしようとしています",
+    "About to link the pull requests into a stack on {base}":
+      "プルリクエストをベース {base} のスタックにまとめようとしています",
+    "About to take the pull requests out of the stack": "プルリクエストをスタックから外そうとしています",
+    Layers: "レイヤー",
+    Stack: "スタック",
+    Stays: "残るもの",
+    "New stack": "新しいスタック",
+    "Extends a stack of {count}": "{count} 件のスタックを延長",
+    "Merged and queued layers stay": "マージ済みとキュー済みのレイヤーは残ります",
+    "Already linked; nothing is sent": "すでにスタックにまとめ済みです（何も送信されません）",
+    "In no stack; nothing is sent": "スタックに属していません（何も送信されません）",
+    "No layer can leave; nothing is sent": "外せるレイヤーがありません（何も送信されません）",
     Head: "ヘッド",
     Commit: "コミット",
     "Line comments": "行コメント",
