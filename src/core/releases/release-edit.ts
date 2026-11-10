@@ -12,7 +12,9 @@ import {
 } from "../github/releases"
 import { REPO_DESCRIPTION, invalid, writableContext } from "../write-support"
 import { resolveRepo } from "../refs"
-import { defineTool } from "../tool"
+import { defineTool, type CallFact } from "../tool"
+import { NOTHING_CHANGED, digest } from "../write-facts"
+import { describedRelease, releaseHeadline, switchValue } from "./describe-support"
 
 const input = z.object({
   repo: z.string().optional().describe(REPO_DESCRIPTION),
@@ -48,6 +50,66 @@ export const releaseEdit = defineTool({
   toolset: "releases",
   class: "overwrite",
   targets: { repo: "repo" },
+  async describe(args, ctx) {
+    if (CHANGES.every((field) => args[field] === undefined)) {
+      throw invalid("Pass at least one of title, notes, prerelease, latest or target to change the release.")
+    }
+    if (args.prerelease === true && args.latest === true) {
+      throw invalid(PRERELEASE_CANNOT_BE_LATEST)
+    }
+
+    const { repo, current } = await describedRelease(args, ctx)
+    if (args.latest !== undefined && current.draft) {
+      throw invalid(
+        `Release ${args.tag} of ${repo.full} is a draft; mark it latest when publishing it with github_release_publish.`,
+      )
+    }
+    if (args.latest === true && (args.prerelease ?? current.prerelease)) {
+      throw invalid(PRERELEASE_CANNOT_BE_LATEST)
+    }
+    if (args.target !== undefined) {
+      if (!current.draft) {
+        throw invalid(
+          `Release ${args.tag} of ${repo.full} is a published release; its tag already names a commit; target is only for a draft whose tag does not exist yet.`,
+        )
+      }
+      const tagSha = await tagCommit(repo, args.tag, ctx)
+      if (tagSha !== null) {
+        throw invalid(
+          `Release ${args.tag} of ${repo.full} is a draft, but its tag already names a commit; target is only for a draft whose tag does not exist yet.`,
+        )
+      }
+      await resolveTarget(repo, args.target, ctx)
+    }
+
+    const titled = args.title !== undefined && args.title !== (current.name ?? "")
+    const noted = args.notes !== undefined && args.notes !== (current.body ?? "")
+    const marked = args.prerelease !== undefined && args.prerelease !== current.prerelease
+    let latest = false
+    if (args.latest !== undefined) {
+      const latestId = await latestReleaseId(repo, ctx)
+      latest = args.latest !== (latestId !== null && current.id === latestId)
+    }
+    const retargeted = args.target !== undefined && args.target !== current.target_commitish
+
+    const headline = releaseHeadline("About to edit the release {name}", current)
+    if (!titled && !noted && !marked && !latest && !retargeted) {
+      return { ...headline, facts: [{ label: "State", value: { text: NOTHING_CHANGED } }] }
+    }
+    const facts: (CallFact | undefined)[] = [
+      titled ? { label: "Title", value: args.title === "" ? { text: "Cleared" } : args.title! } : undefined,
+      marked ? { label: "Prerelease", value: switchValue(args.prerelease!) } : undefined,
+      latest ? { label: "Latest", value: switchValue(args.latest!) } : undefined,
+      retargeted ? { label: "Tag target", value: args.target! } : undefined,
+      noted && args.notes === "" ? { label: "Release notes", value: { text: "Cleared" } } : undefined,
+    ]
+    return {
+      ...headline,
+      facts: facts.filter((fact): fact is CallFact => fact !== undefined),
+      ...(noted && args.notes ? { text: { label: "Release notes", body: args.notes } } : {}),
+      ...(noted ? { pins: { notes: digest(current.body ?? "") } } : {}),
+    }
+  },
   input,
   output,
   async execute(args, ctx) {

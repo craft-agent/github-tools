@@ -5,6 +5,7 @@ import {
   branchRule,
   rawRelease,
   releaseByTagRule,
+  releasesLatestRule,
   releasesPageRule,
   restNotFound,
 } from "../../testing/releases-fixtures"
@@ -12,6 +13,7 @@ import { ORIGIN, repositoryRule } from "../../testing/write-fixtures"
 import { callDescription } from "../describe"
 import type { CallDescription, ToolSpec } from "../tool"
 import { releaseCreate } from "./release-create"
+import { releaseEdit } from "./release-edit"
 
 /** One call of a release write tool to describe, and the replies of GitHub it meets. */
 export type DescribeCase = { name: string; tool: ToolSpec; args: Record<string, unknown>; rules: GhRule[] }
@@ -69,6 +71,42 @@ export const DESCRIBE_CASES = {
     tool: releaseCreate,
     args: { tag: "v2.0.0", target: RELEASE_COMMIT, prerelease: false },
     rules: [repositoryRule(), ...noReleaseRules("v2.0.0"), restNotFound("git/ref/tags/v2.0.0")],
+  },
+  editPublished: {
+    name: "edit the title, notes and prerelease flag of a published release",
+    tool: releaseEdit,
+    args: { tag: TAG, title: "Renamed", notes: "New notes", prerelease: true },
+    rules: publishedRules(),
+  },
+  editClearNotes: {
+    name: "clear the notes of a published release",
+    tool: releaseEdit,
+    args: { tag: TAG, notes: "" },
+    rules: publishedRules(),
+  },
+  editLatest: {
+    name: "make a published release the latest",
+    tool: releaseEdit,
+    args: { tag: TAG, latest: true },
+    rules: [...publishedRules(), releasesLatestRule({ id: 999 })],
+  },
+  editNotLatest: {
+    name: "stop a published release being the latest",
+    tool: releaseEdit,
+    args: { tag: TAG, latest: false },
+    rules: [...publishedRules(), releasesLatestRule({ id: 101 })],
+  },
+  editDraft: {
+    name: "clear the title of a draft and move its target",
+    tool: releaseEdit,
+    args: { tag: TAG, title: "", target: "dev" },
+    rules: [...draftRules(), restNotFound("git/ref/tags/v1.0.0"), branchRule("dev", BRANCH_SHA)],
+  },
+  editNothing: {
+    name: "edit a release to what it is already",
+    tool: releaseEdit,
+    args: { tag: TAG, title: "Release v1.0.0", notes: "Notes for v1.0.0", prerelease: false },
+    rules: publishedRules(),
   },
 } satisfies Record<string, DescribeCase>
 

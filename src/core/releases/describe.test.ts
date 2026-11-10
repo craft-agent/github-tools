@@ -4,13 +4,23 @@ import {
   gitRefTagRule,
   rawRelease,
   releaseByTagRule,
+  releasesLatestRule,
   releasesPageRule,
   restNotFound,
 } from "../../testing/releases-fixtures"
 import { queryOf } from "../../testing/setup-fixtures"
 import { repositoryRule } from "../../testing/write-fixtures"
 import { MAX_FACTS, MAX_HEADLINE_LENGTH, MAX_LABEL_LENGTH } from "../describe"
-import { DESCRIBE_CASES, TAG, describeCase, noReleaseRules, type DescribeCase } from "./describe.fixtures"
+import { NOTHING_CHANGED, digest } from "../write-facts"
+import {
+  DESCRIBE_CASES,
+  TAG,
+  draftRules,
+  describeCase,
+  noReleaseRules,
+  publishedRules,
+  type DescribeCase,
+} from "./describe.fixtures"
 
 /** The methods of a `gh api` call that change something, and the `gh release` commands that do. */
 const WRITE_METHODS = ["POST", "PUT", "PATCH", "DELETE"]
@@ -85,6 +95,88 @@ describe("github_release_create", () => {
     ["a repository the viewer cannot write to", create.args, [NOT_WRITABLE, ...create.rules.slice(1)]],
   ])("%s: no description", async (_name, args, rules) => {
     expect(await describeCase({ ...create, args, rules })).toBeUndefined()
+  })
+})
+
+describe("github_release_edit", () => {
+  const headline = named("About to edit the release {name}")
+
+  test("each change against what GitHub has, the new notes as text, and what they replace pinned", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editPublished)).toEqual({
+      headline,
+      facts: [{ label: "Title", value: "Renamed" }, on("Prerelease")],
+      text: { label: "Release notes", body: "New notes" },
+      pins: { notes: digest("Notes for v1.0.0") },
+    })
+  })
+
+  test("cleared notes are a fact, not text, and still pinned", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editClearNotes)).toEqual({
+      headline,
+      facts: [{ label: "Release notes", value: { text: "Cleared" } }],
+      pins: { notes: digest("Notes for v1.0.0") },
+    })
+  })
+
+  test("the pin follows the notes it replaces", async () => {
+    const item = DESCRIBE_CASES.editPublished
+    const description = await describeCase({ ...item, rules: publishedRules({ body: "Other notes" }) })
+    expect(description?.pins).toEqual({ notes: digest("Other notes") })
+  })
+
+  test("latest is On when the release is not the latest, Off when it is", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editLatest)).toEqual({ headline, facts: [on("Latest")] })
+    expect(await describeCase(DESCRIBE_CASES.editNotLatest)).toEqual({ headline, facts: [off("Latest")] })
+  })
+
+  test("a draft's title can be cleared and its target moved", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editDraft)).toEqual({
+      headline,
+      facts: [
+        { label: "Title", value: { text: "Cleared" } },
+        { label: "Tag target", value: "dev" },
+      ],
+    })
+  })
+
+  test("a release without a name is called by its tag", async () => {
+    const item = DESCRIBE_CASES.editPublished
+    const description = await describeCase({
+      ...item,
+      args: { tag: TAG, prerelease: true },
+      rules: publishedRules({ name: null }),
+    })
+    expect(description?.headline).toEqual(named("About to edit the release {name}", TAG))
+  })
+
+  test("what is in place already says nothing is sent, with no pin", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editNothing)).toEqual({ headline, facts: [state(NOTHING_CHANGED)] })
+  })
+
+  test("a latest flag that is in place already says nothing is sent", async () => {
+    const item = DESCRIBE_CASES.editLatest
+    const rules = [...publishedRules(), releasesLatestRule({ id: 101 })]
+    expect((await describeCase({ ...item, rules }))?.facts).toEqual([state(NOTHING_CHANGED)])
+  })
+
+  const edit = DESCRIBE_CASES.editPublished
+  const draftTagExists = gitRefTagRule(TAG, { object: { type: "commit", sha: RELEASE_COMMIT } })
+  test.each([
+    ["no part at all", { tag: TAG }, edit.rules],
+    ["prerelease and latest together", { tag: TAG, prerelease: true, latest: true }, edit.rules],
+    ["a release that does not exist", edit.args, [repositoryRule(), ...noReleaseRules(TAG)]],
+    ["latest for a draft", { tag: TAG, latest: true }, draftRules()],
+    ["latest for a prerelease", { tag: TAG, latest: true }, publishedRules({ prerelease: true })],
+    ["a target for a published release", { tag: TAG, target: "dev" }, edit.rules],
+    ["a target for a draft whose tag exists", { tag: TAG, target: "dev" }, [...draftRules(), draftTagExists]],
+    [
+      "a target branch that does not exist",
+      { tag: TAG, target: "nope" },
+      [...draftRules(), restNotFound("git/ref/tags/v1.0.0"), restNotFound("branches/nope")],
+    ],
+    ["a repository the viewer cannot write to", edit.args, [NOT_WRITABLE, ...edit.rules.slice(1)]],
+  ])("%s: no description", async (_name, args, rules) => {
+    expect(await describeCase({ ...edit, args, rules })).toBeUndefined()
   })
 })
 
