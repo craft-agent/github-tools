@@ -30,10 +30,14 @@ export const PROJECT_TRANSLATIONS: Translations = {
     "Convert a GitHub project draft into an issue": "GitHub のプロジェクトのドラフトを Issue に変換する",
     "About to convert a GitHub project draft into an issue":
       "GitHub のプロジェクトのドラフトを Issue に変換しようとしています",
+    "About to edit the project item {title}": "GitHub のプロジェクトのアイテム「{title}」を編集しようとしています",
     "About to archive the project item {title}":
       "GitHub のプロジェクトのアイテム「{title}」をアーカイブしようとしています",
     "About to restore the project item {title} from the archive":
       "GitHub のプロジェクトのアイテム「{title}」をアーカイブから戻そうとしています",
+    Fields: "フィールド",
+    "Cleared fields": "クリアするフィールド",
+    "Already in place; nothing is sent": "すでに反映済みです（何も送信されません）",
     "Already archived; nothing is sent": "アーカイブ済みです（何も送信されません）",
     "Not archived; nothing is sent": "アーカイブされていません（何も送信されません）",
   },

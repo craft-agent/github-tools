@@ -1,5 +1,5 @@
 import { rawDraftContent, rawIssueContent, rawItem, statusValue } from "../../testing/board-item-fixtures"
-import { contentRule, itemReadRule, rawBoardContent } from "../../testing/board-write-fixtures"
+import { boardWithFields, contentRule, itemReadRule, rawBoardContent } from "../../testing/board-write-fixtures"
 import { installFakeGh, type GhRule } from "../../testing/fake-gh"
 import { tempRepo } from "../../testing/git-repo"
 import { itemBoardRule, octoBoardRules, rawBoard } from "../../testing/project-fixtures"
@@ -7,6 +7,7 @@ import { ORIGIN } from "../../testing/write-fixtures"
 import { callDescription } from "../describe"
 import type { CallDescription, ToolSpec } from "../tool"
 import { projectItemArchive, projectItemUnarchive } from "./item-archive"
+import { projectItemEdit } from "./item-edit"
 
 /** One call of a project board write tool to describe, and the replies of GitHub it meets. */
 export type DescribeCase = { name: string; tool: ToolSpec; args: Record<string, unknown>; rules: GhRule[] }
@@ -43,6 +44,61 @@ export const itemRules = (item: unknown, ...rules: GhRule[]): GhRule[] => [
 
 /** Representative calls of the board item write tools, which the description tests and the words test share. */
 export const DESCRIBE_CASES = {
+  editFields: {
+    name: "edit field values, skipping one the item holds",
+    tool: projectItemEdit,
+    args: {
+      item: "PVTI_1",
+      fields: { status: "done", estimate: 4, notes: "Old", sprint: "sprint 2", target: "2026-12-01" },
+    },
+    rules: itemRules(ISSUE_ITEM, ...boardWithFields()),
+  },
+  editClearing: {
+    name: "edit clearing fields, one of which is empty",
+    tool: projectItemEdit,
+    args: { item: "PVTI_1", clear_fields: ["NOTES", "Target"] },
+    rules: itemRules(ISSUE_ITEM, ...boardWithFields()),
+  },
+  editByReference: {
+    name: "edit an issue named by its reference",
+    tool: projectItemEdit,
+    args: { item: "octo/hello#12", project: "octo/3", fields: { Status: "Waiting" } },
+    rules: [
+      ...boardWithFields(),
+      contentRule(rawBoardContent("Issue", 12, [["PVTI_1", "PVT_3"]])),
+      itemReadRule("PVTI_1", ISSUE_ITEM),
+    ],
+  },
+  editInPlace: {
+    name: "edit with every value in place already",
+    tool: projectItemEdit,
+    args: { item: "PVTI_1", fields: { Status: "Todo", Estimate: "3" }, clear_fields: ["Target"] },
+    rules: itemRules(ISSUE_ITEM, ...boardWithFields()),
+  },
+  editDraftReplacing: {
+    name: "edit a draft replacing the title and the body",
+    tool: projectItemEdit,
+    args: { item: "PVTI_1", title: "  Plan v2  ", body: "New body", fields: { Status: "Done" } },
+    rules: itemRules(DRAFT_ITEM, ...boardWithFields()),
+  },
+  editDraftClearing: {
+    name: "edit a draft clearing the body",
+    tool: projectItemEdit,
+    args: { item: "PVTI_1", body: "" },
+    rules: itemRules(DRAFT_ITEM),
+  },
+  editDraftAppending: {
+    name: "edit a draft appending to the body",
+    tool: projectItemEdit,
+    args: { item: "PVTI_1", append_body: "More" },
+    rules: itemRules(DRAFT_ITEM),
+  },
+  editDraftInPlace: {
+    name: "edit a draft whose text is in place already",
+    tool: projectItemEdit,
+    args: { item: "PVTI_1", title: DRAFT_TITLE, body: DRAFT_BODY },
+    rules: itemRules(DRAFT_ITEM),
+  },
   archive: {
     name: "archive an item",
     tool: projectItemArchive,

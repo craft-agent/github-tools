@@ -5,7 +5,9 @@ import { readBoardFields } from "../github/board-fields"
 import { clearFieldValue, setFieldValue, updateDraft } from "../github/board-item-write"
 import { assertBoardWritable, given, sameTitle } from "../github/projects"
 import { appended, invalid } from "../write-support"
-import { defineTool } from "../tool"
+import { defineTool, type CallFact, type CallText } from "../tool"
+import { changeFact, digest } from "../write-facts"
+import { describedItem, fieldText, itemHeadline } from "./describe-support"
 import { resolveBoardItem } from "./item-resolve"
 import {
   FIELDS_NOTE,
@@ -16,6 +18,9 @@ import {
   itemArgument,
 } from "./item-support"
 import { BOARD_LOOKUP_NOTE, PROJECT_SCOPE_NOTE, boardSummary, boardSummarySchema } from "./support"
+
+/** How the `State` fact words an edit that finds everything in place. */
+const NOTHING_CHANGED = "Already in place; nothing is sent"
 
 const input = z.object({
   item: itemArgument,
@@ -103,6 +108,66 @@ export const projectItemEdit = defineTool({
   toolset: "projects",
   class: "overwrite",
   targets: { item: "item" },
+  async describe(args, ctx) {
+    const change = parseChange(args)
+    const { board, item, draftId, title: itemTitle } = await describedItem(args, ctx)
+    assertBoardWritable(board)
+
+    const draft = item.content?.type === "draft" ? item.content : undefined
+    if (hasDraftText(change) && !draft) {
+      throw invalid(
+        `title, body and append_body edit a draft's text, but this item is ${contentNoun(item.content)}; change an issue's title and body with github_issue_edit.`,
+      )
+    }
+    if (draft && hasDraftText(change) && !draftId) {
+      throw new ToolError("github_error", `GitHub did not return the text of draft ${item.item_id}.`)
+    }
+
+    const fields =
+      Object.keys(change.values).length > 0 || change.clears.length > 0 ? await readBoardFields(board.id, ctx) : []
+    const writes = planFieldValues(fields, change.values).filter(
+      (write) => !isHeld(write, item.fields[write.field.name]),
+    )
+    const clears = planClears(fields, change.clears).filter((field) => !isEmptyValue(item.fields[field.name]))
+    const currentBody = draft?.body ?? ""
+    const nextBody = change.appendBody === undefined ? change.body : appended(currentBody, change.appendBody)
+    const newTitle = change.title !== undefined && change.title !== draft?.title ? change.title : undefined
+    const newBody = nextBody !== undefined && nextBody !== currentBody ? nextBody : undefined
+
+    const headline = itemHeadline("About to edit the project item {title}", itemTitle)
+    if (writes.length === 0 && clears.length === 0 && newTitle === undefined && newBody === undefined) {
+      return { ...headline, facts: [{ label: "State", value: { text: NOTHING_CHANGED } }] }
+    }
+
+    const facts: CallFact[] = [{ label: "Board", value: board.title }]
+    if (writes.length > 0) {
+      const shown = writes.map(
+        (write) => `${write.field.name}: ${fieldText(item.fields[write.field.name])} → ${write.shown}`,
+      )
+      facts.push({ label: "Fields", value: shown.join("; ") })
+    }
+    const cleared = changeFact(
+      "Cleared fields",
+      [],
+      clears.map((field) => field.name),
+    )
+    if (cleared) facts.push(cleared)
+    if (newTitle !== undefined) facts.push({ label: "Title", value: newTitle })
+
+    let text: CallText | undefined
+    let pins: Record<string, string> | undefined
+    if (newBody !== undefined) {
+      if (change.appendBody !== undefined) {
+        facts.push({ label: "Body", value: { text: "Appended" } })
+        text = { label: "Appended text", body: change.appendBody }
+      } else {
+        facts.push({ label: "Body", value: { text: newBody === "" ? "Cleared" : "Replaced" } })
+        if (newBody !== "") text = { label: "New body", body: newBody }
+        pins = { body: digest(currentBody) }
+      }
+    }
+    return { ...headline, facts, ...(text ? { text } : {}), ...(pins ? { pins } : {}) }
+  },
   input,
   output,
   async execute(args, ctx) {
