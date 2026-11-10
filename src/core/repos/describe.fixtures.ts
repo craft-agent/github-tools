@@ -1,6 +1,13 @@
 import { installFakeGh, type GhRule } from "../../testing/fake-gh"
 import { tempRepo } from "../../testing/git-repo"
-import { repositoryFactsRule, repositoryOwnerRule, repositoryViewRule } from "../../testing/repos-fixtures"
+import {
+  rawRuleset,
+  repositoryFactsRule,
+  repositoryOwnerRule,
+  repositoryViewRule,
+  rulesetGetRule,
+  rulesetListRule,
+} from "../../testing/repos-fixtures"
 import { ORIGIN } from "../../testing/write-fixtures"
 import { callDescription } from "../describe"
 import type { CallDescription, ToolSpec } from "../tool"
@@ -9,6 +16,7 @@ import { repoCreate } from "./repo-create"
 import { repoEdit } from "./repo-edit"
 import { repoUnarchive } from "./repo-unarchive"
 import { repoVisibility } from "./repo-visibility"
+import { rulesetCreate } from "./ruleset-create"
 
 /** One call of a repository write tool to describe, and the replies of GitHub it meets. */
 export type DescribeCase = { name: string; tool: ToolSpec; args: Record<string, unknown>; rules: GhRule[] }
@@ -37,8 +45,59 @@ export const branchRule = (branch: string): GhRule => ({
 
 const TEMPLATE = "octo/hello-template"
 
+/** The `updated_at` of the ruleset `rawRuleset()` makes. */
+export const RULESET_UPDATED_AT = rawRuleset().updated_at
+
+/** The replies for a call on the ruleset 7 (`rawRuleset(extra)`) of `octo/hello`, whose repository has `others` besides it. */
+export const rulesetRules = (extra: Record<string, unknown> = {}, ...others: unknown[]): GhRule[] => [
+  ...repoRules(),
+  rulesetGetRule(rawRuleset(extra)),
+  rulesetListRule(rawRuleset(extra), ...others),
+]
+
 /** Representative calls of the repository write tools, which the description tests and the words test share. */
 export const DESCRIBE_CASES = {
+  createRulesetDefaults: {
+    name: "create a ruleset with the defaults",
+    tool: rulesetCreate,
+    args: { name: "Guard", rules: [{ type: "deletion" }] },
+    rules: [...repoRules(), rulesetListRule()],
+  },
+  createRulesetFull: {
+    name: "create a branch ruleset with every piece",
+    tool: rulesetCreate,
+    args: {
+      name: "Guard",
+      target: "branch",
+      enforcement: "evaluate",
+      include: ["main", "refs/heads/release/*"],
+      exclude: ["tmp"],
+      rules: [{ type: "deletion" }, { type: "pull_request", parameters: { required_approving_review_count: 1 } }],
+      bypass: [
+        { actor_type: "OrganizationAdmin", actor_id: 1 },
+        { actor_type: "Team", actor_id: 9 },
+      ],
+    },
+    rules: [...repoRules(), rulesetListRule(rawRuleset({ name: "Other" }))],
+  },
+  createRulesetTag: {
+    name: "create a tag ruleset with one bypass actor",
+    tool: rulesetCreate,
+    args: {
+      name: "Tags",
+      target: "tag",
+      include: ["v*"],
+      rules: [{ type: "update" }],
+      bypass: [{ actor_type: "Team", actor_id: 9 }],
+    },
+    rules: [...repoRules(), rulesetListRule()],
+  },
+  createRulesetPush: {
+    name: "create a disabled push ruleset",
+    tool: rulesetCreate,
+    args: { name: "Pushes", target: "push", enforcement: "disabled", rules: [{ type: "file_path_restriction" }] },
+    rules: [...repoRules(), rulesetListRule()],
+  },
   createPrivate: {
     name: "create a repository, private by default",
     tool: repoCreate,

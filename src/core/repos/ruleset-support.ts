@@ -3,6 +3,7 @@ import { ToolError } from "../errors"
 import { listRulesets, type Ruleset, type RulesetRow } from "../github/rulesets"
 import { invalid } from "../write-support"
 import type { RefContext, RepoName } from "../refs"
+import type { CallFact, CallHeadline, CallValue } from "../tool"
 
 /** What the ruleset write tools share: the argument shapes, ref patterns, and the checks made before a ruleset is written. */
 
@@ -125,6 +126,46 @@ export function describeRefs(target: string, include: readonly string[], exclude
   if (REF_PREFIXES[target] === undefined) return "every push to the repository"
   const covered = include.join(", ") || "no refs"
   return exclude.length > 0 ? `${covered} except ${exclude.join(", ")}` : covered
+}
+
+/** The enforcements as a fact shows them, as words of the tool's. */
+const ENFORCEMENT_WORDS: Readonly<Record<string, string>> = {
+  active: "Active",
+  evaluate: "Evaluate",
+  disabled: "Disabled",
+}
+
+/** The targets as a fact shows them, as words of the tool's. */
+const TARGET_WORDS: Readonly<Record<string, string>> = { branch: "Branch", tag: "Tag", push: "Push" }
+
+/** The value of a fact that shows `key` as the word `words` gives it, or as it is when GitHub names one the tool has no word for. */
+function wordValue(words: Readonly<Record<string, string>>, key: string): string | CallValue {
+  return Object.hasOwn(words, key) ? { text: words[key]! } : key
+}
+
+/** The `Enforcement` fact of a ruleset with that enforcement. */
+export function enforcementFact(enforcement: string): CallFact {
+  return { label: "Enforcement", value: wordValue(ENFORCEMENT_WORDS, enforcement) }
+}
+
+/** The `Target` fact of a ruleset with that target. */
+export function targetFact(target: string): CallFact {
+  return { label: "Target", value: wordValue(TARGET_WORDS, target) }
+}
+
+/** The `Bypass` fact: how many actors may bypass the ruleset. */
+export function bypassFact(count: number): CallFact {
+  return { label: "Bypass", value: { text: count === 1 ? "{count} actor" : "{count} actors", values: { count } } }
+}
+
+/** The types of the rules, in order. */
+export function ruleTypes(rules: readonly { type: string }[]): string[] {
+  return rules.map((rule) => rule.type)
+}
+
+/** The headline of a call on the ruleset `name`, `text` with the name for `{name}`. */
+export function rulesetHeadline(text: string, name: string): { headline: CallHeadline } {
+  return { headline: { text, values: { name } } }
 }
 
 /** The row of the repository's own ruleset named `name` (without regard to case), other than `exceptId`. */

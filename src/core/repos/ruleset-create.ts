@@ -4,13 +4,17 @@ import { repositoryContext } from "../github/repository"
 import { createRuleset, rulesetSchema } from "../github/rulesets"
 import { invalid } from "../write-support"
 import { resolveRepo } from "../refs"
-import { confirmWrite, defineTool } from "../tool"
+import { confirmWrite, defineTool, type CallDescription, type CallFact, type ToolContext } from "../tool"
+import { changeFact } from "../write-facts"
+import { describedRepo } from "./describe-support"
 import {
   DEFAULT_INCLUDE,
   RULESET_TARGETS,
   assertRefTarget,
+  bypassFact,
   bypassInput,
   describeRefs,
+  enforcementFact,
   enforcementInput,
   findOwnRulesetNamed,
   normalBypass,
@@ -18,8 +22,11 @@ import {
   normalisePatterns,
   patternsInput,
   ruleBodies,
+  ruleTypes,
   rulesInput,
+  rulesetHeadline,
   rulesetNameInput,
+  targetFact,
 } from "./ruleset-support"
 import { REPO_DESCRIPTION } from "./support"
 
@@ -46,6 +53,47 @@ const output = z.object({
   foreign: z.boolean(),
 })
 
+/** Describes the call: the ruleset it makes, how it is enforced, the refs it covers and the types of its rules. */
+async function describeCreate(args: z.output<typeof input>, ctx: ToolContext): Promise<CallDescription> {
+  const target = args.target ?? "branch"
+  const enforcement = args.enforcement ?? "active"
+  let refs: { include: string[]; exclude: string[] } | undefined
+  if (target === "push") {
+    if (args.include !== undefined) assertRefTarget(target, "include")
+    if (args.exclude !== undefined) assertRefTarget(target, "exclude")
+  } else {
+    const given = args.include?.length ? args.include : undefined
+    if (given === undefined && target === "tag") {
+      throw invalid('include is required for a tag ruleset: name the tags it covers, such as ["v*"].')
+    }
+    refs = {
+      include: normalisePatterns(target, "include", given ?? DEFAULT_INCLUDE),
+      exclude: normalisePatterns(target, "exclude", args.exclude ?? []),
+    }
+  }
+  const rules = normalRules(args.rules)
+
+  const { target: repo } = await describedRepo(args, ctx)
+  const taken = await findOwnRulesetNamed(repo, args.name, undefined, ctx)
+  if (taken) {
+    throw invalid(
+      `${repo.full} has a ruleset named "${taken.name}" already (id ${taken.id}); change it with github_ruleset_edit, or pick another name.`,
+    )
+  }
+
+  const facts: (CallFact | undefined)[] = [
+    enforcementFact(enforcement),
+    targetFact(target),
+    refs && changeFact("Refs", refs.include, refs.exclude),
+    { label: "Rules", value: ruleTypes(rules).join(", ") },
+    args.bypass?.length ? bypassFact(args.bypass.length) : undefined,
+  ]
+  return {
+    ...rulesetHeadline("About to create the ruleset {name}", args.name),
+    facts: facts.filter((fact): fact is CallFact => fact !== undefined),
+  }
+}
+
 export const rulesetCreate = defineTool({
   id: "github_ruleset_create",
   title: "Create a GitHub ruleset",
@@ -60,6 +108,7 @@ export const rulesetCreate = defineTool({
   toolset: "repos",
   class: "administrative",
   targets: { repo: "repo" },
+  describe: describeCreate,
   input,
   output,
   async execute(args, ctx) {

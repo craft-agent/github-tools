@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test"
-import { repositoryFactsRule, repositoryOwnerRule, restFailure } from "../../testing/repos-fixtures"
+import {
+  rawRuleset,
+  repositoryFactsRule,
+  repositoryOwnerRule,
+  restFailure,
+  rulesetListRule,
+} from "../../testing/repos-fixtures"
 import { queryOf } from "../../testing/setup-fixtures"
 import { MAX_FACTS, MAX_HEADLINE_LENGTH, MAX_LABEL_LENGTH } from "../describe"
 import { NOTHING_CHANGED, NOT_ARCHIVED } from "../write-facts"
@@ -243,6 +249,76 @@ describe("github_repo_edit", () => {
     ["every merge method off", { allow_merge_commit: false, allow_squash_merge: false }, edit.rules],
   ])("%s: no description", async (_name, args, rules) => {
     expect(await describeCase({ ...edit, args, rules })).toBeUndefined()
+  })
+})
+
+describe("github_ruleset_create", () => {
+  const headline = named("About to create the ruleset {name}", "Guard")
+  const enforcement = (word: string) => ({ label: "Enforcement", value: { text: word } })
+  const target = (word: string) => ({ label: "Target", value: { text: word } })
+
+  test("the defaults are an active branch ruleset on the default branch", async () => {
+    expect(await describeCase(DESCRIBE_CASES.createRulesetDefaults)).toEqual({
+      headline,
+      facts: [
+        enforcement("Active"),
+        target("Branch"),
+        { label: "Refs", value: "+~DEFAULT_BRANCH" },
+        { label: "Rules", value: "deletion" },
+      ],
+    })
+  })
+
+  test("every piece is a fact, with the patterns as the call writes them", async () => {
+    expect(await describeCase(DESCRIBE_CASES.createRulesetFull)).toEqual({
+      headline,
+      facts: [
+        enforcement("Evaluate"),
+        target("Branch"),
+        { label: "Refs", value: "+refs/heads/main +refs/heads/release/* \u2212refs/heads/tmp" },
+        { label: "Rules", value: "deletion, pull_request" },
+        { label: "Bypass", value: { text: "{count} actors", values: { count: 2 } } },
+      ],
+    })
+  })
+
+  test("a tag ruleset with one bypass actor", async () => {
+    expect((await describeCase(DESCRIBE_CASES.createRulesetTag))?.facts).toEqual([
+      enforcement("Active"),
+      target("Tag"),
+      { label: "Refs", value: "+refs/tags/v*" },
+      { label: "Rules", value: "update" },
+      { label: "Bypass", value: { text: "{count} actor", values: { count: 1 } } },
+    ])
+  })
+
+  test("a push ruleset has no refs and may be disabled", async () => {
+    expect((await describeCase(DESCRIBE_CASES.createRulesetPush))?.facts).toEqual([
+      enforcement("Disabled"),
+      target("Push"),
+      { label: "Rules", value: "file_path_restriction" },
+    ])
+  })
+
+  const create = DESCRIBE_CASES.createRulesetDefaults
+  test.each([
+    ["a tag ruleset without include", { ...create.args, target: "tag" }, create.rules],
+    ["include on a push ruleset", { ...create.args, target: "push", include: ["main"] }, create.rules],
+    ["exclude on a push ruleset", { ...create.args, target: "push", exclude: ["main"] }, create.rules],
+    ["a blank ref pattern", { ...create.args, include: [" "] }, create.rules],
+    [
+      "a name another ruleset has, in any case",
+      { ...create.args, name: "protect MAIN" },
+      [...repoRules(), rulesetListRule(rawRuleset())],
+    ],
+    ["no rules", { name: "Guard", rules: [] }, create.rules],
+    [
+      "a repository the viewer does not administer",
+      create.args,
+      [...repoRules({ viewerPermission: "WRITE" }), rulesetListRule()],
+    ],
+  ])("%s: no description", async (_name, args, rules) => {
+    expect(await describeCase({ ...create, args, rules })).toBeUndefined()
   })
 })
 
