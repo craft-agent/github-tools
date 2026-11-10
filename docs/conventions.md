@@ -400,11 +400,22 @@ nothing is sent` as its only fact and no text.
     `Columns by` and `Sorted by` (view ensure). A call that finds the board
     already in the state it asks for shows one `State` fact saying nothing is
     sent.
+  - Repository tools: `Visibility` (a repository's own, or as a change such
+    as `Private to public`), `Template`, `License`, `Gitignore`, `README`
+    and `Homepage` (create); `Default branch`, `Topics`, `Features`,
+    `Merge methods`, `Merge options` and `Template repository` (edit, only
+    for what changes); `Enforcement`, `Target`, `Refs`, `Excluded refs`,
+    `Rules`, `Rule parameters` and `Bypass` (rulesets); `Color` and
+    `Due date` (labels, milestones). A call the tool would refuse, such as
+    archiving an archived repository, gets no description; one it accepts
+    without changing anything shows `Already in place; nothing is sent`. The
+    description a call sets is its text; one it clears is a `Cleared` fact.
   - A replacing body is pinned by the digest of the body it replaces, a new
     development branch by the head commit of its base, a new pull request, a
-    review and a merge by the head commit of the pull request, and a merge
-    that takes lower layers along by the digest of their commits, since the
-    prompt shows none of them in full.
+    review and a merge by the head commit of the pull request, a merge that
+    takes lower layers along by the digest of their commits, and a ruleset
+    edit or delete by the ruleset's update time, since the prompt shows none
+    of them in full.
 
 ## Toolsets and settings
 
