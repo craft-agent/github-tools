@@ -392,6 +392,14 @@ nothing is sent` as its only fact and no text.
     `Extends a stack of N`) and `Stays` (stack link and unlink). A review's
     text is its body followed by each line comment under its `path:line`. A
     call that is refused before it writes gets no description at all.
+  - Board tools: `Board` (the board's real title), `Fields` (one fact for all
+    the field writes, as `Status: Todo → Done; Target: — → 2026-12-01`, since
+    a field's name is data and never a fact's label), `Cleared fields`,
+    `Owner`, `Template`, `Link`, `Default view` and `Views` (create), `Type`
+    and `Options` (field ensure), `Layout`, `Filter`, `Grouped by`,
+    `Columns by` and `Sorted by` (view ensure). A call that finds the board
+    already in the state it asks for shows one `State` fact saying nothing is
+    sent.
   - A replacing body is pinned by the digest of the body it replaces, a new
     development branch by the head commit of its base, a new pull request, a
     review and a merge by the head commit of the pull request, and a merge
