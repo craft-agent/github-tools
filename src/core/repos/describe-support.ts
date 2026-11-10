@@ -1,6 +1,7 @@
 import { readAdministeredRepository, type Visibility } from "../github/repos"
-import { resolveRepo } from "../refs"
+import { resolveRepo, type RepoName } from "../refs"
 import type { CallFact, CallHeadline, ToolContext } from "../tool"
+import { writableContext } from "../write-support"
 
 /** What a description of a repository tool reads: the repository a call means, found as `execute` finds it. */
 
@@ -25,6 +26,11 @@ const TRANSITION_WORDS: Readonly<Record<Visibility, Partial<Record<Visibility, s
  */
 export async function describedRepo(args: { repo?: string }, ctx: ToolContext) {
   return readAdministeredRepository(await resolveRepo(args.repo, ctx), ctx)
+}
+
+/** The repository a label or milestone call means, resolved as `execute` resolves it, once the viewer may write there. Reads only. */
+export async function describedWritableRepo(args: { repo?: string }, ctx: ToolContext): Promise<RepoName> {
+  return (await writableContext(await resolveRepo(args.repo, ctx), ctx)).repo
 }
 
 /** The headline of a call on the repository, `text` with the full name GitHub gives it for `{name}`. */

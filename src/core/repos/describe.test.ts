@@ -1,11 +1,16 @@
 import { describe, expect, test } from "bun:test"
 import {
+  LABEL_ROW,
+  MILESTONE_ROW,
+  labelPages,
+  milestonePages,
   rawRuleset,
   repositoryFactsRule,
   repositoryOwnerRule,
   restFailure,
   rulesetListRule,
 } from "../../testing/repos-fixtures"
+import { repositoryRule } from "../../testing/write-fixtures"
 import { queryOf } from "../../testing/setup-fixtures"
 import { MAX_FACTS, MAX_HEADLINE_LENGTH, MAX_LABEL_LENGTH } from "../describe"
 import { NOTHING_CHANGED, NOT_ARCHIVED } from "../write-facts"
@@ -15,6 +20,8 @@ import {
   branchRule,
   createRules,
   describeCase,
+  labelRules,
+  milestoneRules,
   repoRules,
   rulesetRules,
   type DescribeCase,
@@ -442,6 +449,194 @@ describe("github_ruleset_delete", () => {
     ["no ruleset", { updated_at: RULESET_UPDATED_AT }, item.rules],
   ])("%s: no description", async (_name, args, rules) => {
     expect(await describeCase({ ...item, args, rules })).toBeUndefined()
+  })
+})
+
+describe("github_label_create", () => {
+  const headline = named("About to create the label {name}", "Docs")
+
+  test("a name alone is a headline", async () => {
+    expect(await describeCase(DESCRIBE_CASES.createLabel)).toEqual({ headline, facts: [] })
+  })
+
+  test("the color as it will be sent, and the description verbatim as text", async () => {
+    expect(await describeCase(DESCRIBE_CASES.createLabelFull)).toEqual({
+      headline,
+      facts: [{ label: "Color", value: "#00AA00" }],
+      text: { label: "Description", body: "Documentation" },
+    })
+  })
+
+  const create = DESCRIBE_CASES.createLabel
+  test.each([
+    ["a name the repository has, in any case", { name: "BUG" }, create.rules],
+    ["a color that is not hex", { name: "Docs", color: "green" }, create.rules],
+    ["a repository the viewer cannot write to", create.args, [repositoryRule({ permission: "READ" }), labelPages([])]],
+  ])("%s: no description", async (_name, args, rules) => {
+    expect(await describeCase({ ...create, args, rules })).toBeUndefined()
+  })
+})
+
+describe("github_label_edit", () => {
+  const headline = named("About to edit the label {name}", "Bug")
+
+  test("shows each change against what GitHub has, with the new description as text", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editLabelEverything)).toEqual({
+      headline,
+      facts: [
+        { label: "Name", value: "Defect" },
+        { label: "Color", value: "#d73a4a \u2192 #00ff00" },
+      ],
+      text: { label: "Description", body: "New words" },
+    })
+  })
+
+  test("a cleared description is a fact, not text", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editLabelClearDescription)).toEqual({
+      headline,
+      facts: [{ label: "Description", value: { text: "Cleared" } }],
+    })
+  })
+
+  test("what is in place already says nothing is sent, whatever the case of the color", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editLabelNothing)).toEqual({
+      headline,
+      facts: [{ label: "State", value: { text: NOTHING_CHANGED } }],
+    })
+  })
+
+  const edit = DESCRIBE_CASES.editLabelEverything
+  test.each([
+    ["no change argument", { name: "bug" }, edit.rules],
+    ["a label that does not exist", { name: "nope", color: "#00ff00" }, edit.rules],
+    [
+      "a new name another label has",
+      { name: "bug", new_name: "DOCS" },
+      labelRules(LABEL_ROW, { ...LABEL_ROW, name: "Docs" }),
+    ],
+    [
+      "a repository the viewer cannot write to",
+      edit.args,
+      [repositoryRule({ permission: "READ" }), labelPages([LABEL_ROW])],
+    ],
+  ])("%s: no description", async (_name, args, rules) => {
+    expect(await describeCase({ ...edit, args, rules })).toBeUndefined()
+  })
+})
+
+describe("github_label_delete", () => {
+  test("names the label as GitHub spells it, with nothing more to show", async () => {
+    expect(await describeCase(DESCRIBE_CASES.deleteLabel)).toEqual({
+      headline: named("About to delete the label {name}", "Bug"),
+      facts: [],
+    })
+  })
+
+  const item = DESCRIBE_CASES.deleteLabel
+  test.each([
+    ["a label that does not exist", { name: "nope" }, item.rules],
+    [
+      "a repository the viewer cannot write to",
+      item.args,
+      [repositoryRule({ permission: "READ" }), labelPages([LABEL_ROW])],
+    ],
+  ])("%s: no description", async (_name, args, rules) => {
+    expect(await describeCase({ ...item, args, rules })).toBeUndefined()
+  })
+})
+
+describe("github_milestone_create", () => {
+  const headline = { text: "About to create the milestone {title}", values: { title: "v2" } }
+
+  test("a title alone is a headline", async () => {
+    expect(await describeCase(DESCRIBE_CASES.createMilestone)).toEqual({ headline, facts: [] })
+  })
+
+  test("the due date as a fact and the description verbatim as text", async () => {
+    expect(await describeCase(DESCRIBE_CASES.createMilestoneFull)).toEqual({
+      headline,
+      facts: [{ label: "Due date", value: "2027-01-31" }],
+      text: { label: "Description", body: "The second release" },
+    })
+  })
+
+  const create = DESCRIBE_CASES.createMilestone
+  test.each([
+    ["a title the repository has, in any case", { title: "RELEASE" }, create.rules],
+    ["a title a closed milestone has", { title: "release" }, milestoneRules({ ...MILESTONE_ROW, state: "CLOSED" })],
+    ["a due date that is not a date", { title: "v2", due: "2027-02-30" }, create.rules],
+    [
+      "a repository the viewer cannot write to",
+      create.args,
+      [repositoryRule({ permission: "READ" }), milestonePages([])],
+    ],
+  ])("%s: no description", async (_name, args, rules) => {
+    expect(await describeCase({ ...create, args, rules })).toBeUndefined()
+  })
+})
+
+describe("github_milestone_edit", () => {
+  const headline = { text: "About to edit the milestone {title}", values: { title: "Release" } }
+
+  test("by number: each change against what GitHub has, with the new description as text", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editMilestoneEverything)).toEqual({
+      headline,
+      facts: [
+        { label: "Title", value: "Release 2" },
+        { label: "State", value: { text: "Closed" } },
+        { label: "Due date", value: "2026-12-01 \u2192 2027-01-31" },
+      ],
+      text: { label: "Description", body: "Updated" },
+    })
+  })
+
+  test("by title in any case, clearing the due date", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editMilestoneClearDue)).toEqual({
+      headline,
+      facts: [{ label: "Due date", value: { text: "Cleared" } }],
+    })
+  })
+
+  test("reopening and clearing the description", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editMilestoneReopen)).toEqual({
+      headline,
+      facts: [
+        { label: "State", value: { text: "Open" } },
+        { label: "Description", value: { text: "Cleared" } },
+      ],
+    })
+  })
+
+  test("a due date set where there was none is shown as it is", async () => {
+    const item = DESCRIBE_CASES.editMilestoneEverything
+    const rules = milestoneRules({ ...MILESTONE_ROW, dueOn: null })
+    expect((await describeCase({ ...item, args: { milestone: 1, due: "2027-01-31" }, rules }))?.facts).toEqual([
+      { label: "Due date", value: "2027-01-31" },
+    ])
+  })
+
+  test("what is in place already says nothing is sent", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editMilestoneNothing)).toEqual({
+      headline,
+      facts: [{ label: "State", value: { text: NOTHING_CHANGED } }],
+    })
+  })
+
+  const edit = DESCRIBE_CASES.editMilestoneEverything
+  const two = milestoneRules(MILESTONE_ROW, { ...MILESTONE_ROW, number: 2, title: "Other", state: "CLOSED" })
+  test.each([
+    ["due with clear_due", { milestone: 1, due: "2027-01-31", clear_due: true }, edit.rules],
+    ["no change argument", { milestone: 1 }, edit.rules],
+    ["a milestone number that does not exist", { milestone: 9, state: "closed" }, edit.rules],
+    ["a milestone title that does not exist", { milestone: "nope", state: "closed" }, edit.rules],
+    ["a title another milestone has", { milestone: 1, title: "other" }, two],
+    [
+      "a repository the viewer cannot write to",
+      edit.args,
+      [repositoryRule({ permission: "READ" }), milestonePages([MILESTONE_ROW])],
+    ],
+  ])("%s: no description", async (_name, args, rules) => {
+    expect(await describeCase({ ...edit, args, rules })).toBeUndefined()
   })
 })
 

@@ -1,6 +1,10 @@
 import { installFakeGh, type GhRule } from "../../testing/fake-gh"
 import { tempRepo } from "../../testing/git-repo"
 import {
+  LABEL_ROW,
+  MILESTONE_ROW,
+  labelPages,
+  milestonePages,
   rawRuleset,
   repositoryFactsRule,
   repositoryOwnerRule,
@@ -8,9 +12,14 @@ import {
   rulesetGetRule,
   rulesetListRule,
 } from "../../testing/repos-fixtures"
-import { ORIGIN } from "../../testing/write-fixtures"
+import { ORIGIN, milestonesRule, repositoryRule } from "../../testing/write-fixtures"
 import { callDescription } from "../describe"
 import type { CallDescription, ToolSpec } from "../tool"
+import { labelCreate } from "./label-create"
+import { labelDelete } from "./label-delete"
+import { labelEdit } from "./label-edit"
+import { milestoneCreate } from "./milestone-create"
+import { milestoneEdit } from "./milestone-edit"
 import { repoArchive } from "./repo-archive"
 import { repoCreate } from "./repo-create"
 import { repoEdit } from "./repo-edit"
@@ -47,6 +56,19 @@ export const branchRule = (branch: string): GhRule => ({
 
 const TEMPLATE = "octo/hello-template"
 
+/** The replies for a label call on `octo/hello`, whose repository has the labels `labels` (`Bug` unless told). */
+export const labelRules = (...labels: unknown[]): GhRule[] => [
+  repositoryRule(),
+  labelPages(labels.length ? labels : [LABEL_ROW]),
+]
+
+/** The replies for a milestone call on `octo/hello`, whose repository has the milestones `milestones` (`Release`, number 1, unless told); a title is found by the REST list. */
+export const milestoneRules = (...milestones: Record<string, unknown>[]): GhRule[] => [
+  repositoryRule(),
+  milestonePages(milestones.length ? milestones : [MILESTONE_ROW]),
+  milestonesRule(...(milestones.length ? milestones : [MILESTONE_ROW]).map((row) => String(row.title))),
+]
+
 /** The `updated_at` of the ruleset `rawRuleset()` makes. */
 export const RULESET_UPDATED_AT = rawRuleset().updated_at
 
@@ -59,6 +81,78 @@ export const rulesetRules = (extra: Record<string, unknown> = {}, ...others: unk
 
 /** Representative calls of the repository write tools, which the description tests and the words test share. */
 export const DESCRIBE_CASES = {
+  createLabel: {
+    name: "create a label with just a name",
+    tool: labelCreate,
+    args: { name: "Docs" },
+    rules: labelRules(),
+  },
+  createLabelFull: {
+    name: "create a label with a color and a description",
+    tool: labelCreate,
+    args: { name: "Docs", color: "#00AA00", description: "Documentation" },
+    rules: labelRules(),
+  },
+  editLabelEverything: {
+    name: "edit every part of a label",
+    tool: labelEdit,
+    args: { name: "bug", new_name: "Defect", color: "#00ff00", description: "New words" },
+    rules: labelRules(),
+  },
+  editLabelClearDescription: {
+    name: "clear a label's description",
+    tool: labelEdit,
+    args: { name: "Bug", description: "" },
+    rules: labelRules(),
+  },
+  editLabelNothing: {
+    name: "edit a label to what it is already",
+    tool: labelEdit,
+    args: { name: "BUG", new_name: "Bug", color: "D73A4A", description: "Something is broken" },
+    rules: labelRules(),
+  },
+  deleteLabel: {
+    name: "delete a label",
+    tool: labelDelete,
+    args: { name: "bug" },
+    rules: labelRules(),
+  },
+  createMilestone: {
+    name: "create a milestone with just a title",
+    tool: milestoneCreate,
+    args: { title: "v2" },
+    rules: milestoneRules(),
+  },
+  createMilestoneFull: {
+    name: "create a milestone with a due date and a description",
+    tool: milestoneCreate,
+    args: { title: "v2", due: "2027-01-31", description: "The second release" },
+    rules: milestoneRules(),
+  },
+  editMilestoneEverything: {
+    name: "edit a milestone by number: title, state, due date and description",
+    tool: milestoneEdit,
+    args: { milestone: 1, title: "Release 2", state: "closed", due: "2027-01-31", description: "Updated" },
+    rules: milestoneRules(),
+  },
+  editMilestoneClearDue: {
+    name: "clear the due date of a milestone found by title",
+    tool: milestoneEdit,
+    args: { milestone: "release", clear_due: true },
+    rules: milestoneRules(),
+  },
+  editMilestoneReopen: {
+    name: "reopen a milestone and clear its description",
+    tool: milestoneEdit,
+    args: { milestone: 1, state: "open", description: "" },
+    rules: milestoneRules({ ...MILESTONE_ROW, state: "CLOSED" }),
+  },
+  editMilestoneNothing: {
+    name: "edit a milestone to what it is already",
+    tool: milestoneEdit,
+    args: { milestone: 1, title: "Release", due: "2026-12-01", state: "open", description: "Next release" },
+    rules: milestoneRules(),
+  },
   createRulesetDefaults: {
     name: "create a ruleset with the defaults",
     tool: rulesetCreate,
