@@ -35,6 +35,11 @@ export const PROJECT_TRANSLATIONS: Translations = {
       "GitHub のプロジェクトのアイテム「{title}」をアーカイブしようとしています",
     "About to restore the project item {title} from the archive":
       "GitHub のプロジェクトのアイテム「{title}」をアーカイブから戻そうとしています",
+    "About to add {title} to the project board": "GitHub のプロジェクトボードに「{title}」を追加しようとしています",
+    "About to create the draft {title}": "GitHub のプロジェクトにドラフト「{title}」を作成しようとしています",
+    "About to turn the draft {title} into an issue": "ドラフト「{title}」を Issue に変換しようとしています",
+    "Draft body": "ドラフトの本文",
+    "Already on the board; nothing is sent": "ボードに追加済みです（何も送信されません）",
     Fields: "フィールド",
     "Cleared fields": "クリアするフィールド",
     "Already in place; nothing is sent": "すでに反映済みです（何も送信されません）",

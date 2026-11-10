@@ -1,5 +1,6 @@
 import type { ItemContent, ItemFieldValue } from "../github/board-items"
-import type { CallHeadline, ToolContext } from "../tool"
+import type { FieldWrite } from "../github/board-field-values"
+import type { CallFact, CallHeadline, ToolContext } from "../tool"
 import { resolveBoardItem, type ResolvedItem } from "./item-resolve"
 
 /** What a description of a board item tool reads: the board item a call means, found as `execute` finds it. */
@@ -32,6 +33,12 @@ export async function describedItem(
 /** The headline of a call on the item, `text` with the item's real title for `{title}`; none when the title is unknown, so the tool's title stands. */
 export function itemHeadline(text: string, title: string | undefined): { headline?: CallHeadline } {
   return title === undefined ? {} : { headline: { text, values: { title } } }
+}
+
+/** The `Fields` fact of a call that sets values: `Status: Todo; Priority: High`; none when it sets nothing. */
+export function fieldsFact(writes: readonly FieldWrite[]): CallFact | undefined {
+  if (writes.length === 0) return undefined
+  return { label: "Fields", value: writes.map((write) => `${write.field.name}: ${write.shown}`).join("; ") }
 }
 
 /** A field value as a fact shows it: a list by its names, an iteration by its title, no value as `NO_VALUE`. */

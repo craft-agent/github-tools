@@ -1,12 +1,22 @@
 import { rawDraftContent, rawIssueContent, rawItem, statusValue } from "../../testing/board-item-fixtures"
-import { boardWithFields, contentRule, itemReadRule, rawBoardContent } from "../../testing/board-write-fixtures"
+import {
+  blockersRule,
+  boardWithFields,
+  contentRule,
+  itemReadRule,
+  rawBoardContent,
+} from "../../testing/board-write-fixtures"
 import { installFakeGh, type GhRule } from "../../testing/fake-gh"
 import { tempRepo } from "../../testing/git-repo"
 import { itemBoardRule, octoBoardRules, rawBoard } from "../../testing/project-fixtures"
-import { ORIGIN } from "../../testing/write-fixtures"
+import { pullHeadingRule } from "../../testing/pull-request-write-fixtures"
+import { ORIGIN, issueHeadingRule, milestonesRule, repositoryRule } from "../../testing/write-fixtures"
 import { callDescription } from "../describe"
 import type { CallDescription, ToolSpec } from "../tool"
+import { projectItemAdd } from "./item-add"
 import { projectItemArchive, projectItemUnarchive } from "./item-archive"
+import { projectItemConvert } from "./item-convert"
+import { projectItemCreate } from "./item-create"
 import { projectItemEdit } from "./item-edit"
 
 /** One call of a project board write tool to describe, and the replies of GitHub it meets. */
@@ -40,6 +50,23 @@ export const itemRules = (item: unknown, ...rules: GhRule[]): GhRule[] => [
   itemBoardRule("PVTI_1", rawBoard(3)),
   itemReadRule("PVTI_1", item),
   ...rules,
+]
+
+/** The title the heading rule gives issue 12 when it is added to the board. */
+export const ADDED_TITLE = "Crash on save"
+
+/** An issue 12 or pull request 7 as the board's content query replies with it; `onBoard` puts it on board 3. */
+export const addedContent = (type: "Issue" | "PullRequest", onBoard = false) =>
+  contentRule(
+    rawBoardContent(type, type === "Issue" ? 12 : 7, onBoard ? [["PVTI_1", "PVT_3"]] : [["PVTI_other", "PVT_9"]]),
+  )
+
+/** The replies of adding issue 12 to `octo`'s board 3: its fields, its content, its title and its blockers (`states`). */
+export const addRules = (onBoard = false, ...states: string[]): GhRule[] => [
+  ...boardWithFields(),
+  addedContent("Issue", onBoard),
+  issueHeadingRule({ title: ADDED_TITLE }),
+  blockersRule(...states),
 ]
 
 /** Representative calls of the board item write tools, which the description tests and the words test share. */
@@ -132,6 +159,84 @@ export const DESCRIBE_CASES = {
     tool: projectItemUnarchive,
     args: { item: "PVTI_1" },
     rules: itemRules(archivedItem(false)),
+  },
+  addIssue: {
+    name: "add an issue, which starts as Todo",
+    tool: projectItemAdd,
+    args: { project: "octo/3", item: "12" },
+    rules: addRules(),
+  },
+  addBlockedIssue: {
+    name: "add an issue an open issue blocks, which starts as Waiting",
+    tool: projectItemAdd,
+    args: { project: "octo/3", item: "12" },
+    rules: addRules(false, "CLOSED", "OPEN"),
+  },
+  addWithFields: {
+    name: "add an issue with fields, one of them the Status",
+    tool: projectItemAdd,
+    args: { project: "octo/3", item: "octo/hello#12", fields: { estimate: "3.5", status: "done" } },
+    rules: addRules(),
+  },
+  addPull: {
+    name: "add a pull request",
+    tool: projectItemAdd,
+    args: { project: "octo/3", item: "7" },
+    rules: [...boardWithFields(), addedContent("PullRequest"), pullHeadingRule()],
+  },
+  addExisting: {
+    name: "add an issue that is on the board already",
+    tool: projectItemAdd,
+    args: { project: "octo/3", item: "12" },
+    rules: addRules(true),
+  },
+  addExistingWithFields: {
+    name: "add an issue that is on the board already, with a field",
+    tool: projectItemAdd,
+    args: { project: "octo/3", item: "12", fields: { notes: "Soon" } },
+    rules: addRules(true),
+  },
+  createDraft: {
+    name: "create a draft with a body, which starts as Todo",
+    tool: projectItemCreate,
+    args: { project: "octo/3", title: "  Plan the work  ", body: "Split it in three." },
+    rules: boardWithFields(),
+  },
+  createBare: {
+    name: "create a draft with only a title",
+    tool: projectItemCreate,
+    args: { project: "octo/3", title: "Idea" },
+    rules: boardWithFields(),
+  },
+  createWithFields: {
+    name: "create a draft with fields",
+    tool: projectItemCreate,
+    args: { project: "octo/3", title: "Idea", fields: { estimate: 5, status: "Waiting" } },
+    rules: boardWithFields(),
+  },
+  convertPlain: {
+    name: "convert a draft with nothing else",
+    tool: projectItemConvert,
+    args: { item: "PVTI_1" },
+    rules: itemRules(DRAFT_ITEM, repositoryRule()),
+  },
+  convertFull: {
+    name: "convert a draft with a kind, labels and a milestone",
+    tool: projectItemConvert,
+    args: { item: "PVTI_1", kind: " bug ", labels: ["ui", " ui ", "api"], milestone: "v1" },
+    rules: itemRules(DRAFT_ITEM, repositoryRule(), milestonesRule("v0", "V1")),
+  },
+  convertNewMilestone: {
+    name: "convert a draft with a milestone to create",
+    tool: projectItemConvert,
+    args: { item: "PVTI_1", milestone: "v9", create_milestone: true },
+    rules: itemRules(DRAFT_ITEM, repositoryRule(), milestonesRule("v0")),
+  },
+  convertEmptyDraft: {
+    name: "convert a draft that has no body",
+    tool: projectItemConvert,
+    args: { item: "PVTI_1", labels: ["ui"] },
+    rules: itemRules(rawItem("PVTI_1", { ...rawDraftContent("Plan"), id: "DI_1" }), repositoryRule()),
   },
 } satisfies Record<string, DescribeCase>
 

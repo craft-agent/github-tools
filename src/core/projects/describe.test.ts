@@ -1,12 +1,22 @@
 import { describe, expect, test } from "bun:test"
 import { rawDraftContent, rawItem } from "../../testing/board-item-fixtures"
-import { boardWithFields, contentRule, itemReadRule, rawBoardContent } from "../../testing/board-write-fixtures"
+import {
+  BOARD_FIELD_NODES,
+  boardWithFields,
+  contentRule,
+  itemReadRule,
+  rawBoardContent,
+} from "../../testing/board-write-fixtures"
+import { DEPENDENCIES } from "../../testing/issue-fixtures"
 import { itemBoardRule, octoBoardRules, rawBoard } from "../../testing/project-fixtures"
+import { milestonesRule, repositoryRule } from "../../testing/write-fixtures"
 import { queryOf } from "../../testing/setup-fixtures"
 import { MAX_FACTS, MAX_HEADLINE_LENGTH, MAX_LABEL_LENGTH } from "../describe"
 import { digest } from "../write-facts"
 import {
+  ADDED_TITLE,
   DESCRIBE_CASES,
+  addRules,
   DRAFT_BODY,
   DRAFT_ITEM,
   ISSUE_ITEM,
@@ -196,6 +206,177 @@ describe("github_project_item_unarchive", () => {
       itemReadRule("PVTI_1", archivedItem(true)),
     ]
     expect(await describeCase({ ...DESCRIBE_CASES.unarchive, rules })).toBeUndefined()
+  })
+})
+
+describe("github_project_item_add", () => {
+  const added = headline("About to add {title} to the project board", ADDED_TITLE)
+
+  test("names the issue by its real title and shows the Status it starts in", async () => {
+    expect(await describeCase(DESCRIBE_CASES.addIssue)).toEqual({
+      headline: added,
+      facts: [board, { label: "Fields", value: "Status: Todo" }],
+    })
+  })
+
+  test("an issue an open issue blocks starts as Waiting", async () => {
+    const description = await describeCase(DESCRIBE_CASES.addBlockedIssue)
+    expect(description?.facts).toEqual([board, { label: "Fields", value: "Status: Waiting" }])
+  })
+
+  test("blockers that cannot be read leave the Status as Todo", async () => {
+    const rules = [{ match: DEPENDENCIES, stderr: "HTTP 500", code: 1 }, ...addRules()]
+    const description = await describeCase({ ...DESCRIBE_CASES.addIssue, rules })
+    expect(description?.facts).toEqual([board, { label: "Fields", value: "Status: Todo" }])
+  })
+
+  test("lists the fields given in order, and a Status among them replaces the default", async () => {
+    expect((await describeCase(DESCRIBE_CASES.addWithFields))?.facts).toEqual([
+      board,
+      { label: "Fields", value: "Estimate: 3.5; Status: Done" },
+    ])
+  })
+
+  test("a pull request is named by its title and starts as Todo", async () => {
+    expect(await describeCase(DESCRIBE_CASES.addPull)).toEqual({
+      headline: headline("About to add {title} to the project board", "Add retry"),
+      facts: [board, { label: "Fields", value: "Status: Todo" }],
+    })
+  })
+
+  test("an item on the board already says nothing is sent", async () => {
+    expect(await describeCase(DESCRIBE_CASES.addExisting)).toEqual({
+      headline: added,
+      facts: [{ label: "State", value: word("Already on the board; nothing is sent") }],
+    })
+  })
+
+  test("an item on the board already still gets the fields given, and no default Status", async () => {
+    expect((await describeCase(DESCRIBE_CASES.addExistingWithFields))?.facts).toEqual([
+      board,
+      { label: "Fields", value: "Notes: Soon" },
+    ])
+  })
+
+  const add = DESCRIBE_CASES.addIssue
+  test.each([
+    ["a blank item", { project: "octo/3", item: " " }, add.rules],
+    ["a field the board does not have", { project: "octo/3", item: "12", fields: { Nope: "x" } }, add.rules],
+    ["an option the field does not have", { project: "octo/3", item: "12", fields: { Status: "Nope" } }, add.rules],
+    ["an issue that does not exist", { project: "octo/3", item: "12" }, [...boardWithFields(), contentRule(null)]],
+    [
+      "a board the viewer cannot update",
+      add.args,
+      [...octoBoardRules(3, { viewerCanUpdate: false }), ...add.rules.slice(2)],
+    ],
+  ])("%s: no description", async (_name, args, rules) => {
+    expect(await describeCase({ ...add, args, rules })).toBeUndefined()
+  })
+})
+
+describe("github_project_item_create", () => {
+  const draft = (title: string) => headline("About to create the draft {title}", title)
+
+  test("names the draft by its trimmed title, shows the Status it starts in, and its body as written", async () => {
+    expect(await describeCase(DESCRIBE_CASES.createDraft)).toEqual({
+      headline: draft("Plan the work"),
+      facts: [board, { label: "Fields", value: "Status: Todo" }],
+      text: { label: "Draft body", body: "Split it in three." },
+    })
+  })
+
+  test("without a body there is no text", async () => {
+    const description = await describeCase(DESCRIBE_CASES.createBare)
+    expect(description?.text).toBeUndefined()
+    expect(description?.facts).toEqual([board, { label: "Fields", value: "Status: Todo" }])
+  })
+
+  test("lists the fields given, a Status among them replacing the default", async () => {
+    expect((await describeCase(DESCRIBE_CASES.createWithFields))?.facts).toEqual([
+      board,
+      { label: "Fields", value: "Estimate: 5; Status: Waiting" },
+    ])
+  })
+
+  test("a board without a Status single select gives no Fields fact", async () => {
+    const rules = boardWithFields(BOARD_FIELD_NODES.filter((node) => node.name !== "Status"))
+    const description = await describeCase({ ...DESCRIBE_CASES.createBare, rules })
+    expect(description?.facts).toEqual([board])
+  })
+
+  const create = DESCRIBE_CASES.createDraft
+  test.each([
+    ["a blank title", { project: "octo/3", title: "  " }, create.rules],
+    ["a field the board does not have", { project: "octo/3", title: "x", fields: { Nope: "x" } }, create.rules],
+    ["an option the field does not have", { project: "octo/3", title: "x", fields: { Status: "Nope" } }, create.rules],
+    [
+      "a board the viewer cannot update",
+      create.args,
+      [...octoBoardRules(3, { viewerCanUpdate: false }), ...create.rules.slice(2)],
+    ],
+  ])("%s: no description", async (_name, args, rules) => {
+    expect(await describeCase({ ...create, args, rules })).toBeUndefined()
+  })
+})
+
+describe("github_project_item_convert", () => {
+  const turned = headline("About to turn the draft {title} into an issue", "Plan")
+
+  test("names the draft by its real title and shows its body as the issue's", async () => {
+    expect(await describeCase(DESCRIBE_CASES.convertPlain)).toEqual({
+      headline: turned,
+      facts: [],
+      text: { label: "Issue body", body: DRAFT_BODY },
+    })
+  })
+
+  test("lists the kind, the labels and the milestone as the repository has it", async () => {
+    expect((await describeCase(DESCRIBE_CASES.convertFull))?.facts).toEqual([
+      { label: "Kind", value: "bug" },
+      { label: "Labels", value: "+ui +api" },
+      { label: "Milestone", value: "V1" },
+    ])
+  })
+
+  test("a milestone the call creates is marked new", async () => {
+    expect((await describeCase(DESCRIBE_CASES.convertNewMilestone))?.facts).toEqual([
+      { label: "Milestone", value: { text: "{name} (new)", values: { name: "v9" } } },
+    ])
+  })
+
+  test("a draft without a body shows no text", async () => {
+    const description = await describeCase(DESCRIBE_CASES.convertEmptyDraft)
+    expect(description?.facts).toEqual([{ label: "Labels", value: "+ui" }])
+    expect(description?.text).toBeUndefined()
+  })
+
+  const convert = DESCRIBE_CASES.convertPlain
+  test.each([
+    ["an item that is an issue", { item: "PVTI_1" }, itemRules(ISSUE_ITEM, repositoryRule())],
+    ["labels with a comma", { item: "PVTI_1", labels: ["a,b"] }, convert.rules],
+    ["create_milestone without a milestone", { item: "PVTI_1", create_milestone: true }, convert.rules],
+    [
+      "a milestone that does not exist",
+      { item: "PVTI_1", milestone: "v9" },
+      itemRules(DRAFT_ITEM, repositoryRule(), milestonesRule("v0")),
+    ],
+    [
+      "a repository the viewer cannot write to",
+      { item: "PVTI_1" },
+      itemRules(DRAFT_ITEM, repositoryRule({ permission: "READ" })),
+    ],
+    [
+      "a board the viewer cannot update",
+      { item: "PVTI_1" },
+      [
+        itemBoardRule("PVTI_1", rawBoard(3, { viewerCanUpdate: false })),
+        itemReadRule("PVTI_1", DRAFT_ITEM),
+        repositoryRule(),
+      ],
+    ],
+    ["an item that does not exist", { item: "PVTI_1" }, itemRules(null, repositoryRule())],
+  ])("%s: no description", async (_name, args, rules) => {
+    expect(await describeCase({ ...convert, args, rules })).toBeUndefined()
   })
 })
 

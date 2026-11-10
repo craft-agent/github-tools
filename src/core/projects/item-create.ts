@@ -5,6 +5,7 @@ import { addDraftToBoard } from "../github/board-item-write"
 import { assertBoardWritable, given, resolveBoard } from "../github/projects"
 import { invalid } from "../write-support"
 import { StepErrors, defineTool } from "../tool"
+import { fieldsFact } from "./describe-support"
 import {
   FIELDS_NOTE,
   applyFieldWrites,
@@ -45,6 +46,23 @@ export const projectItemCreate = defineTool({
   toolset: "projects",
   class: "add",
   targets: { project: "board" },
+  async describe(args, ctx) {
+    const title = given(args.title)
+    if (!title) throw invalid("title cannot be blank.")
+    const { project } = await resolveBoard(args, ctx)
+    assertBoardWritable(project)
+    const fields = await readBoardFields(project.id, ctx)
+    const writes = planFieldValues(fields, args.fields ?? {})
+    const status = statusToDefault(fields, args.fields ?? {})
+    if (status) writes.push(...defaultStatusWrite(fields, status, false))
+
+    const fieldsText = fieldsFact(writes)
+    return {
+      headline: { text: "About to create the draft {title}", values: { title } },
+      facts: [{ label: "Board", value: project.title }, ...(fieldsText ? [fieldsText] : [])],
+      ...(args.body ? { text: { label: "Draft body", body: args.body } } : {}),
+    }
+  },
   input,
   output,
   async execute(args, ctx) {
