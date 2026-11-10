@@ -30,7 +30,8 @@ import {
 } from "../github/projects"
 import { writableContext, invalid } from "../write-support"
 import { parseRepo, type RefContext } from "../refs"
-import { StepErrors, defineTool } from "../tool"
+import { StepErrors, defineTool, type CallFact } from "../tool"
+import { changeFact } from "../write-facts"
 import { PROJECT_SCOPE_NOTE, boardSummary, boardSummarySchema } from "./support"
 import {
   BOARD_DATE_FIELDS,
@@ -197,6 +198,66 @@ export const projectCreate = defineTool({
   toolset: "projects",
   class: "idempotent",
   targets: { owner: "owner", link_repo: "repo" },
+  async describe(args, ctx) {
+    const ownerArg = givenOwner(args.owner)
+    if (ownerArg === undefined) throw invalid(`owner cannot be blank; use a login or ${CURRENT_USER}.`)
+    const title = args.title === undefined ? DEFAULT_BOARD_TITLE : given(args.title)
+    if (!title) throw invalid("title cannot be blank.")
+    const standard = args.standard ?? true
+    const templateRef = given(args.template)
+    const linkName = given(args.link_repo)
+    const login = ownerArg === CURRENT_USER ? await viewerLogin(ctx) : ownerArg
+    let linkRepo
+    if (linkName) {
+      const repo = parseRepo(linkName)
+      assertSameOwner({ name: "the board to be created", owner: login }, repo)
+      linkRepo = await writableContext(repo, ctx)
+    }
+
+    const owner = await readBoardOwner(login, ctx)
+
+    const dateMode = args.dates ?? "board"
+    let dateNames: { start: string; target: string } = BOARD_DATE_FIELDS
+    if (dateMode === "issue_fields") {
+      if (!standard) throw invalid("dates applies only with standard.")
+      const definitions = await readOwnerIssueFields({ owner: owner.login, owner_type: owner.type }, ctx)
+      const startDef = requireIssueField({ owner: owner.login, owner_type: owner.type }, definitions, {
+        name: ISSUE_DATE_FIELDS.start,
+        type: "date",
+      })
+      const targetDef = requireIssueField({ owner: owner.login, owner_type: owner.type }, definitions, {
+        name: ISSUE_DATE_FIELDS.target,
+        type: "date",
+      })
+      dateNames = { start: startDef.name, target: targetDef.name }
+    }
+
+    const reused = openBoardTitled((await ownerBoards(owner.login, ctx, owner.type)).boards, title)
+    if (reused) assertBoardWritable(reused)
+    const source =
+      reused || !templateRef ? undefined : (await resolveBoard({ project: templateRef, owner: ownerArg }, ctx)).project
+    const fresh = !reused && !source
+
+    const facts: CallFact[] = [{ label: "Owner", value: owner.login }]
+    if (source) facts.push({ label: "Template", value: source.title })
+    if (linkRepo && (!reused || !(await isLinked(reused, linkRepo.repo, ctx)))) {
+      facts.push({ label: "Link", value: linkRepo.repo.full })
+    }
+    if (standard && fresh) facts.push({ label: "Default view", value: { text: "Removed" } })
+    if (standard && !source) {
+      const present = reused ? await readBoardViewNodes(reused.id, ctx) : []
+      const added = standardTemplate(dateNames)
+        .views.map((view) => view.name)
+        .filter((name) => !present.some((view) => sameTitle(view.name, name)))
+      const viewsFact = changeFact("Views", added)
+      if (viewsFact) facts.push(viewsFact)
+    }
+
+    const headline = reused
+      ? { text: "About to reuse the project board {title}", values: { title: reused.title } }
+      : { text: "About to create the project board {title}", values: { title } }
+    return { headline, facts }
+  },
   input,
   output,
   async execute(args, ctx) {

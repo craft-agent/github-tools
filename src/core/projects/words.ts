@@ -40,10 +40,17 @@ export const PROJECT_TRANSLATIONS: Translations = {
     "About to turn the draft {title} into an issue": "ドラフト「{title}」を Issue に変換しようとしています",
     "Draft body": "ドラフトの本文",
     "Already on the board; nothing is sent": "ボードに追加済みです（何も送信されません）",
+    "About to create the project board {title}": "GitHub のプロジェクトボード「{title}」を作成しようとしています",
+    "About to reuse the project board {title}": "GitHub のプロジェクトボード「{title}」を再利用しようとしています",
     "About to link the project board {title} to the repository":
       "GitHub のプロジェクトボード「{title}」をリポジトリにリンクしようとしています",
     "About to unlink the project board {title} from the repository":
       "GitHub のプロジェクトボード「{title}」とリポジトリのリンクを解除しようとしています",
+    Owner: "オーナー",
+    Template: "テンプレート",
+    Link: "リンク先",
+    "Default view": "既定のビュー",
+    Views: "ビュー",
     "Already linked to the repository; nothing is sent": "すでにリポジトリにリンク済みです（何も送信されません）",
     "Not linked to the repository; nothing is sent": "リポジトリにリンクされていません（何も送信されません）",
     Fields: "フィールド",

@@ -8,7 +8,15 @@ import {
 } from "../../testing/board-write-fixtures"
 import { installFakeGh, type GhRule } from "../../testing/fake-gh"
 import { tempRepo } from "../../testing/git-repo"
-import { itemBoardRule, linkedBoardsRule, octoBoardRules, rawBoard } from "../../testing/project-fixtures"
+import {
+  itemBoardRule,
+  linkedBoardsRule,
+  octoBoardRules,
+  ownerBoardsRule,
+  rawBoard,
+  viewsRule,
+} from "../../testing/project-fixtures"
+import { boardOwnerRule } from "../../testing/setup-fixtures"
 import { pullHeadingRule } from "../../testing/pull-request-write-fixtures"
 import { ORIGIN, issueHeadingRule, milestonesRule, repositoryRule } from "../../testing/write-fixtures"
 import { callDescription } from "../describe"
@@ -18,6 +26,7 @@ import { projectItemArchive, projectItemUnarchive } from "./item-archive"
 import { projectItemConvert } from "./item-convert"
 import { projectItemCreate } from "./item-create"
 import { projectItemEdit } from "./item-edit"
+import { projectCreate } from "./create"
 import { projectLink, projectUnlink } from "./link"
 
 /** One call of a project board write tool to describe, and the replies of GitHub it meets. */
@@ -68,6 +77,30 @@ export const addRules = (onBoard = false, ...states: string[]): GhRule[] => [
   addedContent("Issue", onBoard),
   issueHeadingRule({ title: ADDED_TITLE }),
   blockersRule(...states),
+]
+
+const view = (number: number, name: string) => ({
+  id: `V${number}`,
+  number,
+  name,
+  layout: "TABLE_LAYOUT",
+  filter: null,
+})
+
+/** The replies of a call on a user or organization `octo` that has no board yet. */
+export const noBoardRules = (...rules: GhRule[]): GhRule[] => [
+  ...rules,
+  boardOwnerRule("octo", "Organization"),
+  ownerBoardsRule("organization", "octo", []),
+]
+
+/** The replies of a call on an existing board 4 titled Plan of `octo`, with the views View 1 and ROADMAP; `linked` says whether `octo/hello` lists it. */
+export const planBoardRules = (linked: boolean): GhRule[] => [
+  boardOwnerRule("octo", "Organization"),
+  ownerBoardsRule("organization", "octo", [rawBoard(4, { title: "Plan" })]),
+  viewsRule([view(1, "View 1"), view(2, "ROADMAP")]),
+  linkedBoardsRule("octo", "hello", linked ? [rawBoard(4)] : []),
+  repositoryRule(),
 ]
 
 /** The replies of linking or unlinking board 3 and `octo/hello`; `linked` says whether the repository lists the board. */
@@ -239,6 +272,42 @@ export const DESCRIBE_CASES = {
     tool: projectItemConvert,
     args: { item: "PVTI_1", milestone: "v9", create_milestone: true },
     rules: itemRules(DRAFT_ITEM, repositoryRule(), milestonesRule("v0")),
+  },
+  createNew: {
+    name: "create a board, which loses GitHub's default view",
+    tool: projectCreate,
+    args: { owner: "octo", title: " Plan " },
+    rules: noBoardRules(),
+  },
+  createFromTemplate: {
+    name: "create a board as a copy of a template",
+    tool: projectCreate,
+    args: { owner: "octo", title: "Plan", template: "octo/2" },
+    rules: noBoardRules(...octoBoardRules(2)),
+  },
+  createLinked: {
+    name: "create a board and link it to a repository",
+    tool: projectCreate,
+    args: { owner: "octo", title: "Plan", link_repo: "octo/hello" },
+    rules: noBoardRules(repositoryRule()),
+  },
+  createBoardBare: {
+    name: "create a board without the standard template",
+    tool: projectCreate,
+    args: { owner: "octo", title: "Plan", standard: false },
+    rules: noBoardRules(),
+  },
+  createReuse: {
+    name: "reuse a board that is linked already",
+    tool: projectCreate,
+    args: { owner: "octo", title: " plan ", link_repo: "octo/hello", template: "octo/2" },
+    rules: planBoardRules(true),
+  },
+  createReuseUnlinked: {
+    name: "reuse a board that is not linked yet",
+    tool: projectCreate,
+    args: { owner: "octo", title: "Plan", link_repo: "octo/hello" },
+    rules: planBoardRules(false),
   },
   link: {
     name: "link a board",

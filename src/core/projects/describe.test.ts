@@ -8,8 +8,16 @@ import {
   rawBoardContent,
 } from "../../testing/board-write-fixtures"
 import { DEPENDENCIES } from "../../testing/issue-fixtures"
-import { itemBoardRule, linkedBoardsRule, octoBoardRules, rawBoard } from "../../testing/project-fixtures"
+import {
+  itemBoardRule,
+  linkedBoardsRule,
+  octoBoardRules,
+  ownerBoardsRule,
+  rawBoard,
+  viewerRule,
+} from "../../testing/project-fixtures"
 import { milestonesRule, repositoryRule } from "../../testing/write-fixtures"
+import { boardOwnerRule } from "../../testing/setup-fixtures"
 import { queryOf } from "../../testing/setup-fixtures"
 import { MAX_FACTS, MAX_HEADLINE_LENGTH, MAX_LABEL_LENGTH } from "../describe"
 import { digest } from "../write-facts"
@@ -379,6 +387,103 @@ describe("github_project_item_convert", () => {
     ["an item that does not exist", { item: "PVTI_1" }, itemRules(null, repositoryRule())],
   ])("%s: no description", async (_name, args, rules) => {
     expect(await describeCase({ ...convert, args, rules })).toBeUndefined()
+  })
+})
+
+describe("github_project_create", () => {
+  const plan = (text: string) => headline(text, "Plan")
+  const owner = { label: "Owner", value: "octo" }
+  const defaultView = { label: "Default view", value: word("Removed") }
+  const allViews = { label: "Views", value: "+Roadmap +Kanban +Backlog" }
+
+  test("a board to be made names the call's trimmed title, its owner, and what the standard template does to it", async () => {
+    expect(await describeCase(DESCRIBE_CASES.createNew)).toEqual({
+      headline: plan("About to create the project board {title}"),
+      facts: [owner, defaultView, allViews],
+    })
+  })
+
+  test("a copy of a template names the template's real title, and says nothing of the template's own shape", async () => {
+    expect(await describeCase(DESCRIBE_CASES.createFromTemplate)).toEqual({
+      headline: plan("About to create the project board {title}"),
+      facts: [owner, { label: "Template", value: "Roadmap" }],
+    })
+  })
+
+  test("link_repo shows the repository the board will be linked to", async () => {
+    expect((await describeCase(DESCRIBE_CASES.createLinked))?.facts).toEqual([
+      owner,
+      { label: "Link", value: "octo/hello" },
+      defaultView,
+      allViews,
+    ])
+  })
+
+  test("without the standard template only the owner shows", async () => {
+    expect((await describeCase(DESCRIBE_CASES.createBoardBare))?.facts).toEqual([owner])
+  })
+
+  test("a board that exists is reused under its own title, and only the views it lacks show", async () => {
+    expect(await describeCase(DESCRIBE_CASES.createReuse)).toEqual({
+      headline: plan("About to reuse the project board {title}"),
+      facts: [owner, { label: "Views", value: "+Kanban +Backlog" }],
+    })
+  })
+
+  test("a reused board that is not linked yet shows the link", async () => {
+    expect((await describeCase(DESCRIBE_CASES.createReuseUnlinked))?.facts).toEqual([
+      owner,
+      { label: "Link", value: "octo/hello" },
+      { label: "Views", value: "+Kanban +Backlog" },
+    ])
+  })
+
+  test("@me is the viewer's login", async () => {
+    const rules = [viewerRule("alice"), boardOwnerRule("alice", "User"), ownerBoardsRule("user", "alice", [])]
+    const item = { ...DESCRIBE_CASES.createNew, args: { owner: "@me", title: "Plan", standard: false }, rules }
+    expect((await describeCase(item))?.facts).toEqual([{ label: "Owner", value: "alice" }])
+  })
+
+  const create = DESCRIBE_CASES.createNew
+  test.each([
+    ["a blank owner", { owner: " " }, create.rules],
+    ["a blank title", { owner: "octo", title: " " }, create.rules],
+    ["an owner that does not exist", { owner: "octo" }, [ownerBoardsRule("organization", "octo", [])]],
+    [
+      "a repository of another owner",
+      { owner: "octo", link_repo: "acme/widgets" },
+      [...create.rules, repositoryRule({ repo: "acme/widgets" })],
+    ],
+    [
+      "a repository the viewer cannot write to",
+      { owner: "octo", link_repo: "octo/hello" },
+      [repositoryRule({ permission: "READ" }), ...create.rules],
+    ],
+    ["dates without the standard template", { owner: "octo", standard: false, dates: "issue_fields" }, create.rules],
+    [
+      "issue field dates of a user",
+      { owner: "alice", dates: "issue_fields" },
+      [boardOwnerRule("alice", "User"), ownerBoardsRule("user", "alice", [])],
+    ],
+    [
+      "several open boards of that title",
+      { owner: "octo", title: "Plan" },
+      [
+        boardOwnerRule("octo", "Organization"),
+        ownerBoardsRule("organization", "octo", [rawBoard(4, { title: "Plan" }), rawBoard(5, { title: "plan" })]),
+      ],
+    ],
+    [
+      "a reused board the viewer cannot update",
+      { owner: "octo", title: "Plan" },
+      [
+        boardOwnerRule("octo", "Organization"),
+        ownerBoardsRule("organization", "octo", [rawBoard(4, { title: "Plan", viewerCanUpdate: false })]),
+      ],
+    ],
+    ["a template that does not exist", { owner: "octo", template: "octo/9" }, create.rules],
+  ])("%s: no description", async (_name, args, rules) => {
+    expect(await describeCase({ ...create, args, rules })).toBeUndefined()
   })
 })
 
