@@ -4,7 +4,18 @@ import { repositoryContext } from "../github/repository"
 import { deleteRuleset, readRuleset } from "../github/rulesets"
 import { resolveRepo } from "../refs"
 import { confirmWrite, defineTool } from "../tool"
-import { assertOwnRuleset, assertUnchanged, expectedUpdate, rulesetIdInput, updatedAtInput } from "./ruleset-support"
+import { describedRepo } from "./describe-support"
+import {
+  assertOwnRuleset,
+  assertUnchanged,
+  enforcementFact,
+  expectedUpdate,
+  ruleTypes,
+  rulesetHeadline,
+  rulesetIdInput,
+  targetFact,
+  updatedAtInput,
+} from "./ruleset-support"
 import { REPO_DESCRIPTION } from "./support"
 
 export const rulesetDelete = defineTool({
@@ -19,6 +30,22 @@ export const rulesetDelete = defineTool({
   toolset: "repos",
   class: "administrative",
   targets: { repo: "repo" },
+  async describe(args, ctx) {
+    const expected = expectedUpdate(args.updated_at)
+    const { target } = await describedRepo(args, ctx)
+    const ruleset = await readRuleset(target, args.ruleset, ctx)
+    assertOwnRuleset(target, ruleset, "delete")
+    assertUnchanged(target, ruleset, expected)
+    return {
+      ...rulesetHeadline("About to delete the ruleset {name}", ruleset.name),
+      facts: [
+        enforcementFact(ruleset.enforcement),
+        targetFact(ruleset.target),
+        ...(ruleset.rules.length > 0 ? [{ label: "Rules", value: ruleTypes(ruleset.rules).join(", ") }] : []),
+      ],
+      pins: { updated_at: ruleset.updated_at ?? "" },
+    }
+  },
   input: z.object({
     repo: z.string().optional().describe(REPO_DESCRIPTION),
     ruleset: rulesetIdInput,

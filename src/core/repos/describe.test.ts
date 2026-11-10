@@ -11,10 +11,12 @@ import { MAX_FACTS, MAX_HEADLINE_LENGTH, MAX_LABEL_LENGTH } from "../describe"
 import { NOTHING_CHANGED, NOT_ARCHIVED } from "../write-facts"
 import {
   DESCRIBE_CASES,
+  RULESET_UPDATED_AT,
   branchRule,
   createRules,
   describeCase,
   repoRules,
+  rulesetRules,
   type DescribeCase,
 } from "./describe.fixtures"
 
@@ -319,6 +321,127 @@ describe("github_ruleset_create", () => {
     ],
   ])("%s: no description", async (_name, args, rules) => {
     expect(await describeCase({ ...create, args, rules })).toBeUndefined()
+  })
+})
+
+describe("github_ruleset_edit", () => {
+  const headline = named("About to edit the ruleset {name}", "Protect main")
+  const pins = { updated_at: RULESET_UPDATED_AT }
+
+  test("shows each part that changes, with the real name in the headline and the update pinned", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editRulesetEverything)).toEqual({
+      headline,
+      facts: [
+        { label: "Name", value: "Renamed" },
+        { label: "Enforcement", value: { text: "Evaluate" } },
+        { label: "Refs", value: "+refs/heads/dev" },
+        { label: "Excluded refs", value: "+refs/heads/tmp" },
+        { label: "Rules", value: "+non_fast_forward \u2212deletion" },
+        { label: "Rule parameters", value: "pull_request" },
+        { label: "Bypass", value: { text: "{count} actors", values: { count: 0 } } },
+      ],
+      pins,
+    })
+  })
+
+  test("a new bypass list is a count, and a matching updated_at is accepted", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editRulesetBypass)).toEqual({
+      headline,
+      facts: [{ label: "Bypass", value: { text: "{count} actor", values: { count: 1 } } }],
+      pins,
+    })
+  })
+
+  test("what is in place already says nothing is sent, and still pins", async () => {
+    expect(await describeCase(DESCRIBE_CASES.editRulesetNothing)).toEqual({
+      headline,
+      facts: [{ label: "State", value: { text: NOTHING_CHANGED } }],
+      pins,
+    })
+  })
+
+  test("the same rules in another order are Replaced", async () => {
+    const args = {
+      ruleset: 7,
+      rules: [{ type: "pull_request", parameters: { required_approving_review_count: 1 } }, { type: "deletion" }],
+    }
+    expect((await describeCase({ ...DESCRIBE_CASES.editRulesetBypass, args }))?.facts).toEqual([
+      { label: "Rules", value: { text: "Replaced" } },
+    ])
+  })
+
+  test("the pin follows the ruleset's updated_at", async () => {
+    const item = DESCRIBE_CASES.editRulesetBypass
+    const later = "2026-11-09T00:00:00Z"
+    const description = await describeCase({
+      ...item,
+      args: { ruleset: 7, bypass: [] },
+      rules: rulesetRules({ updated_at: later }),
+    })
+    expect(description?.pins).toEqual({ updated_at: later })
+  })
+
+  const edit = DESCRIBE_CASES.editRulesetBypass
+  test.each([
+    ["no part at all", { ruleset: 7 }, edit.rules],
+    ["an updated_at that is no timestamp", { ...edit.args, updated_at: "yesterday" }, edit.rules],
+    ["a ruleset changed since it was read (stale)", { ...edit.args, updated_at: "2026-11-01T00:00:00Z" }, edit.rules],
+    ["a ruleset that shows no update time (stale)", edit.args, rulesetRules({ updated_at: null })],
+    ["a ruleset the organization defines", edit.args, rulesetRules({ source_type: "Organization", source: "octo" })],
+    [
+      "a name another ruleset has",
+      { ruleset: 7, name: "Other" },
+      rulesetRules({}, rawRuleset({ id: 8, name: "other" })),
+    ],
+    [
+      "include on a push ruleset",
+      { ruleset: 7, include: ["main"] },
+      rulesetRules({ target: "push", conditions: null }),
+    ],
+    ["a ruleset that does not exist", edit.args, [...repoRules(), restFailure("rulesets/7", "Not Found (HTTP 404)")]],
+    [
+      "a repository the viewer does not administer",
+      edit.args,
+      [...repoRules({ viewerPermission: "WRITE" }), ...rulesetRules()],
+    ],
+  ])("%s: no description", async (_name, args, rules) => {
+    expect(await describeCase({ ...edit, args, rules })).toBeUndefined()
+  })
+})
+
+describe("github_ruleset_delete", () => {
+  const item = DESCRIBE_CASES.deleteRuleset
+
+  test("names the ruleset GitHub knows, shows how it is enforced and pins the update", async () => {
+    expect(await describeCase(item)).toEqual({
+      headline: named("About to delete the ruleset {name}", "Protect main"),
+      facts: [
+        { label: "Enforcement", value: { text: "Active" } },
+        { label: "Target", value: { text: "Branch" } },
+        { label: "Rules", value: "deletion, pull_request" },
+      ],
+      pins: { updated_at: RULESET_UPDATED_AT },
+    })
+  })
+
+  test("the pin and the enforcement follow the ruleset", async () => {
+    const description = await describeCase({
+      ...item,
+      args: { ruleset: 7 },
+      rules: rulesetRules({ updated_at: "2026-11-09T00:00:00Z", enforcement: "disabled" }),
+    })
+    expect(description?.pins).toEqual({ updated_at: "2026-11-09T00:00:00Z" })
+    expect(description?.facts[0]).toEqual({ label: "Enforcement", value: { text: "Disabled" } })
+  })
+
+  test.each([
+    ["a ruleset changed since it was read (stale)", { ...item.args, updated_at: "2026-11-01T00:00:00Z" }, item.rules],
+    ["an updated_at that is no timestamp", { ...item.args, updated_at: "yesterday" }, item.rules],
+    ["a ruleset the organization defines", item.args, rulesetRules({ source_type: "Organization", source: "octo" })],
+    ["a ruleset that does not exist", item.args, [...repoRules(), restFailure("rulesets/7", "Not Found (HTTP 404)")]],
+    ["no ruleset", { updated_at: RULESET_UPDATED_AT }, item.rules],
+  ])("%s: no description", async (_name, args, rules) => {
+    expect(await describeCase({ ...item, args, rules })).toBeUndefined()
   })
 })
 

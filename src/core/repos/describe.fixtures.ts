@@ -17,6 +17,8 @@ import { repoEdit } from "./repo-edit"
 import { repoUnarchive } from "./repo-unarchive"
 import { repoVisibility } from "./repo-visibility"
 import { rulesetCreate } from "./ruleset-create"
+import { rulesetDelete } from "./ruleset-delete"
+import { rulesetEdit } from "./ruleset-edit"
 
 /** One call of a repository write tool to describe, and the replies of GitHub it meets. */
 export type DescribeCase = { name: string; tool: ToolSpec; args: Record<string, unknown>; rules: GhRule[] }
@@ -97,6 +99,41 @@ export const DESCRIBE_CASES = {
     tool: rulesetCreate,
     args: { name: "Pushes", target: "push", enforcement: "disabled", rules: [{ type: "file_path_restriction" }] },
     rules: [...repoRules(), rulesetListRule()],
+  },
+  editRulesetEverything: {
+    name: "edit every part of a ruleset",
+    tool: rulesetEdit,
+    args: {
+      ruleset: 7,
+      name: "Renamed",
+      enforcement: "evaluate",
+      include: ["main", "dev"],
+      exclude: ["tmp"],
+      rules: [
+        { type: "pull_request", parameters: { required_approving_review_count: 2 } },
+        { type: "non_fast_forward" },
+      ],
+      bypass: [],
+    },
+    rules: rulesetRules(),
+  },
+  editRulesetBypass: {
+    name: "edit the bypass actors, guarded by updated_at",
+    tool: rulesetEdit,
+    args: { ruleset: 7, updated_at: RULESET_UPDATED_AT, bypass: [{ actor_type: "Team", actor_id: 9 }] },
+    rules: rulesetRules(),
+  },
+  editRulesetNothing: {
+    name: "edit a ruleset to what it is already",
+    tool: rulesetEdit,
+    args: { ruleset: 7, enforcement: "active", include: ["main"], name: "Protect main" },
+    rules: rulesetRules(),
+  },
+  deleteRuleset: {
+    name: "delete a ruleset",
+    tool: rulesetDelete,
+    args: { ruleset: 7, updated_at: RULESET_UPDATED_AT },
+    rules: rulesetRules(),
   },
   createPrivate: {
     name: "create a repository, private by default",
