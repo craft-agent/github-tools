@@ -2,6 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
+import { PLUGIN_NAME } from "./package-name.mjs"
 
 const SERVER = fileURLToPath(new URL("../dist/mcp.js", import.meta.url))
 const EXIT_USAGE = 2
@@ -11,8 +12,11 @@ async function listTools() {
   const client = new Client({ name: "smoke", version: "0.0.0" })
   await client.connect(new StdioClientTransport({ command: process.execPath, args: [SERVER] }))
   try {
+    const serverName = client.getServerVersion()?.name
+    if (serverName !== PLUGIN_NAME)
+      throw new Error(`Expected the server to be named ${PLUGIN_NAME}, got ${serverName}.`)
     const { tools } = await client.listTools()
-    console.log(`The MCP server lists ${tools.length} tools.`)
+    console.log(`The MCP server ${serverName} lists ${tools.length} tools.`)
 
     const result = await client.callTool({ name: UNKNOWN_TOOL })
     const [block] = result.content

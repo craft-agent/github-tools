@@ -23,10 +23,10 @@ import {
 import { errorBody } from "../entry/errors"
 import { PROJECT_PROFILE } from "../entry/profile"
 import type { EntrySettings } from "../entry/settings"
+import { PROJECT } from "../project"
 import { elicitationConfirm } from "./confirm"
 import { createWorkingDirResolver } from "./roots"
 
-const SERVER_NAME = "github-tools"
 const DEFAULT_VERSION = "0.0.0"
 
 export type ServerOptions = {
@@ -71,7 +71,7 @@ function describeTool(spec: ToolSpec): Tool {
 export function createServer(specs: ToolSpec[], settings: EntrySettings, options: ServerOptions = {}): Server {
   const log = options.log ?? ((entry: string) => process.stderr.write(`${entry}\n`))
   const server = new Server(
-    { name: SERVER_NAME, version: options.version ?? DEFAULT_VERSION },
+    { name: PROJECT.name, version: options.version ?? DEFAULT_VERSION },
     { capabilities: { tools: {} } },
   )
   const workingDir = createWorkingDirResolver(server, options.cwd ?? (() => process.cwd()), options.ownDir)

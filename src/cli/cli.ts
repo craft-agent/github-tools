@@ -19,13 +19,14 @@ import { PROJECT_PROFILE, type EntryProfile } from "../entry/profile"
 import { parseToolSettings, promptLanguage } from "../entry/settings"
 import { visible } from "../entry/visible"
 import { promptTranslator, promptWords } from "../entry/words"
+import { PROJECT } from "../project"
 
 /** The exit codes of a command: it did its work, the work failed, or the command line was wrong. */
 export const EXIT_OK = 0
 export const EXIT_FAILED = 1
 export const EXIT_USAGE = 2
 
-const PROGRAM = "github-tools-cli"
+const PROGRAM = PROJECT.cli
 const CWD_FLAG = "--cwd"
 const LANGUAGE_FLAG = "--language"
 const HARNESS_LANGUAGE_FLAG = "--harness-language"
@@ -217,7 +218,7 @@ function errorDetail(error: unknown): string {
  * a cut value or text left out, and `dropped` the number of facts left out
  * past the eighth, each present only when it is above zero), and a `pin` (64 hex digits, independent of the
  * language) of that description and the resources when there is a description.
- * `target` takes `--language <tag>`, else `GITHUB_TOOLS_LANGUAGE`, else
+ * `target` takes `--language <tag>`, else `<envPrefix>_LANGUAGE`, else
  * `--harness-language <tag>` (the harness's own
  * display language) as the prompt language; none, or one without a table,
  * keeps English. Standard output carries only the JSON document; a

@@ -7,13 +7,13 @@ import { fileURLToPath } from "node:url"
 import { forwardedVariables, settingVariables } from "../src/entry/settings"
 import { PROJECT } from "../src/project"
 import { CODEX_MANIFEST } from "./codex-env.mjs"
+import { PLUGIN_NAME } from "./package-name.mjs"
 import { DESCRIPTION, serverJson } from "./server-json.mjs"
 import { VERSION_FILES } from "./version-files.mjs"
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url))
-const PLUGIN_NAME = "github-tools"
-const SERVER_NAME = "github-tools"
 const MCP_ENTRY = "dist/mcp.js"
+const CLI_ENTRY = "dist/cli.js"
 const REGISTRY_DESCRIPTION_LIMIT = 100
 
 /** Each MCP configuration and the variable its harness expands to the plugin's install directory. */
@@ -30,6 +30,12 @@ const read = (file) => readFileSync(join(ROOT, file), "utf8")
 const readJson = (file) => JSON.parse(read(file))
 
 const pkg = readJson("package.json")
+
+const SERVER_NAME = PLUGIN_NAME
+const CLI_NAME = `${PLUGIN_NAME}-cli`
+const REPOSITORY_URL = pkg.repository.url.replace(/^git\+/, "").replace(/\.git$/, "")
+const [, OWNER, REPOSITORY] = /^https:\/\/github\.com\/([^/]+)\/([^/]+)$/.exec(REPOSITORY_URL) ?? []
+const HERMES_PACKAGE = `src/hermes/${PLUGIN_NAME.replaceAll("-", "_")}_hermes`
 
 /** The paths the release workflow passes as `version-files`, one per line. */
 function workflowVersionFiles() {
@@ -95,11 +101,15 @@ describe("MCP configurations", () => {
     }
   })
 
-  test("github-tools runs the MCP server, and github-tools-cli the command line", () => {
-    expect(pkg.bin).toEqual({ "github-tools": MCP_ENTRY, "github-tools-cli": "dist/cli.js" })
+  test("the package runs the MCP server, and the package with -cli the command line", () => {
+    expect(pkg.bin).toEqual({ [PLUGIN_NAME]: MCP_ENTRY, [CLI_NAME]: CLI_ENTRY })
     // npx runs the bin named like the unscoped package name when a package provides several bins.
-    const unscoped = pkg.name.replace(/^@[^/]+\//, "")
-    expect(pkg.bin[unscoped]).toBe(MCP_ENTRY)
+    expect(pkg.bin[PLUGIN_NAME]).toBe(MCP_ENTRY)
+  })
+
+  test("src/project.ts gives the program the names package.json does", () => {
+    expect(PROJECT.name).toBe(PLUGIN_NAME)
+    expect(PROJECT.cli).toBe(CLI_NAME)
   })
 
   test("every tool variable is a variable name, listed once and not a setting's", () => {
@@ -121,13 +131,7 @@ describe("marketplaces", () => {
 })
 
 describe("package files", () => {
-  const manifests = [
-    ...VERSION_FILES,
-    ...Object.keys(MCP_CONFIGS),
-    ...MARKETPLACES,
-    "__init__.py",
-    "src/hermes/github_tools_hermes",
-  ]
+  const manifests = [...VERSION_FILES, ...Object.keys(MCP_CONFIGS), ...MARKETPLACES, "__init__.py", HERMES_PACKAGE]
 
   test.each(["dist", ...manifests])("%s is packed", (path) => {
     expect(isPacked(path, pkg.files)).toBe(true)
@@ -151,11 +155,11 @@ describe("server.json", () => {
     expect(server.packages).toEqual([
       { registryType: "npm", identifier: pkg.name, version: pkg.version, transport: { type: "stdio" } },
     ])
-    expect(server.repository).toEqual({ url: "https://github.com/craft-agent/github-tools", source: "github" })
+    expect(server.repository).toEqual({ url: REPOSITORY_URL, source: "github" })
   })
 
   test("names the registry namespace the repository's owner holds", () => {
-    expect(pkg.mcpName).toBe("io.github.craft-agent/github-tools")
+    expect(pkg.mcpName).toBe(`io.github.${OWNER}/${REPOSITORY}`)
   })
 
   test("describes the server within the registry's limit", () => {
