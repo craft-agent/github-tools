@@ -21,8 +21,14 @@ TOOLSET_EMOJI: dict[str, str] = {
     "actions": "🤖",
 }
 
+#: The settings the tools themselves read, beside the ones every plugin takes: each snake_case name and its type
+#: (``text``, ``boolean``, ``number`` or ``list``), as in ``src/project.ts``. A setting ``a_b`` becomes the flag
+#: ``--a-b`` of the command line.
+OPTIONS: dict[str, str] = {}
+
 __all__ = [
     "CLI_NAME",
+    "OPTIONS",
     "PLUGIN_NAME",
     "SKILL_PREFIX",
     "TOOLSET_EMOJI",
