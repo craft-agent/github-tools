@@ -108,21 +108,18 @@ A project adds a code to `src/core/errors.ts` and to this table together.
 ## Write classes
 
 Every tool belongs to one class, and the class sets its MCP annotations.
-`openWorldHint` is `true` for every tool, since each one reaches GitHub.
+`openWorldHint` is `true` for every tool.
 
-| Class             | Examples                                                   | `readOnlyHint` | `destructiveHint` | `idempotentHint` |
-| ----------------- | ---------------------------------------------------------- | -------------- | ----------------- | ---------------- |
-| read              | view, list, resolve                                        | `true`         | —                 | `true`           |
-| add               | create, comment, add an item                               | `false`        | `false`           | `false`          |
-| idempotent change | ensure, relate, adding a label                             | `false`        | `false`           | `true`           |
-| overwrite         | editing a body or title, close, reopen                     | `false`        | `true`            | `true`           |
-| administrative    | merge, visibility, delete, publishing, every Actions write | `false`        | `true`            | `false`          |
+| Class             | Examples                              | `readOnlyHint` | `destructiveHint` | `idempotentHint` |
+| ----------------- | ------------------------------------- | -------------- | ----------------- | ---------------- |
+| read              | view, list, resolve                   | `true`         | —                 | `true`           |
+| add               | create, add                           | `false`        | `false`           | `false`          |
+| idempotent change | ensure, adding a tag                  | `false`        | `false`           | `true`           |
+| overwrite         | editing a body or title, removing one | `false`        | `true`            | `true`           |
+| administrative    | delete, visibility, publishing        | `false`        | `true`            | `false`          |
 
 - **Overwriting counts as destructive**: it loses what was there, and
   harnesses that confirm only destructive tools should still ask before it.
-- **Every Actions write is administrative**: starting, re-running or
-  cancelling a run. A workflow can deploy, publish or spend whatever its name
-  says, and stopping one halfway can leave a deploy half done.
 - **A tool takes the strictest class its arguments can reach.**
 - **The harness confirms writes.** Every MCP client asks before it runs a
   write tool, so the tool does not ask again by default. Administrative tools
@@ -133,28 +130,10 @@ Every tool belongs to one class, and the class sets its MCP annotations.
   approval of their own.
 - **It asks for everything the call writes to.** A write tool's `targets`
   resolver names what the call writes to, as the permission rules name it
-  (here a repository or a board). Anything it cannot tell, every tool
-  without a resolver, arguments the input schema rejects, and a target holding
-  `*` or `?` (which a harness would store as a pattern) is `*`, and `*` is
-  never stored. An "always" answer then covers only what it named, never a
-  write somewhere else.
-- **The resolvers are made by `githubTargets`**, from a map of argument names
-  to the kind of target each holds: `repo`, an issue or pull request
-  reference (`issue`, `pull`) or a list of issues (`issues`), a workflow run
-  (`run`), a board (`board`), a board that is written to only when it is given
-  (`optional_board`), a board item (`item`) and the owner a board is created
-  for (`owner`). Every argument of the map must be an argument of the tool.
-  A bare number means the call's own repository, and a repository is named
-  in lowercase.
-- **A board is named `owner/projects/N`.** A board belongs to a user or an
-  organization, not to a repository, so its writes name the board rather than
-  the working tree's repository. A board the call does not name is found with
-  the same lookup the tool uses, which reads but never writes. Putting an
-  issue or pull request on a board names the board only, since the issue does
-  not change; a call that also writes to a repository (linking one, turning a
-  draft into an issue) names both. Creating a board names `owner/projects/new`,
-  so an "always" answer lets new boards be made for that owner and no
-  existing board be written to.
+  (a path, an account, a record). Anything it cannot tell, every tool
+  without a resolver, and a target holding `*` or `?` (which a harness would
+  store as a pattern) is `*`, and `*` is never stored. An "always" answer then
+  covers only what it named, never a write somewhere else.
 - **It shows what the call carries, where the tool can say.** Targets are
   ids, so they cannot tell one kind of target from another, and the person
   decides on the text, the file or the kind of target as much as on where it
@@ -313,99 +292,12 @@ note`). The prompt shows it wherever no headline can stand: a tool without
 - **Annotations are hints, not a boundary.** The `read_only` setting
   (below) is what keeps writes out.
 
-## What this package's approval prompts say
-
-The rules above are the starter's; this section is what this package adds
-to them. Every write tool, whatever its class, follows it.
-
-- **Every write tool gives an `intent`.** It starts with `About to`, names the
-  object as its title does (`GitHub issue`, `pull request`), and says only
-  what every call of the tool does: where a call's direction depends on an
-  argument (`undo` on `github_pr_ready`) or may find the work already done
-  (`github_project_field_ensure`), the phrase says what the tool settles, not
-  which way it went. A read tool gives none, since it asks nothing.
-- **Translations sit beside the tools, one table per directory** (`words.ts`
-  of `issues`, `pull-requests`, `projects`, `repos`, `releases`, `runs` and
-  `workflows`), and `src/words.ts` merges them with the shared fact words.
-  `src/words.test.ts` fails on a key no tool uses, on a word a tool uses
-  without a key, and on a template whose translation changes its
-  placeholders, so a table cannot drift from the tools.
-- **A tool is described from what it read, never from what the model said.**
-  A headline names the issue, pull request or board by the title GitHub
-  returns; the arguments only say which one. A tool that cannot tell its
-  target before it runs gives its intent alone.
-- **Facts this package adds** are listed here, each with the tools that give
-  it. A fact appears only where it changes the answer: `State` is not shown
-  for an open issue about to be closed, since it is always open.
-  `src/core/write-facts.ts` holds the ones several toolsets share.
-  - `State` (`stateFact`): the target's state as `Open`, `Closed`, `Merged`
-    or `Draft`. A comment on a closed issue shows it; closing, reopening or
-    merging a target that is already in that state shows `Already closed;
-nothing is sent`, `Already open; nothing is sent` or `Already merged;
-nothing is sent` as its only fact and no text.
-  - A change to a list (`changeFact`): `Labels`, `Assignees`, `Blocked by`,
-    `Sub-issues`, `Blocking`, `Issue fields` as `+added −removed`. The names
-    are data, never translated.
-  - Issue tools: `Reason` and `Duplicate of` (close); `Title`, `Body`
-    (`Replaced`, `Appended` or `Cleared`), `Milestone`, `Kind` (edit);
-    `Parent`, `Board` (create, relate); `Branch` and `Base` (develop). A
-    milestone the call creates reads `<name> (new)`.
-  - Pull request tools: `Base`, `Head` (create, edit), `Closes` (the issues a
-    pull request names, or the ones a merge closes, as `owner/repo#N` even in
-    other repositories), `Reviewers`, `Attachments` (the file names), `Commit`
-    and `Line comments` (review), `Method` (`Merge commit`, `Squash` or
-    `Rebase`), `Also merges` (the lower layers a merge takes along) and
-    `Branch` (`Deleted after merge`) (merge), `Layers` (a stack's pull
-    requests by their real titles, bottom to top), `Stack` (`New stack` or
-    `Extends a stack of N`) and `Stays` (stack link and unlink). A review's
-    text is its body followed by each line comment under its `path:line`. A
-    call that is refused before it writes gets no description at all.
-  - Board tools: `Board` (the board's real title), `Fields` (one fact for all
-    the field writes, as `Status: Todo → Done; Target: — → 2026-12-01`, since
-    a field's name is data and never a fact's label), `Cleared fields`,
-    `Owner`, `Template`, `Link`, `Default view` and `Views` (create), `Type`
-    and `Options` (field ensure), `Layout`, `Filter`, `Grouped by`,
-    `Columns by` and `Sorted by` (view ensure). A call that finds the board
-    already in the state it asks for shows one `State` fact saying nothing is
-    sent.
-  - Repository tools: `Visibility` (a repository's own, or as a change such
-    as `Private to public`), `Template`, `License`, `Gitignore`, `README`
-    and `Homepage` (create); `Default branch`, `Topics`, `Features`,
-    `Merge methods`, `Merge options` and `Template repository` (edit, only
-    for what changes); `Enforcement`, `Target`, `Refs`, `Excluded refs`,
-    `Rules`, `Rule parameters` and `Bypass` (rulesets); `Color` and
-    `Due date` (labels, milestones). A call the tool would refuse, such as
-    archiving an archived repository, gets no description; one it accepts
-    without changing anything shows `Already in place; nothing is sent`. The
-    description a call sets is its text; one it clears is a `Cleared` fact.
-  - Release tools: `Tag target` (not `Target`, which is a ruleset's word and
-    can have only one translation), `Notes` (`Generated by GitHub`),
-    `Prerelease`, `Latest`, `Tag`, `Commit` (the short commit a publish makes
-    the tag name, or `<sha> (existing tag)`), `State` (`Draft` or
-    `Published`) and `Assets` (a delete). The notes are the text under
-    `Release notes`.
-  - Actions tools: `Branch`, `Event` and `Status` (cancel), `Scope` (`Failed
-jobs only`, `One job` or `All jobs`), `Job` and `Debug logging`
-    (re-run), `Ref`, `Commit` and `Inputs` (start), where `Inputs` is one
-    fact for all the `name: value` pairs, since an input's name is data.
-  - A replacing body is pinned by the digest of the body it replaces, a new
-    development branch by the head commit of its base, a new pull request, a
-    review and a merge by the head commit of the pull request, a merge that
-    takes lower layers along by the digest of their commits, a ruleset edit
-    or delete by the ruleset's update time, a release publish by the full
-    commit it tags, replaced release notes by their digest, a re-run by the
-    commit and attempt it repeats and a workflow start by the full commit of
-    its ref, since the prompt shows none of them in full.
-
 ## Toolsets and settings
 
 Every entry point takes the same settings:
 
-- **Toolsets**: one per domain. `issues`, `pull_requests` and `projects` are on
-  by default; `repos`, `releases` and `actions` are opt-in. A small default
-  keeps the model's choice sharp, but some plugins pass no settings at all, and
-  they ship every skill: a skill whose tools are off by default would describe
-  tools the agent does not have.
+- **Toolsets**: one per domain, listed in `src/project.ts` with the ones on by
+  default. A small default keeps the model's choice sharp.
 - **`read_only`** registers no write tool, and wins over every other setting.
 - **`tools` / `exclude_tools`** add or remove single tools; an exclusion wins
   over an inclusion.
@@ -442,12 +334,6 @@ Every entry point takes the same settings:
   settings reach only the MCP server.
 - **Every linked skill names one of the package's toolsets**; a test checks
   it, since a misspelt link would hide the skill wherever it is filtered.
-- **A skill that works across toolsets names the one it cannot work without.**
-  The link holds one toolset, and a skill linked to none would be listed with
-  every tool it describes turned off. Its body says which steps to skip when
-  another toolset's tools are missing, and it leans only on toolsets that are
-  on by default, since the plugins that install the skill folder whole list it
-  whatever the settings select.
 
 ## The core contract
 
@@ -464,37 +350,37 @@ Every entry point takes the same settings:
   approved the call.
 - `src/core/` uses only the `node:*` modules and plain dependencies, never a
   runtime's own globals (`Bun.spawn`, `Bun.file`, …), so the same code runs on
-  Node and on Bun.
+  Node and on Bun. It knows no project either: names, prefixes and toolsets
+  come from `src/project.ts` through the entry points.
 
-## The `gh` runner
+## Programs a tool runs
 
-- **Every call goes through one runner**, with an explicit environment:
-  `GH_PROMPT_DISABLED=1`, `GH_NO_UPDATE_NOTIFIER=1`, `NO_COLOR=1`, and `gh`'s
-  own authentication passed through. Nothing waits on a prompt, and output
-  parses the same everywhere.
+- **Every program a tool runs goes through one runner** built on `exec`, with
+  an explicit environment: what the program needs to find itself and
+  authenticate is passed through, and nothing else, so a stray variable
+  cannot redirect a call. Prompts and colors are switched off, so nothing
+  waits on a person and output parses the same everywhere.
 - **Every variable the tools read besides the settings is named in
-  `TOOL_VARIABLES` in `src/entry/settings.ts`**, whether a tool reads it itself
-  or passes it through to a program. Codex gives a plugin's server only a few
+  `toolVariables` in `src/project.ts`**, whether a tool reads it itself or
+  passes it through to a program. Codex gives a plugin's server only a few
   basic variables (`PATH`, `HOME` and the like) and those its manifest names,
   and `pnpm run manifests` writes that list from the settings and
-  `TOOL_VARIABLES`: a variable left out is set everywhere but in Codex.
-- **Every call has a time limit** (120 s by default), and a call that is
-  stopped, by that limit or by cancellation, has its child process killed:
-  `SIGTERM`, then `SIGKILL` after two seconds. A hung `gh` neither holds a
-  harness forever nor outlives its call.
-- **It checks the `gh` version once per process** against the minimum the
-  tools need, and maps `gh`'s failures to the error codes above. A feature that
-  needs a newer `gh` (attachments) checks for it only in the calls that use
-  it, so every other call keeps the lower minimum.
-- **A failure keeps GitHub's reason.** `gh api` prints a failed reply's body on
-  stdout and only its status on stderr; the reply's `errors` join the message.
+  `toolVariables`: a variable left out is set everywhere but in Codex.
+- **Every call has a time limit**, and a call that is stopped, by that limit
+  or by cancellation, has its child process killed: `SIGTERM`, then `SIGKILL`
+  after two seconds. A hung program neither holds a harness forever nor
+  outlives its call.
+- **The runner maps the program's failures to the error codes above.**
 
 ## Tests
 
-- **One fake `gh` on `PATH`**, matching CLI arguments and GraphQL queries to
-  canned replies, shared by every domain. No test reaches GitHub.
-- Tests run on `bun test`; CI also starts the built MCP server under Node and
-  lists its tools, so a runtime-only API cannot slip in unnoticed.
+- Tests sit beside the code they test (`*.test.ts`) and run on `bun test`;
+  CI also starts the built MCP server, plugin and command line under Node and
+  lists their tools, so a runtime-only API cannot slip in unnoticed.
+- No test reaches a real service. A tool that runs a program is tested
+  against a fake of that program on `PATH`.
+- A test file stays within about 300 lines, split by topic
+  (`<name>.<topic>.test.ts`), so one commit can carry a change and its test.
 
 ## The GitHub tools
 
@@ -605,3 +491,164 @@ changes a rule above, it says so. The discussion behind the rules is on
 - **`unauthenticated`, `gh_missing` and `gh_too_old` come from `gh`**, and
   `rate_limited` is GitHub's own refusal. The `gh` runner tells them apart (see
   "The `gh` runner").
+
+### Write classes of GitHub operations
+
+- **`openWorldHint` is `true` for every tool**, since each one reaches GitHub.
+- **The classes, by example:**
+
+  | Class             | Examples                                                   |
+  | ----------------- | ---------------------------------------------------------- |
+  | read              | view, list, resolve                                        |
+  | add               | create, comment, add an item                               |
+  | idempotent change | ensure, relate, adding a label                             |
+  | overwrite         | editing a body or title, close, reopen                     |
+  | administrative    | merge, visibility, delete, publishing, every Actions write |
+
+- **Every Actions write is administrative**: starting, re-running or
+  cancelling a run. A workflow can deploy, publish or spend whatever its name
+  says, and stopping one halfway can leave a deploy half done.
+
+### Targets
+
+- **A target is a repository or a board.** The resolvers are made by
+  `githubTargets`, from a map of argument names to the kind of target each
+  holds: `repo`, an issue or pull request reference (`issue`, `pull`) or a list
+  of issues (`issues`), a workflow run (`run`), a board (`board`), a board that
+  is written to only when it is given (`optional_board`), a board item (`item`)
+  and the owner a board is created for (`owner`). Every argument of the map
+  must be an argument of the tool. A bare number means the call's own
+  repository, and a repository is named in lowercase.
+- **A board is named `owner/projects/N`.** A board belongs to a user or an
+  organization, not to a repository, so its writes name the board rather than
+  the working tree's repository. A board the call does not name is found with
+  the same lookup the tool uses, which reads but never writes. Putting an
+  issue or pull request on a board names the board only, since the issue does
+  not change; a call that also writes to a repository (linking one, turning a
+  draft into an issue) names both. Creating a board names `owner/projects/new`,
+  so an "always" answer lets new boards be made for that owner and no
+  existing board be written to.
+
+### Approval prompts of the GitHub tools
+
+The rules above are the starter's; this section is what this package adds
+to them. Every write tool, whatever its class, follows it.
+
+- **Every write tool gives an `intent`.** It starts with `About to`, names the
+  object as its title does (`GitHub issue`, `pull request`), and says only
+  what every call of the tool does: where a call's direction depends on an
+  argument (`undo` on `github_pr_ready`) or may find the work already done
+  (`github_project_field_ensure`), the phrase says what the tool settles, not
+  which way it went. A read tool gives none, since it asks nothing.
+- **Translations sit beside the tools, one table per directory** (`words.ts`
+  of `issues`, `pull-requests`, `projects`, `repos`, `releases`, `runs` and
+  `workflows`), and `src/words.ts` merges them with the shared fact words.
+  `src/words.test.ts` fails on a key no tool uses, on a word a tool uses
+  without a key, and on a template whose translation changes its
+  placeholders, so a table cannot drift from the tools.
+- **A tool is described from what it read, never from what the model said.**
+  A headline names the issue, pull request or board by the title GitHub
+  returns; the arguments only say which one. A tool that cannot tell its
+  target before it runs gives its intent alone.
+- **Facts this package adds** are listed here, each with the tools that give
+  it. A fact appears only where it changes the answer: `State` is not shown
+  for an open issue about to be closed, since it is always open.
+  `src/core/write-facts.ts` holds the ones several toolsets share.
+  - `State` (`stateFact`): the target's state as `Open`, `Closed`, `Merged`
+    or `Draft`. A comment on a closed issue shows it; closing, reopening or
+    merging a target that is already in that state shows `Already closed;
+nothing is sent`, `Already open; nothing is sent` or `Already merged;
+nothing is sent` as its only fact and no text.
+  - A change to a list (`changeFact`): `Labels`, `Assignees`, `Blocked by`,
+    `Sub-issues`, `Blocking`, `Issue fields` as `+added −removed`. The names
+    are data, never translated.
+  - Issue tools: `Reason` and `Duplicate of` (close); `Title`, `Body`
+    (`Replaced`, `Appended` or `Cleared`), `Milestone`, `Kind` (edit);
+    `Parent`, `Board` (create, relate); `Branch` and `Base` (develop). A
+    milestone the call creates reads `<name> (new)`.
+  - Pull request tools: `Base`, `Head` (create, edit), `Closes` (the issues a
+    pull request names, or the ones a merge closes, as `owner/repo#N` even in
+    other repositories), `Reviewers`, `Attachments` (the file names), `Commit`
+    and `Line comments` (review), `Method` (`Merge commit`, `Squash` or
+    `Rebase`), `Also merges` (the lower layers a merge takes along) and
+    `Branch` (`Deleted after merge`) (merge), `Layers` (a stack's pull
+    requests by their real titles, bottom to top), `Stack` (`New stack` or
+    `Extends a stack of N`) and `Stays` (stack link and unlink). A review's
+    text is its body followed by each line comment under its `path:line`. A
+    call that is refused before it writes gets no description at all.
+  - Board tools: `Board` (the board's real title), `Fields` (one fact for all
+    the field writes, as `Status: Todo → Done; Target: — → 2026-12-01`, since
+    a field's name is data and never a fact's label), `Cleared fields`,
+    `Owner`, `Template`, `Link`, `Default view` and `Views` (create), `Type`
+    and `Options` (field ensure), `Layout`, `Filter`, `Grouped by`,
+    `Columns by` and `Sorted by` (view ensure). A call that finds the board
+    already in the state it asks for shows one `State` fact saying nothing is
+    sent.
+  - Repository tools: `Visibility` (a repository's own, or as a change such
+    as `Private to public`), `Template`, `License`, `Gitignore`, `README`
+    and `Homepage` (create); `Default branch`, `Topics`, `Features`,
+    `Merge methods`, `Merge options` and `Template repository` (edit, only
+    for what changes); `Enforcement`, `Target`, `Refs`, `Excluded refs`,
+    `Rules`, `Rule parameters` and `Bypass` (rulesets); `Color` and
+    `Due date` (labels, milestones). A call the tool would refuse, such as
+    archiving an archived repository, gets no description; one it accepts
+    without changing anything shows `Already in place; nothing is sent`. The
+    description a call sets is its text; one it clears is a `Cleared` fact.
+  - Release tools: `Tag target` (not `Target`, which is a ruleset's word and
+    can have only one translation), `Notes` (`Generated by GitHub`),
+    `Prerelease`, `Latest`, `Tag`, `Commit` (the short commit a publish makes
+    the tag name, or `<sha> (existing tag)`), `State` (`Draft` or
+    `Published`) and `Assets` (a delete). The notes are the text under
+    `Release notes`.
+  - Actions tools: `Branch`, `Event` and `Status` (cancel), `Scope` (`Failed
+jobs only`, `One job` or `All jobs`), `Job` and `Debug logging`
+    (re-run), `Ref`, `Commit` and `Inputs` (start), where `Inputs` is one
+    fact for all the `name: value` pairs, since an input's name is data.
+  - A replacing body is pinned by the digest of the body it replaces, a new
+    development branch by the head commit of its base, a new pull request, a
+    review and a merge by the head commit of the pull request, a merge that
+    takes lower layers along by the digest of their commits, a ruleset edit
+    or delete by the ruleset's update time, a release publish by the full
+    commit it tags, replaced release notes by their digest, a re-run by the
+    commit and attempt it repeats and a workflow start by the full commit of
+    its ref, since the prompt shows none of them in full.
+
+### Toolsets of the GitHub tools
+
+- **Six toolsets**, listed in `src/project.ts`: `issues`, `pull_requests`,
+  `projects`, `repos`, `releases` and `actions`. The first three are on by
+  default; `repos`, `releases` and `actions` are opt-in. Some plugins pass no
+  settings at all, and they ship every skill: a skill whose tools are off by
+  default would describe tools the agent does not have.
+- **A skill that works across toolsets names the one it cannot work without.**
+  The link holds one toolset, and a skill linked to none would be listed with
+  every tool it describes turned off. Its body says which steps to skip when
+  another toolset's tools are missing, and it leans only on toolsets that are
+  on by default, since the plugins that install the skill folder whole list it
+  whatever the settings select. `github-planning` is linked to `issues` this
+  way.
+
+### The `gh` runner
+
+- **Every call to GitHub goes through one runner** (`src/core/gh.ts`), on the
+  starter's rules for a program a tool runs, with an explicit environment:
+  `GH_PROMPT_DISABLED=1`, `GH_NO_UPDATE_NOTIFIER=1`, `NO_COLOR=1` and the
+  other settings that keep `gh` from prompting, paging or coloring, and `gh`'s
+  own authentication, network and search-path variables passed through.
+- **`toolVariables` in `src/project.ts` is empty.** The variables the runner
+  passes through to `gh` are the list in `src/core/gh.ts`, and none of them is
+  named for a harness that forwards only named variables.
+- **The time limit is 120 s by default** for a `gh` call, and a version check
+  has its own, shorter one.
+- **It checks the `gh` version once per process** against the minimum the
+  tools need (`gh_too_old` otherwise, `gh_missing` when there is no `gh`). A
+  feature that needs a newer `gh` (attachments) checks for it only in the calls
+  that use it, so every other call keeps the lower minimum.
+- **A failure keeps GitHub's reason.** `gh api` prints a failed reply's body on
+  stdout and only its status on stderr; the reply's `errors` join the message.
+
+### Tests of the GitHub tools
+
+- **One fake `gh` on `PATH`** (`src/testing/fake-gh.ts`), matching CLI
+  arguments and GraphQL queries to canned replies, shared by every domain,
+  with the fixtures beside it in `src/testing/`. No test reaches GitHub.
