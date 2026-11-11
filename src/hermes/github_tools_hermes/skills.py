@@ -9,13 +9,14 @@ from collections.abc import Collection
 from pathlib import Path
 
 from .context import PluginContext
+from . import project
 
 logger = logging.getLogger(__name__)
 
 SKILL_FILE = "SKILL.md"
 
-#: Skills are named ``github-<topic>``; Hermes already shows the plugin's name before the skill's.
-NAME_PREFIX = "github-"
+#: Skills are named ``<SKILL_PREFIX><topic>``; Hermes already shows the plugin's name before the skill's.
+NAME_PREFIX = project.SKILL_PREFIX
 
 _FRONTMATTER = re.compile(r"\A---[ \t]*\r?\n((?:.*?\r?\n)?)---[ \t]*(?:\r?\n|\Z)", re.DOTALL)
 _KEY_LINE = re.compile(r"^(name|description)[ \t]*:[ \t]*(.*?)[ \t]*$")
@@ -90,8 +91,8 @@ def read_frontmatter(text: str) -> dict[str, str]:
 
 
 def short_name(name: str) -> str:
-    """A skill's name without its leading ``github-``: ``github-issues`` is shown as ``github-tools:issues``."""
-    return name.removeprefix(NAME_PREFIX) or name
+    """A skill's name without its leading prefix: e.g. ``example-things`` is shown as ``agent-tool-starter:things``."""
+    return name.removeprefix(project.SKILL_PREFIX) or name
 
 
 def register_skills(ctx: PluginContext, skills_dir: Path, toolsets: Collection[str] | None = None) -> None:
@@ -125,6 +126,6 @@ def register_skills(ctx: PluginContext, skills_dir: Path, toolsets: Collection[s
         try:
             ctx.register_skill(name, path, description=found.get("description", ""))
         except (ValueError, OSError) as error:
-            logger.warning("github-tools: skill %s was not registered: %s", folder.name, error)
+            logger.warning("%s: skill %s was not registered: %s", project.PLUGIN_NAME, folder.name, error)
             continue
         registered.add(name)

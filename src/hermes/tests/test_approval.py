@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from unittest import mock
 
-from support import CWD, FAKE_CLI, LISTING, FakeCliCase, StubContext, approval, listing, runtime
+from support import CWD, FAKE_CLI, LISTING, FakeCliCase, StubContext, approval, listing, project, runtime
 
 
 CREATE = "Comment on an issue"
@@ -22,7 +22,7 @@ DETAILS = "\n\n--- Details ---\n\n"
 
 def key(tool_id: str, *resources: str) -> str:
     """The rule_key of a call of ``tool_id`` that names ``resources``."""
-    return f"github-tools:{tool_id}:{','.join(resources)}"
+    return f"{project.PLUGIN_NAME}:{tool_id}:{json.dumps(list(resources), separators=(',', ':'))}"
 
 
 class SurfaceContext(StubContext):
@@ -45,7 +45,7 @@ class ApprovalHookTest(FakeCliCase):
             {
                 "action": "approve",
                 "message": f"{CREATE}{DETAILS}Target: octo/hello",
-                "rule_key": "github-tools:github_issue_comment:octo/hello",
+                "rule_key": key("github_issue_comment", "octo/hello"),
             },
         )
         [call] = self.target_calls()
@@ -253,7 +253,15 @@ class ApprovalHookTest(FakeCliCase):
         self.reply("target github_issue_comment", stdout='{"resources":["octo/hello","other/repo"]}')
         decision = self.hook()(tool_name="github_issue_comment", args={"issue": "other/repo#2", "body": "hi"})
         self.assertEqual(decision["message"], f"{CREATE}{DETAILS}Target: octo/hello\nTarget: other/repo")
-        self.assertEqual(decision["rule_key"], "github-tools:github_issue_comment:octo/hello,other/repo")
+        self.assertEqual(decision["rule_key"], key("github_issue_comment", "octo/hello", "other/repo"))
+
+    def test_resources_with_a_comma_never_share_a_rule_key_with_a_longer_list(self) -> None:
+        hook = self.hook()
+        self.reply("target github_issue_comment", stdout='{"resources":["a,b"]}')
+        joined = hook(tool_name="github_issue_comment", args={})["rule_key"]
+        self.reply("target github_issue_comment", stdout='{"resources":["a","b"]}')
+        split = hook(tool_name="github_issue_comment", args={})["rule_key"]
+        self.assertNotEqual(joined, split)
 
     def assert_single_use(self, tool_id: str, key_prefix: str, **call: Any) -> dict[str, str]:
         """The decision's rule_key is the prefix plus a token no other call shares, so an "always" reuses nothing."""
@@ -267,19 +275,19 @@ class ApprovalHookTest(FakeCliCase):
 
     def test_an_unresolved_target_is_any_resource_and_leaves_nothing_to_reuse(self) -> None:
         self.reply("target github_pr_merge", stdout='{"resources":["*"]}')
-        decision = self.assert_single_use("github_pr_merge", "github-tools:github_pr_merge:*", args={})
+        decision = self.assert_single_use("github_pr_merge", key("github_pr_merge", "*"), args={})
         self.assertEqual(decision["message"], UPDATE)
 
     def test_a_resource_that_cannot_be_told_stays_beside_the_others_and_leaves_nothing_to_reuse(self) -> None:
         self.reply("target github_pr_merge", stdout='{"resources":["octo/hello","*"]}')
-        decision = self.assert_single_use("github_pr_merge", "github-tools:github_pr_merge:octo/hello,*", args={})
+        decision = self.assert_single_use("github_pr_merge", key("github_pr_merge", "octo/hello", "*"), args={})
         self.assertEqual(decision["message"], f"{UPDATE}{DETAILS}Target: octo/hello\nTarget: \\*")
 
     def test_a_rule_key_that_names_only_known_repositories_is_stable(self) -> None:
         self.reply("target github_issue_comment", stdout='{"resources":["octo/hello"]}')
         hook = self.hook()
         keys = {hook(tool_name="github_issue_comment", args={})["rule_key"] for _ in range(2)}
-        self.assertEqual(keys, {"github-tools:github_issue_comment:octo/hello"})
+        self.assertEqual(keys, {key("github_issue_comment", "octo/hello")})
 
     def test_a_failing_target_falls_back_to_any_resource(self) -> None:
         for fields in (
@@ -295,20 +303,20 @@ class ApprovalHookTest(FakeCliCase):
         ):
             self.reply("target github_pr_merge", **fields)
             with self.subTest(fields=fields):
-                self.assert_single_use("github_pr_merge", "github-tools:github_pr_merge:*", args={})
+                self.assert_single_use("github_pr_merge", key("github_pr_merge", "*"), args={})
 
     def test_a_target_that_times_out_or_cannot_start_falls_back_to_any_resource(self) -> None:
         self.reply("target github_pr_merge", sleep=5, stdout='{"resources":["octo/hello"]}')
         hook = self.hook()
         with mock.patch.object(approval, "TARGET_TIMEOUT_SECONDS", 0.3):
             decision = hook(tool_name="github_pr_merge", args={})
-        self.assertRegex(decision["rule_key"], r"^github-tools:github_pr_merge:\*:once-[0-9a-f]{32}$")
+        self.assertRegex(decision["rule_key"], rf"^{re.escape(key('github_pr_merge', '*'))}:once-[0-9a-f]{{32}}$")
         broken = runtime.Runtime(
             node=str(self.dir / "no-node"), cli=FAKE_CLI, skills_dir=self.skills_dir, find_node=lambda: None
         )
         tool = listing.ToolInfo.from_listing(LISTING[2])
         decision = approval.make_hook(broken, [tool])(tool_name="github_pr_merge", args={})
-        self.assertRegex(decision["rule_key"], r"^github-tools:github_pr_merge:\*:once-[0-9a-f]{32}$")
+        self.assertRegex(decision["rule_key"], rf"^{re.escape(key('github_pr_merge', '*'))}:once-[0-9a-f]{{32}}$")
 
     def test_arguments_that_are_not_a_dict_still_ask(self) -> None:
         self.reply("target github_pr_merge", stdout='{"resources":["octo/hello"]}')

@@ -12,13 +12,13 @@ from typing import Any
 
 from .context import PluginContext
 from .listing import READ_CLASS, ToolInfo
-from . import card
+from . import card, project
 from .runtime import Runtime, agent_cwd
 
 #: How long ``target`` may take, in seconds. Hermes stops a ``pre_tool_call`` hook after 30 s and blocks the call.
 TARGET_TIMEOUT_SECONDS = 20
 
-#: What an approval rule matches when a repository a call writes to cannot be told.
+#: What an approval rule matches when a resource a call writes to cannot be told.
 ANY_RESOURCE = card.ANY_RESOURCE
 
 #: The Hermes hook that can hold a tool call for the person's approval.
@@ -26,7 +26,7 @@ HOOK_NAME = "pre_tool_call"
 
 #: The argument the pin hook sets on a call for the handler to read: it carries the pin of what the approval showed.
 #: No tool argument starts with ``_``, so it never collides with one, and the handler removes it before the call runs.
-PIN_ARGUMENT = "_github-tools_pin"
+PIN_ARGUMENT = f"_{project.PLUGIN_NAME}_pin"
 
 #: What a pin looks like: 64 lowercase hexadecimal characters.
 PIN_PATTERN = re.compile(r"[0-9a-f]{64}")
@@ -37,7 +37,7 @@ PIN_STASH_LIMIT = 256
 
 @dataclass(frozen=True)
 class Target:
-    """What one ``target`` run says of a call: its repositories, description, translated title and intent, and the card's words.
+    """What one ``target`` run says of a call: its resources, description, translated title and intent, and the card's words.
 
     A ``title`` or ``intent`` of ``None`` is the tool's registered one, or none, and the ``words`` default to English.
     A ``pin`` of ``None`` is none given (or a malformed one); it comes only with a description.
@@ -158,7 +158,7 @@ def resolve_target(
     language: str | None = None,
     harness_language: Callable[[], str | None] = lambda: display_language(),
 ) -> Target:
-    """What ``target`` prints: ``["*"]`` for repositories that cannot be told, no description for one absent or bad.
+    """What ``target`` prints: ``["*"]`` for resources that cannot be told, no description for one absent or bad.
 
     ``language`` is the plugin's ``language`` setting and ``harness_language`` reads Hermes' display language
     per call; neither may fail the run, and ``target`` picks among them.
@@ -183,6 +183,11 @@ def resolve_target(
         return Target([ANY_RESOURCE], description, title, words, intent, pin)
     except Exception:  # an approval is asked for either way; only its resources are lost
         return Target([ANY_RESOURCE], None)
+
+
+def rule_key(tool_id: str, resources: list[str]) -> str:
+    """The key an "always" answer is stored under: the resources as a JSON list, so no two lists share one."""
+    return f"{project.PLUGIN_NAME}:{tool_id}:{json.dumps(resources, separators=(',', ':'))}"
 
 
 def _message(tool: ToolInfo, target: Target, surface: Callable[[], str | None]) -> str:
@@ -236,12 +241,12 @@ def make_hook(
             else:
                 pins.take(call)
         resources = target.resources
-        rule_key = f"github-tools:{tool.id}:{','.join(resources)}"
+        key = rule_key(tool.id, resources)
         if ANY_RESOURCE in resources:
             # Hermes falls back to the bare tool name for a missing rule_key, which an "always" would turn into a
-            # grant for every repository; a key no later call repeats leaves nothing reusable.
-            rule_key = f"{rule_key}:once-{uuid.uuid4().hex}"
-        return {"action": "approve", "message": _message(tool, target, surface), "rule_key": rule_key}
+            # grant for every resource; a key no later call repeats leaves nothing reusable.
+            key = f"{key}:once-{uuid.uuid4().hex}"
+        return {"action": "approve", "message": _message(tool, target, surface), "rule_key": key}
 
     return hook
 

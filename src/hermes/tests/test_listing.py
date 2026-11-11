@@ -6,7 +6,7 @@ import unittest
 from typing import Any
 from unittest import mock
 
-from support import FAKE_CLI, FakeCliCase, StubContext, listing, plugin, runtime, tool_entry
+from support import FAKE_CLI, FakeCliCase, StubContext, listing, plugin, project, runtime, tool_entry
 
 
 class ToolInfoIntentTest(unittest.TestCase):
@@ -58,7 +58,7 @@ class ListingTest(FakeCliCase):
 
     def test_a_failing_list_registers_nothing_and_warns_once(self) -> None:
         for fields in (
-            {"code": 2, "stderr": "github-tools-cli: Unknown toolset \"bogus\"\n"},
+            {"code": 2, "stderr": f"{project.CLI_NAME}: Unknown toolset \"bogus\"\n"},
             {"code": 0, "stdout": "not json"},
             {"code": 0, "stdout": '{"not": "a list"}'},
             {"code": 0, "stdout": '[{"id": "github_issue_read"}]'},
