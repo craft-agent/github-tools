@@ -18,8 +18,10 @@ import {
   type ErrorDetails,
   type ToolContext,
   type ToolSpec,
+  type Toolsets,
 } from "../core"
 import { errorBody } from "../entry/errors"
+import { PROJECT_PROFILE } from "../entry/profile"
 import type { EntrySettings } from "../entry/settings"
 import { elicitationConfirm } from "./confirm"
 import { createWorkingDirResolver } from "./roots"
@@ -32,6 +34,8 @@ export type ServerOptions = {
   cwd?: () => string
   /** Where the tools are installed: never a call's working tree, so a client root inside it is skipped. */
   ownDir?: string
+  /** The toolsets the settings select from; defaults to this package's. */
+  toolsets?: Toolsets
   /** The version the server reports; defaults to `0.0.0`. */
   version?: string
   /** Receives the full text of an unexpected error, which the client never sees; defaults to stderr. */
@@ -71,7 +75,8 @@ export function createServer(specs: ToolSpec[], settings: EntrySettings, options
     { capabilities: { tools: {} } },
   )
   const workingDir = createWorkingDirResolver(server, options.cwd ?? (() => process.cwd()), options.ownDir)
-  const selected = new Map(selectTools(specs, settings).map((spec) => [spec.id, spec]))
+  const toolsets = options.toolsets ?? PROJECT_PROFILE.toolsets
+  const selected = new Map(selectTools(specs, settings, toolsets).map((spec) => [spec.id, spec]))
   const tools = [...selected.values()].map(describeTool)
 
   server.setRequestHandler(ListToolsRequestSchema, () => ({ tools }))

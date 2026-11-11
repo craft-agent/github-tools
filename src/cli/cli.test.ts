@@ -11,6 +11,7 @@ import {
   type Translations,
 } from "../core"
 import { tempRepo } from "../testing/git-repo"
+import { PROJECT_PROFILE } from "../entry/profile"
 import { EXIT_FAILED, EXIT_OK, EXIT_USAGE, runCli, type CliIo } from "./cli"
 
 const input = z.object({
@@ -199,7 +200,9 @@ describe("list", () => {
     expect(run.code).toBe(EXIT_OK)
     expect(run.stderr).toBe("")
     const listed = json(run)
-    expect(listed.map((entry: { id: string }) => entry.id)).toEqual(selectTools(specs, {}).map((spec) => spec.id))
+    expect(listed.map((entry: { id: string }) => entry.id)).toEqual(
+      selectTools(specs, {}, PROJECT_PROFILE.toolsets).map((spec) => spec.id),
+    )
     expect(listed[0]).toEqual({
       id: READ_ID,
       title: `Title of ${READ_ID}`,

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { TargetKind } from "./core"
+import { PROJECT } from "./project"
 import { ALL_TOOLS } from "./tools"
 
 /** What every tool that writes to one pull request declares; spelled out here so the pin does not follow the constant. */
@@ -97,6 +98,18 @@ const NOT_TARGETS: Record<string, Record<string, string>> = {
 const REPOSITORY_LIKE = /repo|issue|parent|blocked|blocking|duplicate/
 
 const writeTools = ALL_TOOLS.filter((spec) => spec.class !== "read")
+
+describe("the registry", () => {
+  test("every tool id starts with the package's tool prefix", () => {
+    const stray = ALL_TOOLS.filter((spec) => !spec.id.startsWith(`${PROJECT.toolPrefix}_`)).map((spec) => spec.id)
+    expect(stray).toEqual([])
+  })
+
+  test("every tool belongs to a toolset the package defines", () => {
+    const stray = ALL_TOOLS.filter((spec) => !PROJECT.toolsets.includes(spec.toolset)).map((spec) => spec.id)
+    expect(stray).toEqual([])
+  })
+})
 
 describe("the registry's write tools", () => {
   test("every one declares its targets", () => {

@@ -1,4 +1,4 @@
-import { ToolError, type ToolSettings, type Toolset, type Toolsets } from "../core"
+import { ToolError, type ToolSettings, type Toolsets } from "../core"
 import { PROJECT } from "../project"
 import { PROJECT_PROFILE, type EntryProfile } from "./profile"
 
@@ -74,7 +74,7 @@ function splitList(value: string): string[] {
     .filter((item) => item !== "")
 }
 
-function checkToolsets(names: string[], source: string, toolsets: Toolsets): Toolset[] | "all" | undefined {
+function checkToolsets(names: string[], source: string, toolsets: Toolsets): string[] | "all" | undefined {
   if (names.includes(ALL_TOOLSETS)) return ALL_TOOLSETS
   const unknown = names.find((name) => !toolsets.names.includes(name))
   if (unknown !== undefined) {
@@ -84,7 +84,7 @@ function checkToolsets(names: string[], source: string, toolsets: Toolsets): Too
         : "no toolsets are defined"
     throw new ToolError("invalid_argument", `Unknown toolset "${unknown}" in ${source}; ${known}.`)
   }
-  return names.length ? (names as Toolset[]) : undefined
+  return names.length ? names : undefined
 }
 
 function parseBoolean(value: string, source: string): boolean {
@@ -184,7 +184,7 @@ function optionError(name: string, expected: string): ToolError {
   return new ToolError("invalid_argument", `Option "${name}" must be ${expected}.`)
 }
 
-function toolsetsOption(value: unknown, toolsets: Toolsets): Toolset[] | "all" | undefined {
+function toolsetsOption(value: unknown, toolsets: Toolsets): string[] | "all" | undefined {
   if (value === ALL_TOOLSETS) return ALL_TOOLSETS
   const names = stringList(value)
   if (!names) throw optionError("toolsets", `a list of toolset names or "${ALL_TOOLSETS}"`)

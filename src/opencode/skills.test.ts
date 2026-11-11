@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
-import { TOOLSETS } from "../core"
+import { PROJECT } from "../project"
 import { loadSkills, readSkills } from "./skills"
 
 let dir: string
@@ -131,7 +131,7 @@ describe("the package's skills", () => {
   test("each linked skill names one of the package's toolsets", async () => {
     const shipped = await readSkills(new URL("../../skills/", import.meta.url))
     const stray = shipped
-      .filter(({ toolset }) => toolset !== undefined && !(TOOLSETS as readonly string[]).includes(toolset))
+      .filter(({ toolset }) => toolset !== undefined && !PROJECT.toolsets.includes(toolset))
       .map(({ skill, toolset }) => `${skill.id}: ${toolset}`)
     expect(stray).toEqual([])
   })

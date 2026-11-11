@@ -4,13 +4,6 @@ import { ToolError, isAbortError, isToolError } from "./errors"
 /** The toolsets of a package: every name, in the order `all` lists them, and the ones on when a setting names none. */
 export type Toolsets = { names: readonly string[]; defaults: readonly string[] }
 
-export const TOOLSETS = ["issues", "pull_requests", "projects", "repos", "releases", "actions"] as const
-
-export type Toolset = (typeof TOOLSETS)[number]
-
-/** The toolsets that are on when a setting does not name any. */
-export const DEFAULT_TOOLSETS: Toolset[] = ["issues", "pull_requests", "projects"]
-
 /** How far a tool's effect reaches; `docs/conventions.md` defines each class and its annotations. */
 export type WriteClass = "read" | "add" | "idempotent" | "overwrite" | "administrative"
 
@@ -66,13 +59,13 @@ export type ToolContext = {
 }
 
 export type ToolSpec<I extends z.ZodObject<any> = z.ZodObject<any>, O extends z.ZodObject<any> = z.ZodObject<any>> = {
-  /** `github_<domain>_<verb>`; a public interface, so it never changes once published. */
+  /** `<prefix>_<domain>_<verb>`; a public interface, so it never changes once published. */
   id: string
   title: string
   /** What the agent is about to do, as a fixed phrase without values (`About to create a note`); the approval prompt shows it where no headline can stand, and the title where the tool has none. */
   intent?: string
   description: string
-  toolset: Toolset
+  toolset: string
   class: WriteClass
   /** The arguments that name a repository or board the call writes to, by name; each must be an argument of `input`. */
   targets?: Readonly<Record<string, TargetKind>>
@@ -90,7 +83,7 @@ export type ToolSpec<I extends z.ZodObject<any> = z.ZodObject<any>, O extends z.
 /** A client meta key that makes the client ask even under an allow rule. */
 export const REQUIRES_USER_INTERACTION = "anthropic/requiresUserInteraction"
 
-const TOOL_ID_PATTERN = /^github_[a-z]+(?:_[a-z]+)+$/
+const TOOL_ID_PATTERN = /^[a-z]+(?:_[a-z]+){2,}$/
 const MAX_TOOL_ID_LENGTH = 40
 const READ_TOOL_SUFFIX = "_read"
 
@@ -104,7 +97,7 @@ export function defineTool<I extends z.ZodObject<any>, O extends z.ZodObject<any
   spec: ToolSpec<I, O>,
 ): ToolSpec<I, O> {
   if (!TOOL_ID_PATTERN.test(spec.id)) {
-    throw new Error(`Tool id "${spec.id}" must look like github_<domain>_<verb> in lowercase letters.`)
+    throw new Error(`Tool id "${spec.id}" must look like <prefix>_<domain>_<verb> in lowercase letters.`)
   }
   if (spec.id.length > MAX_TOOL_ID_LENGTH) {
     throw new Error(`Tool id "${spec.id}" is longer than ${MAX_TOOL_ID_LENGTH} characters.`)
@@ -172,8 +165,8 @@ export async function confirmWrite(
 
 /** The settings every entry point takes. */
 export type ToolSettings = {
-  /** The toolsets that are on; `"all"` turns on every one. Absent or empty means `DEFAULT_TOOLSETS`. */
-  toolsets?: Toolset[] | "all"
+  /** The toolsets that are on; `"all"` turns on every one. Absent or empty means the default toolsets. */
+  toolsets?: string[] | "all"
   /** Registers no write tool, and wins over every other setting. */
   read_only?: boolean
   /** Single tools to add, by id, whatever their toolset. */
@@ -190,7 +183,8 @@ function knownIds(setting: string, ids: string[], known: ReadonlySet<string>): v
 /** The tools the settings turn on, in the order of `all`. */
 export function selectTools<S extends Pick<ToolSpec, "id" | "toolset" | "class">>(
   all: S[],
-  settings: ToolSettings = {},
+  settings: ToolSettings,
+  toolsets: Toolsets,
 ): S[] {
   const ids = new Set<string>()
   for (const spec of all) {
@@ -199,13 +193,12 @@ export function selectTools<S extends Pick<ToolSpec, "id" | "toolset" | "class">
   }
 
   const requested = settings.toolsets?.length === 0 ? undefined : settings.toolsets
-  const toolsets: ReadonlySet<string> = new Set(requested === "all" ? TOOLSETS : (requested ?? DEFAULT_TOOLSETS))
-  const unknownToolset = [...toolsets].find((name) => !(TOOLSETS as readonly string[]).includes(name))
+  const on: ReadonlySet<string> = new Set(requested === "all" ? toolsets.names : (requested ?? toolsets.defaults))
+  const unknownToolset = [...on].find((name) => !toolsets.names.includes(name))
   if (unknownToolset !== undefined) {
-    throw new ToolError(
-      "invalid_argument",
-      `Unknown toolset "${unknownToolset}"; use one of ${TOOLSETS.join(", ")} or "all".`,
-    )
+    const known =
+      toolsets.names.length > 0 ? `use one of ${toolsets.names.join(", ")} or "all"` : "no toolsets are defined"
+    throw new ToolError("invalid_argument", `Unknown toolset "${unknownToolset}"; ${known}.`)
   }
   const added = settings.tools ?? []
   const excluded = new Set(settings.exclude_tools ?? [])
@@ -214,7 +207,7 @@ export function selectTools<S extends Pick<ToolSpec, "id" | "toolset" | "class">
 
   return all.filter(
     (spec) =>
-      (toolsets.has(spec.toolset) || added.includes(spec.id)) &&
+      (on.has(spec.toolset) || added.includes(spec.id)) &&
       !excluded.has(spec.id) &&
       !(settings.read_only && spec.class !== "read"),
   )

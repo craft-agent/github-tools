@@ -15,6 +15,7 @@ import {
 } from "../core"
 import { errorBody } from "../entry/errors"
 import { approvalOf, checkPin } from "../entry/pin"
+import { PROJECT_PROFILE, type EntryProfile } from "../entry/profile"
 import { parseToolSettings, promptLanguage } from "../entry/settings"
 import { visible } from "../entry/visible"
 import { promptTranslator, promptWords } from "../entry/words"
@@ -34,8 +35,10 @@ const PIN_FLAG = "--pin"
 export type CliIo = {
   /** The tools the command line can select from. */
   specs: ToolSpec[]
-  /** Where the `GITHUB_TOOLS_*` settings fall back to. */
+  /** Where the `<envPrefix>_*` settings fall back to. */
   env: Record<string, string | undefined>
+  /** The settings' environment prefix and the toolsets; defaults to this package's. */
+  profile?: EntryProfile
   /** Reads standard input to its end; an empty string when there is none. */
   readStdin(): Promise<string>
   /** Receives the JSON document a command answers with. */
@@ -81,10 +84,12 @@ function takeFlag(argv: string[], flag: string): { value: string | undefined; re
 }
 
 /** Reads the command line; a mistake in it, in the settings or in the tool selection is `invalid_argument`. */
-function parseCommand(argv: string[], io: Pick<CliIo, "specs" | "env">): Command {
+function parseCommand(argv: string[], io: Pick<CliIo, "specs" | "env" | "profile">): Command {
+  const profile = io.profile ?? PROJECT_PROFILE
+  const select = (flags: string[]) => selectTools(io.specs, parseToolSettings(flags, io.env, profile), profile.toolsets)
   const [name, ...args] = argv
   if (name === "list") {
-    return { name, selected: selectTools(io.specs, parseToolSettings(args, io.env)) }
+    return { name, selected: select(args) }
   }
   if (name !== "run" && name !== "target") {
     const given = name === undefined ? "No command given" : `Unknown command "${name}"`
@@ -101,13 +106,13 @@ function parseCommand(argv: string[], io: Pick<CliIo, "specs" | "env">): Command
     const { value: language, rest: afterLanguage } = takeFlag(rest, LANGUAGE_FLAG)
     const { value: harnessLanguage, rest: unknown } = takeFlag(afterLanguage, HARNESS_LANGUAGE_FLAG)
     if (unknown.length > 0) throw usageError(`Unknown option "${unknown[0]}".`)
-    return { name, toolId, cwd, language: promptLanguage(language, io.env, harnessLanguage) }
+    return { name, toolId, cwd, language: promptLanguage(language, io.env, harnessLanguage, profile) }
   }
   const { value: pin, rest: selection } = takeFlag(rest, PIN_FLAG)
   if (pin !== undefined && !PIN_PATTERN.test(pin)) {
     throw usageError(`Option ${PIN_FLAG} needs the 64 lowercase hexadecimal digits \`target\` answered with.`)
   }
-  return { name, toolId, cwd, pin, selected: selectTools(io.specs, parseToolSettings(selection, io.env)) }
+  return { name, toolId, cwd, pin, selected: select(selection) }
 }
 
 function describeSpec(spec: ToolSpec) {
