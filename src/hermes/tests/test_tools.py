@@ -7,7 +7,7 @@ import unittest
 from typing import Any
 from unittest import mock
 
-from support import CWD, FAKE_CLI, LISTING, FakeCliCase, approval as approval_module, runtime, tools
+from support import CWD, FAKE_CLI, LISTING, FakeCliCase, approval as approval_module, project, runtime, tools
 
 PIN = "ab12" * 16
 
@@ -33,15 +33,23 @@ class RegisterTest(FakeCliCase):
         self.assertEqual(
             {tool_id: (tool["toolset"], tool["emoji"]) for tool_id, tool in ctx.tools.items()},
             {
-                "github_issue_read": ("github-tools-issues", "🎫"),
-                "github_issue_comment": ("github-tools-issues", "🎫"),
-                "github_pr_merge": ("github-tools-pull-requests", "🔀"),
-                "github_project_item_add": ("github-tools-projects", "📋"),
-                "github_repo_edit": ("github-tools-repos", "📦"),
-                "github_release_publish": ("github-tools-releases", "🚀"),
-                "github_run_rerun": ("github-tools-actions", "🤖"),
+                "github_issue_read": (f"{project.PLUGIN_NAME}-issues", "🎫"),
+                "github_issue_comment": (f"{project.PLUGIN_NAME}-issues", "🎫"),
+                "github_pr_merge": (f"{project.PLUGIN_NAME}-pull-requests", "🔀"),
+                "github_project_item_add": (f"{project.PLUGIN_NAME}-projects", "📋"),
+                "github_repo_edit": (f"{project.PLUGIN_NAME}-repos", "📦"),
+                "github_release_publish": (f"{project.PLUGIN_NAME}-releases", "🚀"),
+                "github_run_rerun": (f"{project.PLUGIN_NAME}-actions", "🤖"),
             },
         )
+
+    def test_groups_tools_by_toolset_with_configured_emoji(self) -> None:
+        with mock.patch.dict(tools.TOOLSET_EMOJI, {"issues": "🧩", "pull_requests": "🔀"}, clear=True):
+            ctx = self.register()
+            self.assertEqual(ctx.tools["github_issue_read"]["emoji"], "🧩")
+            self.assertEqual(ctx.tools["github_issue_comment"]["emoji"], "🧩")
+            self.assertEqual(ctx.tools["github_pr_merge"]["emoji"], "🔀")
+            self.assertEqual(ctx.tools["github_project_item_add"]["emoji"], "")
 
     def test_registers_the_approval_hook_on_pre_tool_call(self) -> None:
         ctx = self.register()
@@ -100,10 +108,10 @@ class HandlerTest(FakeCliCase):
             self.assertEqual(json.loads(self.handler()({})), {"error": "not_found: No such thing."})
 
     def test_maps_an_exit_without_a_document_to_its_stderr(self) -> None:
-        self.reply("run github_issue_comment", stderr="github-tools-cli: boom\n", code=2)
-        self.assertEqual(json.loads(self.handler()({})), {"error": "github-tools-cli failed: github-tools-cli: boom"})
+        self.reply("run github_issue_comment", stderr=f"{project.CLI_NAME}: boom\n", code=2)
+        self.assertEqual(json.loads(self.handler()({})), {"error": f"{project.CLI_NAME} failed: {project.CLI_NAME}: boom"})
         self.reply("run github_issue_comment", code=3)
-        self.assertEqual(json.loads(self.handler()({})), {"error": "github-tools-cli failed: exit status 3"})
+        self.assertEqual(json.loads(self.handler()({})), {"error": f"{project.CLI_NAME} failed: exit status 3"})
 
     def test_maps_a_success_that_is_not_a_result_document_to_an_error(self) -> None:
         self.reply("run github_issue_comment", stdout="garbage")

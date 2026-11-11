@@ -53,10 +53,11 @@ def copy_plugin(destination: Path) -> Path:
 
 load_root(ROOT, ROOT_NAME)
 package = sys.modules[f"{ROOT_NAME}.{IMPL}"]
-approval, listing, plugin, runtime, settings, skills, tools = (
+approval, listing, plugin, project, runtime, settings, skills, tools = (
     package.approval,
     package.listing,
     package.plugin,
+    package.project,
     package.runtime,
     package.settings,
     package.skills,

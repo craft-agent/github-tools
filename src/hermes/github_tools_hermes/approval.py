@@ -12,7 +12,7 @@ from typing import Any
 
 from .context import PluginContext
 from .listing import READ_CLASS, ToolInfo
-from . import card
+from . import card, project
 from .runtime import Runtime, agent_cwd
 
 #: How long ``target`` may take, in seconds. Hermes stops a ``pre_tool_call`` hook after 30 s and blocks the call.
@@ -26,7 +26,7 @@ HOOK_NAME = "pre_tool_call"
 
 #: The argument the pin hook sets on a call for the handler to read: it carries the pin of what the approval showed.
 #: No tool argument starts with ``_``, so it never collides with one, and the handler removes it before the call runs.
-PIN_ARGUMENT = "_github-tools_pin"
+PIN_ARGUMENT = f"_{project.PLUGIN_NAME}_pin"
 
 #: What a pin looks like: 64 lowercase hexadecimal characters.
 PIN_PATTERN = re.compile(r"[0-9a-f]{64}")
@@ -236,7 +236,7 @@ def make_hook(
             else:
                 pins.take(call)
         resources = target.resources
-        rule_key = f"github-tools:{tool.id}:{','.join(resources)}"
+        rule_key = f"{project.PLUGIN_NAME}:{tool.id}:{','.join(resources)}"
         if ANY_RESOURCE in resources:
             # Hermes falls back to the bare tool name for a missing rule_key, which an "always" would turn into a
             # grant for every repository; a key no later call repeats leaves nothing reusable.

@@ -7,6 +7,7 @@ import logging
 from .approval import register_approval
 from .context import PluginContext
 from .listing import list_tools
+from . import project
 from .runtime import Unavailable, locate_runtime
 from .settings import SettingsError, language_setting, settings_flags
 from .skills import register_skills
@@ -29,7 +30,7 @@ def register(ctx: PluginContext) -> None:
         flags = settings_flags(ctx)
         tools = list_tools(runtime, flags)
     except (Unavailable, SettingsError) as error:
-        logger.warning("github-tools is not available and registers nothing: %s", error)
+        logger.warning("%s is not available and registers nothing: %s", project.PLUGIN_NAME, error)
         return
 
     register_tools(ctx, runtime, tools, flags)

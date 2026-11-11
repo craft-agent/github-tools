@@ -9,23 +9,17 @@ from typing import Any
 from .approval import PIN_ARGUMENT, parse_pin, run_arguments
 from .context import PluginContext
 from .listing import ToolInfo
+from . import project
 from .runtime import CliError, Runtime, agent_cwd
 
 #: How long one call may take, in seconds: above the 120 s the core gives each ``gh`` call.
 RUN_TIMEOUT_SECONDS = 150
 
 #: The toolset name of a tool in ``hermes tools``: the package's toolset after this prefix.
-TOOLSET_PREFIX = "github-tools-"
+TOOLSET_PREFIX = f"{project.PLUGIN_NAME}-"
 
 #: The emoji each toolset is shown with.
-TOOLSET_EMOJI = {
-    "issues": "🎫",
-    "pull_requests": "🔀",
-    "projects": "📋",
-    "repos": "📦",
-    "releases": "🚀",
-    "actions": "🤖",
-}
+TOOLSET_EMOJI = project.TOOLSET_EMOJI
 
 
 def error_result(message: str) -> str:
@@ -52,7 +46,7 @@ def _failure(code: int, stdout: str, stderr: str) -> str:
             message = f"{message}\n" + json.dumps(details, ensure_ascii=False, separators=(",", ":"))
         return error_result(message)
     detail = stderr.strip() or f"exit status {code}"
-    return error_result(f"github-tools-cli failed: {detail}")
+    return error_result(f"{project.CLI_NAME} failed: {detail}")
 
 
 def make_handler(runtime: Runtime, tool_id: str, flags: list[str]) -> Callable[..., str]:

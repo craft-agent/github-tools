@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from support import FakeCliCase, StubContext, skills
+from support import FakeCliCase, StubContext, project, skills
 
 
 def front(*lines: str, eol: str = "\n") -> str:
@@ -55,7 +55,7 @@ class ReadLinkTest(unittest.TestCase):
 
 class LinkedSkillsTest(FakeCliCase):
     def skill(self, folder: str, toolset: str | None = None, name: str | None = None) -> Path:
-        lines = ["---", f"name: {skills.NAME_PREFIX}{name or folder}"]
+        lines = ["---", f"name: {project.SKILL_PREFIX}{name or folder}"]
         if toolset is not None:
             lines += ["metadata:", f"  toolset: {toolset}"]
         path = self.skills_dir / folder / "SKILL.md"

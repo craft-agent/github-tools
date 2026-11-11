@@ -6,6 +6,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from . import project
 from .runtime import CliError, Runtime, Unavailable
 
 #: How long ``list`` may take, in seconds.
@@ -42,7 +43,7 @@ class ToolInfo:
             or not all(isinstance(entry.get(field), str) for field in _TEXT_FIELDS)
             or not isinstance(entry.get("input_schema"), dict)
         ):
-            raise Unavailable(f"github-tools-cli listed a tool the plugin cannot read: {entry!r}")
+            raise Unavailable(f"{project.CLI_NAME} listed a tool the plugin cannot read: {entry!r}")
         intent = entry.get("intent")
         return cls(
             intent=intent if isinstance(intent, str) and intent.strip() else None,
@@ -67,11 +68,11 @@ def list_tools(runtime: Runtime, flags: list[str]) -> list[ToolInfo]:
         raise Unavailable(str(error)) from error
     if result.code != 0:
         detail = result.stderr.strip() or f"exit status {result.code}"
-        raise Unavailable(f"`github-tools-cli list` failed: {detail}")
+        raise Unavailable(f"`{project.CLI_NAME} list` failed: {detail}")
     try:
         listing = json.loads(result.stdout)
     except json.JSONDecodeError as error:
-        raise Unavailable("`github-tools-cli list` did not answer with JSON") from error
+        raise Unavailable(f"`{project.CLI_NAME} list` did not answer with JSON") from error
     if not isinstance(listing, list):
-        raise Unavailable("`github-tools-cli list` did not answer with a list")
+        raise Unavailable(f"`{project.CLI_NAME} list` did not answer with a list")
     return [ToolInfo.from_listing(entry) for entry in listing]

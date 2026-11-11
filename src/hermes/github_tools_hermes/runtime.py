@@ -12,6 +12,8 @@ from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import project
+
 #: Whether processes have groups the plugin can signal as a whole.
 _POSIX = os.name == "posix"
 
@@ -76,22 +78,22 @@ class Runtime:
             process = self._start(node, args)
         except OSError as error:
             if os.path.exists(node):
-                raise CliError(f"github-tools-cli could not be started: {error}") from error
+                raise CliError(f"{project.CLI_NAME} could not be started: {error}") from error
             found = self._find_again(node)
             if found is None:
                 raise CliError(
-                    f"github-tools-cli could not be started: node is gone from {node}; install Node.js 24 or later, "
+                    f"{project.CLI_NAME} could not be started: node is gone from {node}; install Node.js 24 or later, "
                     "then restart Hermes from a shell where `node` runs"
                 ) from error
             try:
                 process = self._start(found, args)
             except OSError as again:
-                raise CliError(f"github-tools-cli could not be started: {again}") from again
+                raise CliError(f"{project.CLI_NAME} could not be started: {again}") from again
         try:
             stdout, stderr = process.communicate(input=stdin, timeout=timeout)
         except subprocess.TimeoutExpired as error:
             _stop(process)
-            raise CliError(f"github-tools-cli did not finish within {timeout:g} seconds") from error
+            raise CliError(f"{project.CLI_NAME} did not finish within {timeout:g} seconds") from error
         except BaseException:
             _stop(process)
             raise

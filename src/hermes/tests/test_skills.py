@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from support import LISTING, ROOT, FakeCliCase, StubContext, plugin, skills
+from support import LISTING, ROOT, FakeCliCase, StubContext, plugin, project, skills
 
 
 class SkillsTest(FakeCliCase):
@@ -15,9 +15,9 @@ class SkillsTest(FakeCliCase):
         path.write_text(text, encoding="utf-8")
         return path
 
-    def test_registers_each_skill_without_the_github_prefix(self) -> None:
-        issues = self.skill("issues", "---\nname: github-issues\ndescription: Work with issues\n---\n# Issues\n")
-        boards = self.skill("boards", '---\nname: "github-project-boards"\ndescription: \'It\'\'s a board\'\n---\nBody')
+    def test_registers_each_skill_without_the_skill_prefix(self) -> None:
+        issues = self.skill("issues", f"---\nname: {project.SKILL_PREFIX}issues\ndescription: Work with issues\n---\n# Issues\n")
+        boards = self.skill("boards", f'---\nname: "{project.SKILL_PREFIX}project-boards"\ndescription: \'It\'\'s a board\'\n---\nBody')
         self.assertEqual(
             self.register().skills,
             [("project-boards", boards, "It's a board"), ("issues", issues, "Work with issues")],
@@ -32,16 +32,16 @@ class SkillsTest(FakeCliCase):
         self.assertEqual(self.register().skills, [("plain", path, "")])
 
     def test_only_plain_and_quoted_single_line_values_are_read(self) -> None:
-        path = self.skill("folded", "---\nname: >\n  github-folded\ndescription: [a, b]\n---\nBody")
+        path = self.skill("folded", f"---\nname: >\n  {project.SKILL_PREFIX}folded\ndescription: [a, b]\n---\nBody")
         self.assertEqual(self.register().skills, [("folded", path, "")])
 
     def test_a_name_that_is_only_the_prefix_is_kept(self) -> None:
-        path = self.skill("bare", "---\nname: github-\n---\nBody")
-        self.assertEqual(self.register().skills, [("github-", path, "")])
+        path = self.skill("bare", f"---\nname: {project.SKILL_PREFIX}\n---\nBody")
+        self.assertEqual(self.register().skills, [(project.SKILL_PREFIX, path, "")])
 
     def test_the_first_of_two_skills_with_one_name_wins(self) -> None:
-        first = self.skill("a", "---\nname: github-issues\n---\nA")
-        self.skill("b", "---\nname: github-issues\n---\nB")
+        first = self.skill("a", f"---\nname: {project.SKILL_PREFIX}issues\n---\nA")
+        self.skill("b", f"---\nname: {project.SKILL_PREFIX}issues\n---\nB")
         self.assertEqual([path for _, path, _ in self.register().skills], [first])
 
     def test_folders_without_a_skill_file_and_plain_files_are_skipped(self) -> None:
@@ -55,8 +55,8 @@ class SkillsTest(FakeCliCase):
         self.assertEqual(len(ctx.tools), len(LISTING))
 
     def test_a_skill_hermes_refuses_is_skipped_and_the_rest_register(self) -> None:
-        self.skill("bad", "---\nname: github-bad name\n---\nBody")
-        good = self.skill("good", "---\nname: github-good\n---\nBody")
+        self.skill("bad", f"---\nname: {project.SKILL_PREFIX}bad name\n---\nBody")
+        good = self.skill("good", f"---\nname: {project.SKILL_PREFIX}good\n---\nBody")
 
         class Refusing(StubContext):
             def register_skill(self, name: str, path: Path, description: str = "") -> None:
