@@ -65,7 +65,7 @@ function describeTool(spec: ToolSpec): Tool {
 /**
  * An MCP server that serves the tools the settings select from `specs`, over
  * whatever transport is connected. Each call runs in the client's working
- * repository, and with `confirm: "elicitation"` an administrative tool asks
+ * directory, and with `confirm: "elicitation"` an administrative tool asks
  * through a form where the client offers one.
  */
 export function createServer(specs: ToolSpec[], settings: EntrySettings, options: ServerOptions = {}): Server {
