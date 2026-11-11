@@ -15,70 +15,13 @@ async function thrown(promise: Promise<unknown>): Promise<unknown> {
   )
 }
 
-describe("confirmWrite", () => {
-  const admin = { id: "github_repo_delete", class: "administrative" } as const
-
-  test("with no hook, the harness approved", async () => {
-    await confirmWrite(admin, {}, "Delete octo/hello")
-  })
-
-  test("an accept lets the call go on, and the hook sees the tool and message", async () => {
-    const requests: unknown[] = []
-    await confirmWrite(
-      admin,
-      {
-        confirm: async (request) => {
-          requests.push(request)
-          return true
-        },
-      },
-      "Delete octo/hello",
-    )
-    expect(requests).toEqual([{ tool: "github_repo_delete", message: "Delete octo/hello" }])
-  })
-
-  test.each([false, undefined, "yes", 1])("anything but true (%p) is declined", async (answer) => {
-    const error = await thrown(confirmWrite(admin, { confirm: async () => answer as boolean }, "Delete octo/hello"))
-    expect(isToolError(error) && error.code).toBe("declined")
-    expect((error as Error).message).toContain("Delete octo/hello")
-  })
-
-  test("a failing hook's error passes through", async () => {
-    const failure = new Error("elicitation broke")
-    const error = await thrown(
-      confirmWrite(
-        admin,
-        {
-          confirm: async () => {
-            throw failure
-          },
-        },
-        "m",
-      ),
-    )
-    expect(error).toBe(failure)
-  })
-
-  test("other classes never ask", async () => {
-    let asked = false
-    const confirm = async () => {
-      asked = true
-      return false
-    }
-    for (const writeClass of ["read", "add", "idempotent", "overwrite"] as const) {
-      await confirmWrite({ id: "github_issue_edit", class: writeClass }, { confirm }, "m")
-    }
-    expect(asked).toBe(false)
-  })
-})
-
 describe("invoke", () => {
   const tool = (execute: ToolSpec<typeof input, typeof output>["execute"]) =>
     defineTool({
-      id: "github_issue_count",
+      id: "demo_thing_count",
       title: "Count",
       description: "d",
-      toolset: "issues",
+      toolset: "alpha",
       class: "add",
       input,
       output,
@@ -108,7 +51,7 @@ describe("invoke", () => {
       ),
     )
     expect(isToolError(error) && error.code).toBe("invalid_argument")
-    expect((error as Error).message).toContain("github_issue_count")
+    expect((error as Error).message).toContain("demo_thing_count")
     expect((error as Error).message).toContain("count: ")
     expect((error as Error).message).toContain("label: ")
   })
@@ -168,13 +111,13 @@ describe("invoke", () => {
     tool((async () => result) as unknown as ToolSpec<typeof input, typeof output>["execute"])
 
   test("a result that breaks the output schema is an internal_error carrying the raw result", async () => {
-    const bad = returning({ total: "many", created: "https://github.com/o/r/issues/7" })
+    const bad = returning({ total: "many", created: "https://example.com/things/7" })
     const error = await thrown(invoke(bad, { count: 1 }, CTX))
     expect(isToolError(error) && error.code).toBe("internal_error")
     const message = (error as Error).message
-    expect(message).toContain("github_issue_count returned a result that does not match its output schema")
+    expect(message).toContain("demo_thing_count returned a result that does not match its output schema")
     expect(message).toContain("total")
-    expect(message).toContain('"created":"https://github.com/o/r/issues/7"')
+    expect(message).toContain('"created":"https://example.com/things/7"')
   })
 
   test("the raw result in that message is capped", async () => {
@@ -191,7 +134,7 @@ describe("invoke", () => {
   })
 
   test("a ToolError from execute passes through unchanged", async () => {
-    const failure = new ToolError("not_found", "no such issue")
+    const failure = new ToolError("not_found", "no such thing")
     const error = await thrown(
       invoke(
         tool(async () => {
@@ -222,10 +165,67 @@ describe("invoke", () => {
   })
 })
 
+describe("confirmWrite", () => {
+  const admin = { id: "demo_thing_delete", class: "administrative" } as const
+
+  test("with no hook, the harness approved", async () => {
+    await confirmWrite(admin, {}, "Delete the thing")
+  })
+
+  test("an accept lets the call go on, and the hook sees the tool and message", async () => {
+    const requests: unknown[] = []
+    await confirmWrite(
+      admin,
+      {
+        confirm: async (request) => {
+          requests.push(request)
+          return true
+        },
+      },
+      "Delete the thing",
+    )
+    expect(requests).toEqual([{ tool: "demo_thing_delete", message: "Delete the thing" }])
+  })
+
+  test.each([false, undefined, "yes", 1])("anything but true (%p) is declined", async (answer) => {
+    const error = await thrown(confirmWrite(admin, { confirm: async () => answer as boolean }, "Delete the thing"))
+    expect(isToolError(error) && error.code).toBe("declined")
+    expect((error as Error).message).toContain("Delete the thing")
+  })
+
+  test("a failing hook's error passes through", async () => {
+    const failure = new Error("elicitation broke")
+    const error = await thrown(
+      confirmWrite(
+        admin,
+        {
+          confirm: async () => {
+            throw failure
+          },
+        },
+        "m",
+      ),
+    )
+    expect(error).toBe(failure)
+  })
+
+  test("other classes never ask", async () => {
+    let asked = false
+    const confirm = async () => {
+      asked = true
+      return false
+    }
+    for (const writeClass of ["read", "add", "idempotent", "overwrite"] as const) {
+      await confirmWrite({ id: "demo_thing_edit", class: writeClass }, { confirm }, "m")
+    }
+    expect(asked).toBe(false)
+  })
+})
+
 describe("StepErrors", () => {
   test("returns a step's value and records nothing", async () => {
     const steps = new StepErrors()
-    expect(await steps.record("milestone", async () => 5)).toBe(5)
+    expect(await steps.record("label", async () => 5)).toBe(5)
     expect(steps.any).toBe(false)
     expect(steps.errors).toEqual({})
   })
@@ -233,7 +233,7 @@ describe("StepErrors", () => {
   test("a failing step yields undefined and is recorded, with the code of a ToolError", async () => {
     const steps = new StepErrors()
     expect(
-      await steps.record("milestone", async () => {
+      await steps.record("label", async () => {
         throw new ToolError("forbidden", "no access")
       }),
     ).toBeUndefined()
@@ -243,7 +243,7 @@ describe("StepErrors", () => {
       }),
     ).toBeUndefined()
     expect(steps.any).toBe(true)
-    expect(steps.errors).toEqual({ milestone: "forbidden: no access", relation: "plain failure" })
+    expect(steps.errors).toEqual({ label: "forbidden: no access", relation: "plain failure" })
   })
 
   test("later steps still run after a failure", async () => {
