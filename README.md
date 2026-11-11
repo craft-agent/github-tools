@@ -296,6 +296,18 @@ Hermes. Every Actions write asks each time, since a workflow can deploy or
 publish whatever its name says. Enabling or disabling a workflow, deleting a
 run and downloading artifacts are not covered yet.
 
+### Planning
+
+[`github-planning`](skills/github-planning/SKILL.md) adds no tool. It says how
+to plan with the issue and board tools: when work is one issue or a parent
+issue with sub-issues, how to size a sub-issue, how steps outside the
+repository (an approval, a vendor's answer) enter the plan, the form of each
+body, the order to file in, and what a later change rewrites in a body or
+says in a comment. It is shown as `github-tools:github-planning` in Claude
+Code and `github-tools:planning` in Hermes. It is linked to the `issues`
+toolset, which it cannot work without, and says what to skip when the board
+tools are off.
+
 ## Reads and writes
 
 Every read tool is named `github_<domain>_read`. Reads can run unasked; writes
@@ -404,9 +416,10 @@ environment variable in `env:` is allowed). Where each harness reads them:
 - `src/cli/` — the command line the Hermes plugin calls, built to `dist/cli.js`
   and run by `github-tools-cli`.
 - `src/hermes/`, `plugin.yaml` and `__init__.py` — the Hermes plugin.
-- `skills/` — one skill per toolset, `skills/<name>/SKILL.md`, which every
-  harness that takes skills loads from the package or plugin root; the native
-  plugins load only those of the toolsets that are on.
+- `skills/` — one skill per toolset and one for planning with them,
+  `skills/<name>/SKILL.md`, which every harness that takes skills loads from the
+  package or plugin root; the native plugins load only those of the toolsets
+  that are on.
 - `.claude-plugin/`, `.codex-plugin/`, `.agents/plugins/`, `.mcp.json`,
   `.antigravity-plugin/` and `mcp_config.json` — the plugin manifests of the
   other harnesses. Codex reads `.codex-plugin/plugin.json`; a root
