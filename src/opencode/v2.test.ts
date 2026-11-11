@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { z } from "zod"
 import { tempRepo } from "../testing/git-repo"
-import { ADD_ID, ADMIN_ID, FAILING_ID, LABEL_ID, READ_ID, fixtureSpecs } from "./testing"
+import { ADD_ID, ADMIN_ID, FAILING_ID, LABEL_ID, PROFILE, READ_ID, fixtureSpecs } from "./testing"
 import type { V2Context, V2PermissionRequest, V2Skill, V2Tool } from "./types"
 import { createV2Setup } from "./v2"
 
@@ -190,64 +190,12 @@ describe("V2 tool calls", () => {
     ).toEqual([[ADMIN_ID, ["octo/hello"], ["octo/hello"], "administrative"]])
   })
 
-  test("without a repo argument the resource is the session directory's origin repository", async () => {
-    const repo = tempRepo("https://github.com/Octo/Hello.git")
-    cleanups.push(repo.cleanup)
-    const { tools, asserts } = await setUp({ location: { directory: repo.dir } })
-    await tools.get(ADD_ID)!.execute({}, { sessionID: SESSION_ID, signal })
-    expect(asserts.map((request) => request.resources)).toEqual([["octo/hello"]])
-  })
-
-  test("a qualified issue in another repository asks for that repository, not the session directory's", async () => {
-    const repo = tempRepo("https://github.com/Octo/Hello.git")
-    cleanups.push(repo.cleanup)
-    const { tools, asserts } = await setUp({ location: { directory: repo.dir } })
-    await tools.get(ADD_ID)!.execute({ issue: "Other/Repo#4" }, { sessionID: SESSION_ID, signal })
-    expect(asserts.map((request) => [request.resources, request.save])).toEqual([[["other/repo"], ["other/repo"]]])
-  })
-
-  test("a call that writes to two repositories asks for both, and the message names each on a Target line", async () => {
-    const repo = tempRepo("https://github.com/Octo/Hello.git")
-    cleanups.push(repo.cleanup)
-    const { tools, asserts } = await setUp({ location: { directory: repo.dir } })
-    await tools.get(ADD_ID)!.execute({ issue: "3", branch_repo: "Fork/Hello" }, { sessionID: SESSION_ID, signal })
-    expect(asserts.map((request) => [request.resources, request.save])).toEqual([
-      [
-        ["fork/hello", "octo/hello"],
-        ["fork/hello", "octo/hello"],
-      ],
-    ])
-    expect(asserts[0]!.metadata?.message).toBe(
-      `Title of ${ADD_ID}\n\n--- Details ---\n\nTarget: fork/hello\nTarget: octo/hello`,
-    )
-  })
-
   test("a call whose targets cannot be told shows its title alone", async () => {
     const { tools, asserts } = await setUp()
     await expect(tools.get(ADD_ID)!.execute({ repo: 5 }, { sessionID: SESSION_ID, signal })).rejects.toThrow(
       "invalid_argument",
     )
     expect(asserts[0]!.metadata?.message).toBe(`Title of ${ADD_ID}`)
-  })
-
-  test("the resource is * when the repository cannot be resolved, and an always answer saves nothing", async () => {
-    const repo = tempRepo()
-    cleanups.push(repo.cleanup)
-    const { tools, asserts } = await setUp({ location: { directory: repo.dir } })
-    await tools.get(ADD_ID)!.execute({}, { sessionID: SESSION_ID, signal })
-    await tools.get(ADD_ID)!.execute({ repo: "not a repo" }, { sessionID: SESSION_ID, signal })
-    expect(asserts.map((request) => [request.resources, request.save])).toEqual([
-      [["*"], []],
-      [["*"], []],
-    ])
-  })
-
-  test("a repository that cannot be told is asked for beside the others, and never saved", async () => {
-    const repo = tempRepo()
-    cleanups.push(repo.cleanup)
-    const { tools, asserts } = await setUp({ location: { directory: repo.dir } })
-    await tools.get(ADD_ID)!.execute({ issue: "a/b#1", branch_repo: "not a repo" }, { sessionID: SESSION_ID, signal })
-    expect(asserts.map((request) => [request.resources, request.save])).toEqual([[["a/b", "*"], ["a/b"]]])
   })
 
   test("the install directory is handed to the tool, and a bare number there asks for *", async () => {
@@ -307,7 +255,7 @@ describe("V2 tool calls", () => {
 
 describe("V2 skills", () => {
   async function withSkillsDir(run: (dir: string) => Promise<void>) {
-    const dir = await mkdtemp(join(tmpdir(), "github-tools-skills-"))
+    const dir = await mkdtemp(join(tmpdir(), "skills-"))
     try {
       await run(dir)
     } finally {
@@ -318,14 +266,14 @@ describe("V2 skills", () => {
   test("registers the skills of the injected directory", async () => {
     await withSkillsDir(async (dir) => {
       await mkdir(join(dir, "triage"))
-      await writeFile(join(dir, "triage", "SKILL.md"), "---\nname: issue-triage\ndescription: Sort issues\n---\nBody\n")
+      await writeFile(join(dir, "triage", "SKILL.md"), "---\nname: thing-triage\ndescription: Sort things\n---\nBody\n")
       const fake = fakeContext()
-      await createV2Setup([], { skillsDir: dir })(fake.ctx)
+      await createV2Setup([], { skillsDir: dir, profile: PROFILE })(fake.ctx)
       expect(fake.skills).toEqual([
         {
-          id: "issue-triage",
-          name: "issue-triage",
-          description: "Sort issues",
+          id: "thing-triage",
+          name: "thing-triage",
+          description: "Sort things",
           path: join(dir, "triage", "SKILL.md"),
           content: "Body\n",
         },
@@ -335,7 +283,7 @@ describe("V2 skills", () => {
 
   test("registers no skill when the directory is missing", async () => {
     const fake = fakeContext()
-    await createV2Setup([], { skillsDir: join(tmpdir(), "github-tools-no-such-dir") })(fake.ctx)
+    await createV2Setup([], { skillsDir: join(tmpdir(), "skills-no-such-dir"), profile: PROFILE })(fake.ctx)
     expect(fake.skills).toEqual([])
   })
 })

@@ -1,7 +1,14 @@
 import { z } from "zod"
 import { ToolError, defineTool, githubTargets, type ToolSpec, type Translations, type WriteClass } from "../core"
+import type { EntryProfile } from "../entry/profile"
 
 /** Fixtures the OpenCode plugin tests share. */
+
+/** The profile the test plugins are built with: `alpha` is on by default, `beta` is not. */
+export const PROFILE: EntryProfile = {
+  envPrefix: "DEMO",
+  toolsets: { names: ["alpha", "beta"], defaults: ["alpha"] },
+}
 
 export const toolInput = z.object({
   repo: z.string().describe("The repository, as owner/name.").optional(),

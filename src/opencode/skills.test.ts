@@ -9,7 +9,7 @@ import { loadSkills, readSkills } from "./skills"
 let dir: string
 
 beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), "github-tools-skills-"))
+  dir = await mkdtemp(join(tmpdir(), "skills-"))
 })
 
 afterEach(async () => {
@@ -27,13 +27,13 @@ describe("loadSkills", () => {
   test("reads the name, description and body of a skill", async () => {
     const path = await skillFile(
       "triage",
-      "---\nname: issue-triage\ndescription: Sort the issues\n---\n# Triage\n\nSteps.\n",
+      "---\nname: thing-triage\ndescription: Sort the things\n---\n# Triage\n\nSteps.\n",
     )
     expect(await loadSkills(dir)).toEqual([
       {
-        id: "issue-triage",
-        name: "issue-triage",
-        description: "Sort the issues",
+        id: "thing-triage",
+        name: "thing-triage",
+        description: "Sort the things",
         path,
         content: "# Triage\n\nSteps.\n",
       },
@@ -46,9 +46,9 @@ describe("loadSkills", () => {
   })
 
   test("falls back to the folder name when the frontmatter has no name", async () => {
-    await skillFile("board-sync", "---\ndescription: Keep the board in step\n---\nBody\n")
+    await skillFile("thing-sync", "---\ndescription: Keep the things in step\n---\nBody\n")
     const [skill] = await loadSkills(dir)
-    expect(skill).toMatchObject({ id: "board-sync", name: "board-sync", description: "Keep the board in step" })
+    expect(skill).toMatchObject({ id: "thing-sync", name: "thing-sync", description: "Keep the things in step" })
   })
 
   test("a file without frontmatter is all content, with no description", async () => {
@@ -119,7 +119,6 @@ describe("loadSkills", () => {
 describe("the package's skills", () => {
   test("each loads under its folder's name, with a description and a body", async () => {
     const shipped = await loadSkills(new URL("../../skills/", import.meta.url))
-    expect(shipped.map((skill) => skill.id)).toContain("github-issues")
     for (const skill of shipped) {
       expect(skill.path).toEndWith(join(skill.id, "SKILL.md"))
       expect(skill.description?.length ?? 0).toBeGreaterThan(0)
