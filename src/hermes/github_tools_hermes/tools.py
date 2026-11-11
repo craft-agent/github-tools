@@ -23,8 +23,8 @@ TOOLSET_EMOJI = {
     "pull_requests": "🔀",
     "projects": "📋",
     "repos": "📦",
-    "releases": "🏷️",
-    "actions": "⚙️",
+    "releases": "🚀",
+    "actions": "🤖",
 }
 
 

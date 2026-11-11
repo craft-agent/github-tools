@@ -38,8 +38,8 @@ class RegisterTest(FakeCliCase):
                 "github_pr_merge": ("github-tools-pull-requests", "🔀"),
                 "github_project_item_add": ("github-tools-projects", "📋"),
                 "github_repo_edit": ("github-tools-repos", "📦"),
-                "github_release_publish": ("github-tools-releases", "🏷️"),
-                "github_run_rerun": ("github-tools-actions", "⚙️"),
+                "github_release_publish": ("github-tools-releases", "🚀"),
+                "github_run_rerun": ("github-tools-actions", "🤖"),
             },
         )
 
