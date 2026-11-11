@@ -12,17 +12,21 @@ const PACKAGE = new URL("../package.json", import.meta.url)
 const DEFAULT_OUTPUT = new URL("../server.json", import.meta.url)
 const SCHEMA = "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json"
 
-/** The registry accepts at most 100 characters here, fewer than package.json's description. */
-export const DESCRIPTION =
-  "GitHub tools for coding agents: issues, project boards, pull requests, releases and Actions."
+/** The registry accepts at most this many characters in a description. */
+export const DESCRIPTION_LIMIT = 100
 
 /** The `server.json` document for a parsed package.json. */
 export function serverJson(pkg) {
   if (!pkg.mcpName) throw new Error("package.json has no `mcpName` for the MCP Registry.")
+  if (!pkg.description || pkg.description.length > DESCRIPTION_LIMIT) {
+    throw new Error(
+      `package.json needs a \`description\` of at most ${DESCRIPTION_LIMIT} characters for the MCP Registry.`,
+    )
+  }
   return {
     $schema: SCHEMA,
     name: pkg.mcpName,
-    description: DESCRIPTION,
+    description: pkg.description,
     repository: { url: pkg.repository.url.replace(/^git\+/, "").replace(/\.git$/, ""), source: "github" },
     version: pkg.version,
     packages: [{ registryType: "npm", identifier: pkg.name, version: pkg.version, transport: { type: "stdio" } }],

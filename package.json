@@ -1,7 +1,7 @@
 {
   "name": "@craftsamo/github-tools",
   "version": "0.12.0",
-  "description": "GitHub tools for coding agents: issues, project boards, pull requests, repositories, releases and Actions.",
+  "description": "GitHub tools for coding agents: issues, boards, pull requests, repositories, releases and Actions.",
   "author": "craftsamo",
   "license": "LicenseRef-AGPL-3.0-Commons-Clause",
   "repository": {

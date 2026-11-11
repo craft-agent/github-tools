@@ -1,103 +1,53 @@
 # Tool conventions
 
 The rules every tool in this package follows, so tools read alike across
-domains and harnesses. Each rule carries the reason it was chosen; the
-discussion behind them is on
-[#2](https://github.com/craft-agent/github-tools/issues/2) and
-[#3](https://github.com/craft-agent/github-tools/issues/3).
+domains and harnesses. Each rule carries the reason it was chosen; a change
+to a rule changes this file first, with its reason.
 
 ## Names
 
-- **Tool IDs are `github_<domain>_<verb>`**: `github_issue_create`,
-  `github_project_item_add`. The word order follows the GitHub CLI's command
-  groups (`gh issue create`, `gh project item-add`), so a name maps to a
-  command anyone can look up. The `github_` prefix keeps a name unambiguous
-  where a harness lists every tool in one namespace.
+- **Tool IDs are `<prefix>_<domain>_<verb>`**: `<prefix>_note_read` and
+  `<prefix>_note_create` for a `note` domain. The prefix is `toolPrefix` in
+  `src/project.ts`; it keeps a name unambiguous where a harness lists every
+  tool in one namespace. When the domain has a well-known command line,
+  follow its word order, so a name maps to a command anyone can look up.
 - **The same ID in every entry point.** Permission rules and skills are
   written once, and an ID is a public interface: renaming one is a breaking
   change.
-- **Verbs are the CLI's**: `view`, `list`, `create`, `edit`, `close`, `reopen`,
-  `comment`, `review`, `ready`, `merge`, `delete`, `add` for putting an item
-  on a board, and for Actions `run` (start a workflow, `gh workflow run`),
-  `rerun` and `cancel` (`gh run rerun`, `gh run cancel`). Native stacks are
-  `github_stack_*`, after the `gh stack` extension's command group (`link`,
-  and `unlink` for its `unstack`). A verb of our own only where the CLI has no
-  command for the operation:
+- **Verbs are plain**: `create`, `edit`, `delete`, `add`, `remove`, and these
+  with a fixed meaning:
 
-  | Verb         | Means                                                        |
-  | ------------ | ------------------------------------------------------------ |
-  | `read`       | the one read tool of a domain (below)                        |
-  | `relate`     | set an issue's parent, sub-issues and dependencies           |
-  | `resolve`    | find which board, repository or object a call means          |
-  | `ensure`     | create when missing, reuse when present; never a second copy |
-  | `visibility` | change who can read a repository                             |
-  | `publish`    | make a draft release public: tag it and notify watchers      |
-
-  `visibility` has a tool of its own although the CLI changes it with
-  `repo edit`: it is administrative, and folded into `github_repo_edit` it
-  would make every description change ask like it. Where a CLI group has no
-  write command (milestones, rulesets), the writes take the CLI's usual
-  `create`, `edit` and `delete`.
-
-  `publish` has a tool of its own although the CLI publishes a draft with
-  `release edit --draft=false`: it is administrative, and folded into
-  `github_release_edit` it would make every notes edit ask like it.
+  | Verb      | Means                                                        |
+  | --------- | ------------------------------------------------------------ |
+  | `read`    | the one read tool of a domain (below)                        |
+  | `resolve` | find which object a call means                               |
+  | `ensure`  | create when missing, reuse when present; never a second copy |
 
 - **One read tool per domain, one write tool per operation.**
-  `github_<domain>_read` takes a `method` argument whose values are the CLI's
-  read verbs (`view`, `list`, …). A model picks tools worse as their number
-  grows, and reads share one set of annotations, so folding them loses
-  nothing. Writes stay apart because a merged write tool would carry its
-  strictest class: creating an issue would ask like overwriting one.
-- **Names stay within about 40 characters**, so a client prefix such as
-  `mcp__<server>__` still fits a 64-character limit.
+  `<prefix>_<domain>_read` takes a `method` argument (`view`, `list`, …). A
+  model picks tools worse as their number grows, and reads share one set of
+  annotations, so folding them loses nothing. Writes stay apart because a
+  merged write tool would carry its strictest class: creating something would
+  ask like overwriting it.
+- **Names stay within 40 characters**, so a client prefix such as
+  `mcp__<server>__` still fits a 64-character limit. `defineTool` enforces
+  the shape and the length; `src/tools.test.ts` enforces the prefix.
 
 ## Arguments
 
 - **snake_case**, for arguments and for the keys of a result alike: one style
-  for everything a model reads, and it lines up with the GitHub API's fields
-  (`state_reason`, `issue_number`).
-- **Lists change through flat arguments**: `add_labels`, `remove_labels`,
-  `add_assignees`. Shallow schemas are read reliably by every model the
-  harnesses run. An argument that replaces a whole list, where one is needed,
-  is named for the list (`labels`) and its description says it replaces.
-- **Field values are one map by field name.** A board's fields (`fields`) and
-  an organization's issue fields (`issue_fields`) take `{name: value}`, names
-  and options matched without regard to case; clearing takes a list of names
-  (`clear_fields`, `clear_issue_fields`). A field the owner adds or renames
-  stays reachable without a new argument. Every name, option and value is
-  checked against the field definitions before anything is written, and a
-  refusal names the choices there are.
-- **References.** An issue or pull request is `12`, `#12`, `owner/repo#12` or
-  its URL; a board is its number, `owner/number`, its URL or its title; a
-  workflow run is its id or its URL. A bare number means the working tree's
-  repository (its `origin` on GitHub); `repo` (`owner/name`) names another. A
-  call that needs a repository and finds neither fails, saying so.
-- **A board not named is looked up, never guessed.** By title (the `project`
-  argument when it is no reference, default `Roadmap`), in order: the owner
-  given, else the boards linked to the repository, the organization that owns
-  it, and the viewer. Several candidates on one route stop the call with the
-  candidates listed, and a repository that cannot be read fails instead of
-  falling through to another route.
-- **A write that acts on a commit takes `head_sha`.** Opening, reviewing and
-  merging a pull request check, when it is given, that the branch on GitHub is
-  still at that commit, and stop with `stale` before writing otherwise. The
-  caller pushed or read that commit; anything newer arrived unseen. Publishing
-  a release checks that the commit its tag would name is the one given, stops
-  with `stale` otherwise, and pins a new tag to the commit it checked.
-  Starting a workflow checks the commit its ref names; GitHub starts a
-  workflow by ref, not by commit, so the run's own commit is read afterwards
-  and a difference is reported rather than prevented.
-- **A read that waits is bounded.** A read that waits for GitHub (checks to
-  settle, a workflow run to finish) waits at most `wait` seconds, 45 by
-  default, then returns what it has and says to call again. Hosts stop a tool
-  call after about a minute, so a longer wait would end in a failed call
-  instead of an answer.
-- **The tools' own install directory is never the working tree.** A harness may
-  start a tool inside the directory the package is installed in, a checkout of
-  this package, whose `origin` is not the caller's project. A bare number there
-  fails, saying so, instead of reading this package's issues; `repo` or a
-  qualified reference still works.
+  for everything a model reads.
+- **Lists change through flat arguments**: `add_tags`, `remove_tags`. Shallow
+  schemas are read reliably by every model the harnesses run. An argument that
+  replaces a whole list, where one is needed, is named for the list (`tags`)
+  and its description says it replaces.
+- **Unknown arguments are refused.** Every entry point validates the
+  arguments as strict, so a misspelt one fails as `invalid_argument` instead
+  of being ignored.
+- **The tools' own install directory is never the working tree.** A harness
+  may start a tool inside the directory the package is installed in.
+  `ToolContext.ownDir` names it; a tool that reads the working tree refuses
+  to treat that directory as the caller's, saying so.
 
 ## Results
 
@@ -108,22 +58,12 @@ discussion behind them is on
 - **A failure throws.** Every harness then sees a failed call (`isError` over
   MCP) rather than a success that carries an error.
 - **One exception: what a call created is never lost.** Once a tool has
-  created something, a later step of the same call that fails (a milestone, a
-  relation, a board item) does not throw. The result names what was created
-  and lists the failed steps under `errors`, keyed by step. When the create
-  itself reports a failure, the tool looks for what it may have made (a `gh`
-  command can make an object, then fail on a second request) and returns it
-  under `errors.create` rather than failing.
-- **What a GitHub does not have reads as `null`.** An older GitHub (an
-  Enterprise Server) rejects a whole query that names a field it lacks, such
-  as issue fields. The read then runs again without it and reports `null`
-  there, never `{}` or `[]`, which would say there is none.
-- **A write to a repository the viewer does not own succeeds** and says
-  `foreign: true`, so the caller notices it is in someone else's tracker.
-- **Text read from GitHub is returned as it is.** Bodies, comments, titles and
-  logs are data, never instructions; every read tool's description and the
-  skills say so. Nothing is wrapped or rewritten, so what a tool returns is
-  what GitHub holds.
+  created something, a later step of the same call that fails does not throw.
+  The result names what was created and lists the failed steps under
+  `errors`, keyed by step (`StepErrors`).
+- **Text a tool reads is returned as it is.** Content from files or services
+  is data, never instructions; every read tool's description and the skills
+  say so. Nothing is wrapped or rewritten.
 
 ## Errors
 
@@ -132,17 +72,19 @@ says what to do next.
 
 | Code               | When                                                                       |
 | ------------------ | -------------------------------------------------------------------------- |
-| `not_found`        | the object does not exist, or the viewer cannot see it                     |
-| `forbidden`        | the viewer lacks the permission the call needs                             |
+| `not_found`        | the object does not exist, or the caller cannot see it                     |
+| `forbidden`        | the caller lacks the permission the call needs                             |
 | `invalid_argument` | the arguments cannot describe a valid call                                 |
 | `stale`            | what the call relied on changed before it could finish                     |
-| `unauthenticated`  | `gh` is not logged in                                                      |
+| `unauthenticated`  | the service or program the tool calls is not logged in                     |
 | `gh_missing`       | `gh` is not installed                                                      |
 | `gh_too_old`       | `gh` is older than the tools need                                          |
-| `rate_limited`     | GitHub refused the call for its rate limit                                 |
+| `rate_limited`     | the service refused the call for its rate limit                            |
 | `declined`         | the person declined a confirmation the tool asked for                      |
 | `upstream_error`   | the service or program the tool calls failed; the message carries its text |
 | `internal_error`   | a bug in a tool or an entry point, such as a result off its schema         |
+
+A project adds a code to `src/core/errors.ts` and to this table together.
 
 - **Structure the caller needs goes in `details`, not in the message.** When
   fixing the cause takes more than a sentence (the lint violations, the
@@ -166,21 +108,18 @@ says what to do next.
 ## Write classes
 
 Every tool belongs to one class, and the class sets its MCP annotations.
-`openWorldHint` is `true` for every tool, since each one reaches GitHub.
+`openWorldHint` is `true` for every tool.
 
-| Class             | Examples                                                   | `readOnlyHint` | `destructiveHint` | `idempotentHint` |
-| ----------------- | ---------------------------------------------------------- | -------------- | ----------------- | ---------------- |
-| read              | view, list, resolve                                        | `true`         | —                 | `true`           |
-| add               | create, comment, add an item                               | `false`        | `false`           | `false`          |
-| idempotent change | ensure, relate, adding a label                             | `false`        | `false`           | `true`           |
-| overwrite         | editing a body or title, close, reopen                     | `false`        | `true`            | `true`           |
-| administrative    | merge, visibility, delete, publishing, every Actions write | `false`        | `true`            | `false`          |
+| Class             | Examples                              | `readOnlyHint` | `destructiveHint` | `idempotentHint` |
+| ----------------- | ------------------------------------- | -------------- | ----------------- | ---------------- |
+| read              | view, list, resolve                   | `true`         | —                 | `true`           |
+| add               | create, add                           | `false`        | `false`           | `false`          |
+| idempotent change | ensure, adding a tag                  | `false`        | `false`           | `true`           |
+| overwrite         | editing a body or title, removing one | `false`        | `true`            | `true`           |
+| administrative    | delete, visibility, publishing        | `false`        | `true`            | `false`          |
 
 - **Overwriting counts as destructive**: it loses what was there, and
   harnesses that confirm only destructive tools should still ask before it.
-- **Every Actions write is administrative**: starting, re-running or
-  cancelling a run. A workflow can deploy, publish or spend whatever its name
-  says, and stopping one halfway can leave a deploy half done.
 - **A tool takes the strictest class its arguments can reach.**
 - **The harness confirms writes.** Every MCP client asks before it runs a
   write tool, so the tool does not ask again by default. Administrative tools
@@ -191,28 +130,10 @@ Every tool belongs to one class, and the class sets its MCP annotations.
   approval of their own.
 - **It asks for everything the call writes to.** A write tool's `targets`
   resolver names what the call writes to, as the permission rules name it
-  (here a repository or a board). Anything it cannot tell, every tool
-  without a resolver, arguments the input schema rejects, and a target holding
-  `*` or `?` (which a harness would store as a pattern) is `*`, and `*` is
-  never stored. An "always" answer then covers only what it named, never a
-  write somewhere else.
-- **The resolvers are made by `githubTargets`**, from a map of argument names
-  to the kind of target each holds: `repo`, an issue or pull request
-  reference (`issue`, `pull`) or a list of issues (`issues`), a workflow run
-  (`run`), a board (`board`), a board that is written to only when it is given
-  (`optional_board`), a board item (`item`) and the owner a board is created
-  for (`owner`). Every argument of the map must be an argument of the tool.
-  A bare number means the call's own repository, and a repository is named
-  in lowercase.
-- **A board is named `owner/projects/N`.** A board belongs to a user or an
-  organization, not to a repository, so its writes name the board rather than
-  the working tree's repository. A board the call does not name is found with
-  the same lookup the tool uses, which reads but never writes. Putting an
-  issue or pull request on a board names the board only, since the issue does
-  not change; a call that also writes to a repository (linking one, turning a
-  draft into an issue) names both. Creating a board names `owner/projects/new`,
-  so an "always" answer lets new boards be made for that owner and no
-  existing board be written to.
+  (a path, an account, a record). Anything it cannot tell, every tool
+  without a resolver, and a target holding `*` or `?` (which a harness would
+  store as a pattern) is `*`, and `*` is never stored. An "always" answer then
+  covers only what it named, never a write somewhere else.
 - **It shows what the call carries, where the tool can say.** Targets are
   ids, so they cannot tell one kind of target from another, and the person
   decides on the text, the file or the kind of target as much as on where it
@@ -371,7 +292,244 @@ note`). The prompt shows it wherever no headline can stand: a tool without
 - **Annotations are hints, not a boundary.** The `read_only` setting
   (below) is what keeps writes out.
 
-## What this package's approval prompts say
+## Toolsets and settings
+
+Every entry point takes the same settings:
+
+- **Toolsets**: one per domain, listed in `src/project.ts` with the ones on by
+  default. A small default keeps the model's choice sharp.
+- **`read_only`** registers no write tool, and wins over every other setting.
+- **`tools` / `exclude_tools`** add or remove single tools; an exclusion wins
+  over an inclusion.
+- **`confirm`** is `harness` (the default) or `elicitation`; it says who asks
+  before an administrative tool acts (see "Write classes"). The default leaves
+  the question to the harness, whose approval every user already knows.
+- **`language`** is the language of a native plugin's approval prompt (see
+  "Write classes"); unset, the prompt follows the harness's display language
+  or stays in English.
+
+## Skills
+
+- **A skill names the toolset it documents**, under `metadata` in its
+  frontmatter:
+
+  ```yaml
+  metadata:
+    toolset: issues
+  ```
+
+  The Agent Skills format allows no other top-level key, and its validators
+  refuse one. The value is a plain or quoted one-line scalar; any other form
+  reads as no link. A folder's name never links a skill, so every entry point
+  reads the link the same way without knowing the package's toolsets.
+
+- **A native plugin registers a linked skill only when its toolset is on**:
+  when the settings register at least one tool of that toolset, from the same
+  selection the tools come from. A skill that describes tools the model does
+  not have invites calls that fail. So `read_only`, `tools` and
+  `exclude_tools` count too: a toolset whose every tool is left out takes its
+  skill with it. A skill with no link is always registered.
+- **Plugins that install the skill folder whole cannot follow the settings**:
+  Claude Code, Codex, Grok Build and Antigravity load every skill, since the
+  settings reach only the MCP server.
+- **Every linked skill names one of the package's toolsets**; a test checks
+  it, since a misspelt link would hide the skill wherever it is filtered.
+
+## The core contract
+
+- A tool spec declares its ID, description, argument schema, output schema,
+  toolset and write class; every entry point derives the same metadata from
+  it. A write tool also declares `targets(args, context)`, which names what
+  the call writes to.
+- `execute(args, context)` gets the working directory, an abort signal, an
+  optional `ownDir` (the directory the tools are installed in, never the
+  working tree) and an optional `confirm(request) => Promise<boolean>` hook.
+  Nothing in it names a harness. An entry point supplies `confirm` when the
+  `elicitation` setting is on; without it the harness's approval stands, and a
+  tool that needs a confirmation treats a missing hook as the harness having
+  approved the call.
+- `src/core/` uses only the `node:*` modules and plain dependencies, never a
+  runtime's own globals (`Bun.spawn`, `Bun.file`, …), so the same code runs on
+  Node and on Bun. It knows no project either: names, prefixes and toolsets
+  come from `src/project.ts` through the entry points.
+
+## Programs a tool runs
+
+- **Every program a tool runs goes through one runner** built on `exec`, with
+  an explicit environment: what the program needs to find itself and
+  authenticate is passed through, and nothing else, so a stray variable
+  cannot redirect a call. Prompts and colors are switched off, so nothing
+  waits on a person and output parses the same everywhere.
+- **Every variable the tools read besides the settings is named in
+  `toolVariables` in `src/project.ts`**, whether a tool reads it itself or
+  passes it through to a program. Codex gives a plugin's server only a few
+  basic variables (`PATH`, `HOME` and the like) and those its manifest names,
+  and `pnpm run manifests` writes that list from the settings and
+  `toolVariables`: a variable left out is set everywhere but in Codex.
+- **Every call has a time limit**, and a call that is stopped, by that limit
+  or by cancellation, has its child process killed: `SIGTERM`, then `SIGKILL`
+  after two seconds. A hung program neither holds a harness forever nor
+  outlives its call.
+- **The runner maps the program's failures to the error codes above.**
+
+## Tests
+
+- Tests sit beside the code they test (`*.test.ts`) and run on `bun test`;
+  CI also starts the built MCP server, plugin and command line under Node and
+  lists their tools, so a runtime-only API cannot slip in unnoticed.
+- No test reaches a real service. A tool that runs a program is tested
+  against a fake of that program on `PATH`.
+- A test file stays within about 300 lines, split by topic
+  (`<name>.<topic>.test.ts`), so one commit can carry a change and its test.
+
+## The GitHub tools
+
+The rules below are github-tools' own, on top of everything above; where one
+changes a rule above, it says so. The discussion behind the rules is on
+[#2](https://github.com/craft-agent/github-tools/issues/2) and
+[#3](https://github.com/craft-agent/github-tools/issues/3).
+
+### Names
+
+- **Tool IDs follow the GitHub CLI's command groups**: `github_issue_create`,
+  `github_project_item_add` for `gh issue create` and `gh project item-add`, so
+  a name maps to a command anyone can look up. The `github_` prefix is
+  `toolPrefix` in `src/project.ts`.
+- **Verbs are the CLI's**: `view`, `list`, `create`, `edit`, `close`, `reopen`,
+  `comment`, `review`, `ready`, `merge`, `delete`, `add` for putting an item
+  on a board, and for Actions `run` (start a workflow, `gh workflow run`),
+  `rerun` and `cancel` (`gh run rerun`, `gh run cancel`). Native stacks are
+  `github_stack_*`, after the `gh stack` extension's command group (`link`,
+  and `unlink` for its `unstack`). A verb of our own, besides the starter's
+  `read`, `resolve` and `ensure`, only where the CLI has no command for the
+  operation:
+
+  | Verb         | Means                                                   |
+  | ------------ | ------------------------------------------------------- |
+  | `relate`     | set an issue's parent, sub-issues and dependencies      |
+  | `visibility` | change who can read a repository                        |
+  | `publish`    | make a draft release public: tag it and notify watchers |
+
+  `visibility` has a tool of its own although the CLI changes it with
+  `repo edit`: it is administrative, and folded into `github_repo_edit` it
+  would make every description change ask like it. Where a CLI group has no
+  write command (milestones, rulesets), the writes take the CLI's usual
+  `create`, `edit` and `delete`.
+
+  `publish` has a tool of its own although the CLI publishes a draft with
+  `release edit --draft=false`: it is administrative, and folded into
+  `github_release_edit` it would make every notes edit ask like it.
+
+- **A read tool's `method` values are the CLI's read verbs** (`view`, `list`,
+  …), and `resolve` finds which board, repository or object a call means.
+
+### Arguments
+
+- **Keys line up with the GitHub API's fields** (`state_reason`,
+  `issue_number`), in snake_case.
+- **Lists change through flat arguments** named for the GitHub object:
+  `add_labels`, `remove_labels`, `add_assignees`; the argument that replaces a
+  whole list is `labels`.
+- **Field values are one map by field name.** A board's fields (`fields`) and
+  an organization's issue fields (`issue_fields`) take `{name: value}`, names
+  and options matched without regard to case; clearing takes a list of names
+  (`clear_fields`, `clear_issue_fields`). A field the owner adds or renames
+  stays reachable without a new argument. Every name, option and value is
+  checked against the field definitions before anything is written, and a
+  refusal names the choices there are.
+- **References.** An issue or pull request is `12`, `#12`, `owner/repo#12` or
+  its URL; a board is its number, `owner/number`, its URL or its title; a
+  workflow run is its id or its URL. A bare number means the working tree's
+  repository (its `origin` on GitHub); `repo` (`owner/name`) names another. A
+  call that needs a repository and finds neither fails, saying so.
+- **A board not named is looked up, never guessed.** By title (the `project`
+  argument when it is no reference, default `Roadmap`), in order: the owner
+  given, else the boards linked to the repository, the organization that owns
+  it, and the viewer. Several candidates on one route stop the call with the
+  candidates listed, and a repository that cannot be read fails instead of
+  falling through to another route.
+- **A write that acts on a commit takes `head_sha`.** Opening, reviewing and
+  merging a pull request check, when it is given, that the branch on GitHub is
+  still at that commit, and stop with `stale` before writing otherwise. The
+  caller pushed or read that commit; anything newer arrived unseen. Publishing
+  a release checks that the commit its tag would name is the one given, stops
+  with `stale` otherwise, and pins a new tag to the commit it checked.
+  Starting a workflow checks the commit its ref names; GitHub starts a
+  workflow by ref, not by commit, so the run's own commit is read afterwards
+  and a difference is reported rather than prevented.
+- **A read that waits is bounded.** A read that waits for GitHub (checks to
+  settle, a workflow run to finish) waits at most `wait` seconds, 45 by
+  default, then returns what it has and says to call again. Hosts stop a tool
+  call after about a minute, so a longer wait would end in a failed call
+  instead of an answer.
+- **A bare number in the tools' own install directory fails.** That directory
+  is a checkout of this package, whose `origin` is not the caller's project, so
+  the call fails, saying so, instead of reading this package's issues; `repo`
+  or a qualified reference still works.
+
+### Results
+
+- **The steps after a create.** Once a tool has created something, a later step of the same call that fails (a milestone, a
+  relation, a board item) does not throw; it is listed under `errors` as the
+  rule above says. When the create itself reports a failure, the tool looks
+  for what it may have made (a `gh` command can make an object, then fail on a
+  second request) and returns it under `errors.create` rather than failing.
+- **What a GitHub does not have reads as `null`.** An older GitHub (an
+  Enterprise Server) rejects a whole query that names a field it lacks, such
+  as issue fields. The read then runs again without it and reports `null`
+  there, never `{}` or `[]`, which would say there is none.
+- **A write to a repository the viewer does not own succeeds** and says
+  `foreign: true`, so the caller notices it is in someone else's tracker.
+- **Text read from GitHub** (bodies, comments, titles and logs) is what GitHub
+  holds, which is what a tool returns.
+
+### Errors
+
+- **The caller of the table is the viewer**, the account `gh` is logged in as:
+  `not_found` is also what an object reads as when the viewer cannot see it,
+  `forbidden` when the viewer lacks the permission.
+- **`unauthenticated`, `gh_missing` and `gh_too_old` come from `gh`**, and
+  `rate_limited` is GitHub's own refusal. The `gh` runner tells them apart (see
+  "The `gh` runner").
+
+### Write classes of GitHub operations
+
+- **`openWorldHint` is `true` for every tool**, since each one reaches GitHub.
+- **The classes, by example:**
+
+  | Class             | Examples                                                   |
+  | ----------------- | ---------------------------------------------------------- |
+  | read              | view, list, resolve                                        |
+  | add               | create, comment, add an item                               |
+  | idempotent change | ensure, relate, adding a label                             |
+  | overwrite         | editing a body or title, close, reopen                     |
+  | administrative    | merge, visibility, delete, publishing, every Actions write |
+
+- **Every Actions write is administrative**: starting, re-running or
+  cancelling a run. A workflow can deploy, publish or spend whatever its name
+  says, and stopping one halfway can leave a deploy half done.
+
+### Targets
+
+- **A target is a repository or a board.** The resolvers are made by
+  `githubTargets`, from a map of argument names to the kind of target each
+  holds: `repo`, an issue or pull request reference (`issue`, `pull`) or a list
+  of issues (`issues`), a workflow run (`run`), a board (`board`), a board that
+  is written to only when it is given (`optional_board`), a board item (`item`)
+  and the owner a board is created for (`owner`). Every argument of the map
+  must be an argument of the tool. A bare number means the call's own
+  repository, and a repository is named in lowercase.
+- **A board is named `owner/projects/N`.** A board belongs to a user or an
+  organization, not to a repository, so its writes name the board rather than
+  the working tree's repository. A board the call does not name is found with
+  the same lookup the tool uses, which reads but never writes. Putting an
+  issue or pull request on a board names the board only, since the issue does
+  not change; a call that also writes to a repository (linking one, turning a
+  draft into an issue) names both. Creating a board names `owner/projects/new`,
+  so an "always" answer lets new boards be made for that owner and no
+  existing board be written to.
+
+### Approval prompts of the GitHub tools
 
 The rules above are the starter's; this section is what this package adds
 to them. Every write tool, whatever its class, follows it.
@@ -455,101 +613,42 @@ jobs only`, `One job` or `All jobs`), `Job` and `Debug logging`
     commit and attempt it repeats and a workflow start by the full commit of
     its ref, since the prompt shows none of them in full.
 
-## Toolsets and settings
+### Toolsets of the GitHub tools
 
-Every entry point takes the same settings:
-
-- **Toolsets**: one per domain. `issues`, `pull_requests` and `projects` are on
-  by default; `repos`, `releases` and `actions` are opt-in. A small default
-  keeps the model's choice sharp, but some plugins pass no settings at all, and
-  they ship every skill: a skill whose tools are off by default would describe
-  tools the agent does not have.
-- **`read_only`** registers no write tool, and wins over every other setting.
-- **`tools` / `exclude_tools`** add or remove single tools; an exclusion wins
-  over an inclusion.
-- **`confirm`** is `harness` (the default) or `elicitation`; it says who asks
-  before an administrative tool acts (see "Write classes"). The default leaves
-  the question to the harness, whose approval every user already knows.
-- **`language`** is the language of a native plugin's approval prompt (see
-  "Write classes"); unset, the prompt follows the harness's display language
-  or stays in English.
-
-## Skills
-
-- **A skill names the toolset it documents**, under `metadata` in its
-  frontmatter:
-
-  ```yaml
-  metadata:
-    toolset: issues
-  ```
-
-  The Agent Skills format allows no other top-level key, and its validators
-  refuse one. The value is a plain or quoted one-line scalar; any other form
-  reads as no link. A folder's name never links a skill, so every entry point
-  reads the link the same way without knowing the package's toolsets.
-
-- **A native plugin registers a linked skill only when its toolset is on**:
-  when the settings register at least one tool of that toolset, from the same
-  selection the tools come from. A skill that describes tools the model does
-  not have invites calls that fail. So `read_only`, `tools` and
-  `exclude_tools` count too: a toolset whose every tool is left out takes its
-  skill with it. A skill with no link is always registered.
-- **Plugins that install the skill folder whole cannot follow the settings**:
-  Claude Code, Codex, Grok Build and Antigravity load every skill, since the
-  settings reach only the MCP server.
-- **Every linked skill names one of the package's toolsets**; a test checks
-  it, since a misspelt link would hide the skill wherever it is filtered.
+- **Six toolsets**, listed in `src/project.ts`: `issues`, `pull_requests`,
+  `projects`, `repos`, `releases` and `actions`. The first three are on by
+  default; `repos`, `releases` and `actions` are opt-in. Some plugins pass no
+  settings at all, and they ship every skill: a skill whose tools are off by
+  default would describe tools the agent does not have.
 - **A skill that works across toolsets names the one it cannot work without.**
   The link holds one toolset, and a skill linked to none would be listed with
   every tool it describes turned off. Its body says which steps to skip when
   another toolset's tools are missing, and it leans only on toolsets that are
   on by default, since the plugins that install the skill folder whole list it
-  whatever the settings select.
+  whatever the settings select. `github-planning` is linked to `issues` this
+  way.
 
-## The core contract
+### The `gh` runner
 
-- A tool spec declares its ID, description, argument schema, output schema,
-  toolset and write class; every entry point derives the same metadata from
-  it. A write tool also declares `targets(args, context)`, which names what
-  the call writes to.
-- `execute(args, context)` gets the working directory, an abort signal, an
-  optional `ownDir` (the directory the tools are installed in, never the
-  working tree) and an optional `confirm(request) => Promise<boolean>` hook.
-  Nothing in it names a harness. An entry point supplies `confirm` when the
-  `elicitation` setting is on; without it the harness's approval stands, and a
-  tool that needs a confirmation treats a missing hook as the harness having
-  approved the call.
-- `src/core/` uses only the `node:*` modules and plain dependencies, never a
-  runtime's own globals (`Bun.spawn`, `Bun.file`, …), so the same code runs on
-  Node and on Bun.
-
-## The `gh` runner
-
-- **Every call goes through one runner**, with an explicit environment:
-  `GH_PROMPT_DISABLED=1`, `GH_NO_UPDATE_NOTIFIER=1`, `NO_COLOR=1`, and `gh`'s
-  own authentication passed through. Nothing waits on a prompt, and output
-  parses the same everywhere.
-- **Every variable the tools read besides the settings is named in
-  `TOOL_VARIABLES` in `src/entry/settings.ts`**, whether a tool reads it itself
-  or passes it through to a program. Codex gives a plugin's server only a few
-  basic variables (`PATH`, `HOME` and the like) and those its manifest names,
-  and `pnpm run manifests` writes that list from the settings and
-  `TOOL_VARIABLES`: a variable left out is set everywhere but in Codex.
-- **Every call has a time limit** (120 s by default), and a call that is
-  stopped, by that limit or by cancellation, has its child process killed:
-  `SIGTERM`, then `SIGKILL` after two seconds. A hung `gh` neither holds a
-  harness forever nor outlives its call.
+- **Every call to GitHub goes through one runner** (`src/core/gh.ts`), on the
+  starter's rules for a program a tool runs, with an explicit environment:
+  `GH_PROMPT_DISABLED=1`, `GH_NO_UPDATE_NOTIFIER=1`, `NO_COLOR=1` and the
+  other settings that keep `gh` from prompting, paging or coloring, and `gh`'s
+  own authentication, network and search-path variables passed through.
+- **`toolVariables` in `src/project.ts` is empty.** The variables the runner
+  passes through to `gh` are the list in `src/core/gh.ts`, and none of them is
+  named for a harness that forwards only named variables.
+- **The time limit is 120 s by default** for a `gh` call, and a version check
+  has its own, shorter one.
 - **It checks the `gh` version once per process** against the minimum the
-  tools need, and maps `gh`'s failures to the error codes above. A feature that
-  needs a newer `gh` (attachments) checks for it only in the calls that use
-  it, so every other call keeps the lower minimum.
+  tools need (`gh_too_old` otherwise, `gh_missing` when there is no `gh`). A
+  feature that needs a newer `gh` (attachments) checks for it only in the calls
+  that use it, so every other call keeps the lower minimum.
 - **A failure keeps GitHub's reason.** `gh api` prints a failed reply's body on
   stdout and only its status on stderr; the reply's `errors` join the message.
 
-## Tests
+### Tests of the GitHub tools
 
-- **One fake `gh` on `PATH`**, matching CLI arguments and GraphQL queries to
-  canned replies, shared by every domain. No test reaches GitHub.
-- Tests run on `bun test`; CI also starts the built MCP server under Node and
-  lists its tools, so a runtime-only API cannot slip in unnoticed.
+- **One fake `gh` on `PATH`** (`src/testing/fake-gh.ts`), matching CLI
+  arguments and GraphQL queries to canned replies, shared by every domain,
+  with the fixtures beside it in `src/testing/`. No test reaches GitHub.

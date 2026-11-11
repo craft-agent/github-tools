@@ -33,7 +33,7 @@ function v2Tool(ctx: V2Context, spec: ToolSpec, ownDir: string | undefined, t: T
       if (needsPermission(spec)) {
         if (directory === undefined) {
           throw new Error(
-            `invalid_argument: The session's directory could not be read, so ${spec.id} cannot tell which repository it changes; pass \`repo\` as owner/name or retry.`,
+            `invalid_argument: The session's directory could not be read, so ${spec.id} cannot tell what it changes; retry.`,
           )
         }
         const toolContext = { cwd: directory, ownDir, signal }

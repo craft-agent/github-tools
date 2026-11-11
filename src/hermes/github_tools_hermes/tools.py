@@ -12,7 +12,7 @@ from .listing import ToolInfo
 from . import project
 from .runtime import CliError, Runtime, agent_cwd
 
-#: How long one call may take, in seconds: above the 120 s the core gives each ``gh`` call.
+#: How long one call may take, in seconds: a ceiling above what a tool call is expected to take.
 RUN_TIMEOUT_SECONDS = 150
 
 #: The toolset name of a tool in ``hermes tools``: the package's toolset after this prefix.
