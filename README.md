@@ -375,6 +375,7 @@ variable, and an option or setting wins over the variable too.
 | `exclude_tools` | `--exclude-tools` | `GITHUB_TOOLS_EXCLUDE_TOOLS` | single tools to remove by ID; wins over `tools` and `toolsets`                                                                   |
 | `confirm`       | `--confirm`       | `GITHUB_TOOLS_CONFIRM`       | MCP server only: `harness` (default) or `elicitation`, as the conventions say                                                    |
 | `language`      | `--language`      | `GITHUB_TOOLS_LANGUAGE`      | native plugins only: the approval prompt's language, such as `ja`                                                                |
+| `emoji`         | —                 | —                            | Hermes only: the emoji shown beside each toolset, by toolset name (`""` for none)                                                |
 
 Lists are comma-separated in a flag or a variable. GitHub Actions does not let a
 secret or configuration variable be named `GITHUB_*`, so in a workflow pass a
