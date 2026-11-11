@@ -153,8 +153,20 @@ async function cli(argv: string[], stdin = "", overrides: Partial<CliIo> = {}): 
 const json = (run: Run): any => JSON.parse(run.stdout)
 
 /** The plugin's own words in English, as `target` answers without a language. */
-const ENGLISH_WORDS = { details: "Details", target: "Target", more: "(+{count} more)" }
-const JAPANESE_WORDS = { details: "詳細", target: "対象", more: "（ほか {count} 件）" }
+const ENGLISH_WORDS = {
+  details: "Details",
+  target: "Target",
+  more: "(+{count} more)",
+  more_character: "(+{count} more character)",
+  more_characters: "(+{count} more characters)",
+}
+const JAPANESE_WORDS = {
+  details: "詳細",
+  target: "対象",
+  more: "（ほか {count} 件）",
+  more_character: "（ほか {count} 文字）",
+  more_characters: "（ほか {count} 文字）",
+}
 
 /** Japanese words for the described fixture's title, headline, fact label and text label. */
 const TRANSLATIONS: Translations = {
