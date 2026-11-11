@@ -334,6 +334,12 @@ Every entry point takes the same settings:
   settings reach only the MCP server.
 - **Every linked skill names one of the package's toolsets**; a test checks
   it, since a misspelt link would hide the skill wherever it is filtered.
+- **A skill that works across toolsets names the one it cannot work without.**
+  The link holds one toolset, and a skill linked to none would be registered
+  with every tool it describes turned off. Its body says which steps to skip
+  when another toolset's tools are missing, and it leans only on toolsets that
+  are on by default, since the plugins that install the skill folder whole
+  list it whatever the settings select.
 
 ## The core contract
 
@@ -620,13 +626,9 @@ jobs only`, `One job` or `All jobs`), `Job` and `Debug logging`
   default; `repos`, `releases` and `actions` are opt-in. Some plugins pass no
   settings at all, and they ship every skill: a skill whose tools are off by
   default would describe tools the agent does not have.
-- **A skill that works across toolsets names the one it cannot work without.**
-  The link holds one toolset, and a skill linked to none would be listed with
-  every tool it describes turned off. Its body says which steps to skip when
-  another toolset's tools are missing, and it leans only on toolsets that are
-  on by default, since the plugins that install the skill folder whole list it
-  whatever the settings select. `github-planning` is linked to `issues` this
-  way.
+- **`github-planning` is linked to `issues`**, the toolset it cannot work
+  without (see "Skills"). It also uses the board tools, from `projects`, which
+  is on by default too, and its body says what to skip when they are missing.
 
 ### The `gh` runner
 
