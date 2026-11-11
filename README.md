@@ -1,8 +1,10 @@
 # github-tools
 
-GitHub tools for coding agents: issues, project boards, pull requests,
-repositories, releases and Actions. One implementation, delivered to each
-agent harness in the form that suits it best.
+GitHub tools for coding agents: issues, boards, pull requests, repositories, releases and Actions.
+
+The tools cover issues, project boards, pull requests and native stacks,
+repositories, releases and Actions, through the GitHub CLI. One implementation,
+delivered to each agent harness in the form that suits it best.
 
 | Harness        | Delivery                                       | Pinned by                      |
 | -------------- | ---------------------------------------------- | ------------------------------ |
@@ -308,19 +310,40 @@ Code and `github-tools:planning` in Hermes. It is linked to the `issues`
 toolset, which it cannot work without, and says what to skip when the board
 tools are off.
 
+## Adding a tool
+
+1. Write the spec in `src/core/<domain>/<verb>.ts` with `defineTool`: an ID
+   `<prefix>_<domain>_<verb>`, a title and description, the Zod argument and
+   output schemas, its toolset and write class, and `execute(args, context)`.
+   A write tool also gives `targets(args, context)`: what the call writes to,
+   as a permission rule should name it.
+2. Test it beside the spec (`<verb>.test.ts`), calling it through `invoke` as
+   the entry points do. A tool that runs a program is tested against a fake of
+   that program on `PATH`; no test reaches a real service.
+3. List it in `src/tools.ts`. A new toolset goes into `toolsets` in
+   `src/project.ts` (and `defaultToolsets` when it is on by default), and a
+   variable the tool reads besides the settings into `toolVariables`.
+4. Add or update the toolset's skill, `skills/<prefix>-<toolset>/SKILL.md`,
+   whose frontmatter names the toolset under `metadata`.
+5. Run `pnpm run build && pnpm run manifests` to list the tool in
+   `plugin.yaml` and its variables in Codex's manifest, then describe it under
+   "Tools and skills".
+
+[`docs/conventions.md`](docs/conventions.md) has the rules each step follows.
+
 ## Reads and writes
 
-Every read tool is named `github_<domain>_read`. Reads can run unasked; writes
-are confirmed by the harness.
+Every read tool is named `<prefix>_<domain>_read`. Reads can run unasked;
+writes are confirmed by the harness.
 
-| Harness     | Reads without asking                                                                                                                                    |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| OpenCode    | always; the plugin asks only before a write                                                                                                             |
-| Claude Code | the rule `mcp__plugin_github-tools_github-tools__*_read` in `permissions.allow` of `~/.claude/settings.json` or a project                               |
-| Codex       | always; Codex runs tools that declare `readOnlyHint` unasked, as the read tools do                                                                      |
-| Grok Build  | `grok --allow 'MCPTool(github-tools__*_read)' --allow 'MCPTool(github_*_read)'` (both rules; see below)                                                 |
-| Antigravity | the rule `mcp(github-tools_github-tools/github_issue_read)` in `permissions.allow` of `~/.gemini/antigravity-cli/settings.json`, one for each read tool |
-| Hermes      | always; the plugin asks only before a write                                                                                                             |
+| Harness     | Reads without asking                                                                                         |
+| ----------- | ------------------------------------------------------------------------------------------------------------ |
+| OpenCode    | always; the plugin asks only before a write                                                                  |
+| Claude Code | the rule `mcp__plugin_github-tools_github-tools__*_read` in `permissions.allow` of `~/.claude/settings.json` |
+| Codex       | always; Codex runs tools that declare `readOnlyHint` unasked, as the read tools do                           |
+| Grok Build  | `grok --allow 'MCPTool(github-tools__*_read)' --allow 'MCPTool(github_*_read)'` (both rules; see below)      |
+| Antigravity | the rule `mcp(github-tools_github-tools/<tool id>)` in `permissions.allow`, one for each read tool           |
+| Hermes      | always; the plugin asks only before a write                                                                  |
 
 Where a write is asked about, and where it is not:
 
@@ -329,15 +352,13 @@ Where a write is asked about, and where it is not:
 - **Codex** under `codex exec`, and **Grok Build** under `grok -p`, refuse a
   write they cannot ask about, unless it is allowed beforehand.
 - **Grok Build** calls the plugin's tools through its `use_tool` tool, and the
-  agent often names a tool without its server first (`github_project_read`).
-  Grok checks the rules against the name as given, so the server-qualified rule
-  alone does not match that first call, and `grok -p` refuses it and stops
-  instead of letting the agent retry with `github-tools__github_project_read`.
-  The second rule matches the short name; a write still matches neither.
+  agent often names a tool without its server first. Grok checks the rules
+  against the name as given, so the server-qualified rule alone does not match
+  that first call. The second rule matches the short name; a write still
+  matches neither.
 - **Antigravity** asks before any MCP tool no rule allows, reads included, and
-  names the plugin's server `github-tools_github-tools` (plugin, then server).
-  `agy -p` refuses a tool it cannot ask about; `--dangerously-skip-permissions`
-  runs every tool unasked.
+  names the plugin's server `github-tools_github-tools` (plugin,
+  then server). `agy -p` refuses a tool it cannot ask about.
 - **Hermes** `hermes chat -q` refuses a write it cannot ask about; `hermes -z`
   and `--yolo` skip approval, so writes then run unasked.
 
@@ -352,7 +373,7 @@ variable, and an option or setting wins over the variable too.
 | `read_only`     | `--read-only`     | `GITHUB_TOOLS_READ_ONLY`     | registers no tool that writes; wins over every other setting                                                                     |
 | `tools`         | `--tools`         | `GITHUB_TOOLS_TOOLS`         | single tools to add by ID, whatever their toolset                                                                                |
 | `exclude_tools` | `--exclude-tools` | `GITHUB_TOOLS_EXCLUDE_TOOLS` | single tools to remove by ID; wins over `tools` and `toolsets`                                                                   |
-| `confirm`       | `--confirm`       | `GITHUB_TOOLS_CONFIRM`       | MCP server only: `harness` (default) or `elicitation`, as `docs/conventions.md` describes                                        |
+| `confirm`       | `--confirm`       | `GITHUB_TOOLS_CONFIRM`       | MCP server only: `harness` (default) or `elicitation`, as the conventions say                                                    |
 | `language`      | `--language`      | `GITHUB_TOOLS_LANGUAGE`      | native plugins only: the approval prompt's language, such as `ja`                                                                |
 
 Lists are comma-separated in a flag or a variable. GitHub Actions does not let a
@@ -367,7 +388,8 @@ environment variable in `env:` is allowed). Where each harness reads them:
   variable set where `opencode run` starts has no effect until the service is
   restarted in that environment (`opencode service restart`). V1 runs plugins
   in its own process.
-- **Hermes** takes `plugins.entries.github-tools.settings` in `config.yaml`:
+- **Hermes** takes `plugins.entries.github-tools.settings` in
+  `config.yaml`:
 
   ```yaml
   plugins:
@@ -382,8 +404,8 @@ environment variable in `env:` is allowed). Where each harness reads them:
   Without a `language` setting, the approval card follows Hermes's own
   `display.language` (or `HERMES_LANGUAGE`), the language of its approval
   buttons, and else stays in English. The plugin passes its own environment
-  to the command line it runs, so the variables work too. A running gateway
-  keeps the environment it started with; restart it (`hermes gateway restart`) after changing one.
+  to the command line it runs, so the variables work too. A running gateway keeps the environment it started with;
+  restart it (`hermes gateway restart`) after changing one.
 
 - **Claude Code, Grok Build and Antigravity** start the plugin's server without
   flags and pass it the client's environment, so set the variables in the
@@ -391,8 +413,8 @@ environment variable in `env:` is allowed). Where each harness reads them:
 - **Codex** passes a plugin's MCP server only a few basic variables (such as
   `PATH` and `HOME`) and those the plugin's manifest names, which are the
   variables above: set them in the environment Codex runs in. A variable the
-  tools read besides the settings belongs in `TOOL_VARIABLES` in
-  `src/entry/settings.ts`; `pnpm run manifests` adds it to the manifest after the
+  tools read besides the settings belongs in `toolVariables` in
+  `src/project.ts`; `pnpm run manifests` adds it to the manifest after the
   settings' variables. To pass flags, or to give the server a variable the
   package does not name, add the server under `[mcp_servers]` in Codex's
   `config.toml` instead of using the plugin: flags go in `args`, `env_vars`
@@ -408,10 +430,15 @@ environment variable in `env:` is allowed). Where each harness reads them:
 
 ## Layout
 
-- `src/core/` — the tools, free of any harness.
+- `src/project.ts` — the package's name, tool ID prefix, setting prefix,
+  toolsets and the other variables its tools read.
+- `src/core/` — the tool contract and the tools, free of any harness and of
+  the project's names.
+- `src/tools.ts` — the list of every tool, which each entry point registers.
 - `src/words.ts` — the translations of the tools' words, per language, which
   the native plugins use in their approval prompts.
-- `src/mcp/` — the MCP server, built to `dist/mcp.js` and run by `github-tools`.
+- `src/mcp/` — the MCP server, built to `dist/mcp.js` and run by
+  `github-tools`.
 - `src/opencode/` — the OpenCode plugin, built to `dist/opencode.js`.
 - `src/cli/` — the command line the Hermes plugin calls, built to `dist/cli.js`
   and run by `github-tools-cli`.
