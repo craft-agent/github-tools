@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { targetKinds, type TargetKind } from "./core"
+import { selectTools } from "./core/tool"
+import { PROJECT_PROFILE } from "./entry/profile"
 import { PROJECT } from "./project"
 import { ALL_TOOLS } from "./tools"
 
@@ -100,6 +102,28 @@ const REPOSITORY_LIKE = /repo|issue|parent|blocked|blocking|duplicate/
 const writeTools = ALL_TOOLS.filter((spec) => spec.class !== "read")
 
 describe("the registry", () => {
+  test("defaults to issues, pull_requests and projects", () => {
+    const ids = [
+      "github_issue_read",
+      "github_issue_create",
+      "github_pr_read",
+      "github_pr_merge",
+      "github_project_read",
+      "github_project_item_add",
+      "github_release_create",
+    ]
+    const all = ids.map((id) => ALL_TOOLS.find((spec) => spec.id === id)!)
+    expect(PROJECT.defaultToolsets).toEqual(["issues", "pull_requests", "projects"])
+    expect(selectTools(all, {}, PROJECT_PROFILE.toolsets).map((spec) => spec.id)).toEqual([
+      "github_issue_read",
+      "github_issue_create",
+      "github_pr_read",
+      "github_pr_merge",
+      "github_project_read",
+      "github_project_item_add",
+    ])
+  })
+
   test("every tool id starts with the package's tool prefix", () => {
     const stray = ALL_TOOLS.filter((spec) => !spec.id.startsWith(`${PROJECT.toolPrefix}_`)).map((spec) => spec.id)
     expect(stray).toEqual([])

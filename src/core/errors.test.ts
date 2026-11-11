@@ -51,10 +51,10 @@ describe("ToolError", () => {
 
   test("cause still works as before", () => {
     const cause = new Error("inner failure")
-    const withCause = new ToolError("upstream_error", "Outer failure.", { cause })
+    const withCause = new ToolError("internal_error", "Outer failure.", { cause })
     expect(withCause.cause).toBe(cause)
 
-    const withoutCause = new ToolError("upstream_error", "Outer failure.")
+    const withoutCause = new ToolError("internal_error", "Outer failure.")
     expect(withoutCause.cause).toBeUndefined()
   })
 })

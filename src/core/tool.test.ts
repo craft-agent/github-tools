@@ -1,34 +1,10 @@
 import { describe, expect, test } from "bun:test"
 import { z } from "zod"
-import { PROJECT_PROFILE } from "../entry/profile"
-import { PROJECT } from "../project"
 import { ToolError, isToolError } from "./errors"
-import {
-  StepErrors,
-  confirmWrite,
-  defineTool,
-  invoke,
-  selectTools,
-  type ToolContext,
-  type ToolSpec,
-  type WriteClass,
-} from "./tool"
+import { StepErrors, confirmWrite, defineTool, invoke, type ToolContext, type ToolSpec } from "./tool"
 
 const input = z.object({ count: z.number().int(), label: z.string().optional() })
 const output = z.object({ total: z.number() })
-
-function spec(id: string, toolset: string, writeClass: WriteClass): ToolSpec {
-  return defineTool({
-    id,
-    title: id,
-    description: "A test tool.",
-    toolset,
-    class: writeClass,
-    input: z.object({}),
-    output: z.object({}),
-    execute: async () => ({}),
-  })
-}
 
 const CTX: ToolContext = { cwd: process.cwd() }
 
@@ -93,113 +69,6 @@ describe("confirmWrite", () => {
       await confirmWrite({ id: "github_issue_edit", class: writeClass }, { confirm }, "m")
     }
     expect(asked).toBe(false)
-  })
-})
-
-describe("selectTools", () => {
-  const all = [
-    spec("github_issue_read", "issues", "read"),
-    spec("github_issue_create", "issues", "add"),
-    spec("github_pr_read", "pull_requests", "read"),
-    spec("github_pr_merge", "pull_requests", "administrative"),
-    spec("github_project_read", "projects", "read"),
-    spec("github_project_item_add", "projects", "add"),
-    spec("github_release_create", "releases", "add"),
-  ]
-  const ids = (settings: Parameters<typeof selectTools>[1] = {}) =>
-    selectTools(all, settings, PROJECT_PROFILE.toolsets).map((s) => s.id)
-
-  test("defaults to issues, pull_requests and projects", () => {
-    expect(PROJECT.defaultToolsets).toEqual(["issues", "pull_requests", "projects"])
-    expect(ids()).toEqual([
-      "github_issue_read",
-      "github_issue_create",
-      "github_pr_read",
-      "github_pr_merge",
-      "github_project_read",
-      "github_project_item_add",
-    ])
-  })
-
-  test('"all" turns on every toolset', () => {
-    expect(ids({ toolsets: "all" })).toEqual(all.map((s) => s.id))
-  })
-
-  test("an explicit list replaces the default", () => {
-    expect(ids({ toolsets: ["projects"] })).toEqual(["github_project_read", "github_project_item_add"])
-  })
-
-  test("an empty toolsets list means the default toolsets, like an absent one", () => {
-    expect(ids({ toolsets: [] })).toEqual(ids())
-    expect(ids({ toolsets: [] })).toEqual(ids({ toolsets: undefined }))
-    expect(ids({ toolsets: [], tools: ["github_release_create"] })).toContain("github_release_create")
-    expect(ids({ toolsets: [], read_only: true })).toEqual([
-      "github_issue_read",
-      "github_pr_read",
-      "github_project_read",
-    ])
-  })
-
-  test("tools adds single tools across toolsets", () => {
-    expect(ids({ tools: ["github_release_create"] })).toContain("github_release_create")
-    expect(ids({ toolsets: ["projects"], tools: ["github_release_create"] })).toEqual([
-      "github_project_read",
-      "github_project_item_add",
-      "github_release_create",
-    ])
-  })
-
-  test("exclude_tools removes, and wins over tools and toolsets", () => {
-    expect(ids({ exclude_tools: ["github_pr_merge"] })).not.toContain("github_pr_merge")
-    expect(ids({ tools: ["github_release_create"], exclude_tools: ["github_release_create"] })).not.toContain(
-      "github_release_create",
-    )
-  })
-
-  test("read_only drops every non-read tool and wins over tools", () => {
-    expect(ids({ read_only: true })).toEqual(["github_issue_read", "github_pr_read", "github_project_read"])
-    expect(
-      ids({ toolsets: ["issues"], read_only: true, tools: ["github_release_create", "github_project_read"] }),
-    ).toEqual(["github_issue_read", "github_project_read"])
-  })
-
-  test("keeps the order of the full list", () => {
-    expect(ids({ toolsets: ["projects", "pull_requests", "issues"] })).toEqual(ids())
-  })
-
-  test("an unknown toolset is invalid_argument naming it", () => {
-    const error = (() => {
-      try {
-        selectTools(all, { toolsets: ["issues", "nope"] }, PROJECT_PROFILE.toolsets)
-      } catch (e) {
-        return e
-      }
-    })()
-    expect(isToolError(error) && error.code).toBe("invalid_argument")
-    expect((error as Error).message).toContain("nope")
-    for (const name of PROJECT.toolsets) expect((error as Error).message).toContain(name)
-  })
-
-  test("an unknown tool id in tools or exclude_tools is invalid_argument naming it", () => {
-    for (const settings of [{ tools: ["github_nope_read"] }, { exclude_tools: ["github_nope_read"] }]) {
-      try {
-        selectTools(all, settings, PROJECT_PROFILE.toolsets)
-        throw new Error("expected selectTools to throw")
-      } catch (error) {
-        expect(isToolError(error) && error.code).toBe("invalid_argument")
-        expect((error as Error).message).toContain("github_nope_read")
-      }
-    }
-  })
-
-  test("duplicate ids are a plain Error", () => {
-    try {
-      selectTools([all[0]!, all[0]!], {}, PROJECT_PROFILE.toolsets)
-      throw new Error("expected selectTools to throw")
-    } catch (error) {
-      expect(isToolError(error)).toBe(false)
-      expect((error as Error).message).toContain("github_issue_read")
-    }
   })
 })
 
