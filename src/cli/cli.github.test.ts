@@ -33,6 +33,17 @@ async function target(cwd: string, args = {}, ownDir?: string) {
 }
 
 describe("GitHub targets", () => {
+  test("list reads GITHUB_TOOLS_TOOLSETS and ignores GITHUB_TOOLS_CONFIRM", async () => {
+    const release = defineTool({ ...spec, id: "github_release_publish", toolset: "releases" })
+    const run = await cli(["list"], "", {
+      specs: [spec, release],
+      profile: undefined,
+      env: { GITHUB_TOOLS_TOOLSETS: "releases", GITHUB_TOOLS_CONFIRM: "ask" },
+    })
+    expect(run.code).toBe(EXIT_OK)
+    expect(json(run).map((entry: { id: string }) => entry.id)).toEqual([release.id])
+  })
+
   test("reads GITHUB_TOOLS_LANGUAGE with the package profile", async () => {
     const run = await cli(["target", spec.id, "--cwd", "/x"], '{"repo":"Octo/Hello"}', {
       specs: [spec],

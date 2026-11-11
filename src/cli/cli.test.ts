@@ -1,124 +1,22 @@
 import { describe, expect, test } from "bun:test"
-import { z } from "zod"
-import { ToolError, abortError, annotations, defineTool, githubTargets, selectTools, type ToolSpec } from "../core"
-import { PROJECT_PROFILE } from "../entry/profile"
+import { annotations, selectTools } from "../core"
 import { PROJECT } from "../project"
-import { EXIT_FAILED, EXIT_OK, EXIT_USAGE, runCli, type CliIo } from "./cli"
-
-const input = z.object({
-  repo: z.string().describe("The repository, as owner/name.").optional(),
-  count: z.number().int().optional(),
-})
-const output = z.object({
-  tool: z.string(),
-  cwd: z.string(),
-  count: z.number().optional(),
-  own_dir: z.string().optional(),
-})
-const writeInput = input.extend({ issue: z.string().optional(), parent: z.string().optional() })
-
-const READ_ID = "github_issue_read"
-const ADD_ID = "github_issue_comment"
-const ADMIN_ID = "github_release_publish"
-const MISSING_ID = "github_issue_close"
-const BROKEN_ID = "github_issue_reopen"
-const SLOW_ID = "github_issue_lock"
-const DETAILED_ID = "github_issue_validate"
-const DESCRIBED_ID = "github_issue_label"
-const HANGING_DESCRIBE_ID = "github_issue_pin"
-
-function fixture(id: string, toolset: ToolSpec["toolset"], writeClass: ToolSpec["class"]): ToolSpec {
-  return defineTool({
-    id,
-    title: `Title of ${id}`,
-    description: `Description of ${id}`,
-    toolset,
-    class: writeClass,
-    ...(id === ADD_ID && { targets: githubTargets({ issue: "issue", repo: "repo", parent: "issue" }) }),
-    input: id === ADD_ID ? writeInput : input,
-    output,
-    async execute(args, ctx) {
-      return { tool: id, cwd: ctx.cwd, count: args.count, own_dir: ctx.ownDir }
-    },
-  })
-}
-
-function failingWith(id: string, writeClass: ToolSpec["class"], fail: (signal?: AbortSignal) => Promise<never>) {
-  return defineTool({
-    id,
-    title: id,
-    description: id,
-    toolset: "issues",
-    class: writeClass,
-    input,
-    output,
-    execute: (_args, ctx) => fail(ctx.signal),
-  })
-}
-
-function describing(id: string, describe: ToolSpec["describe"]): ToolSpec {
-  return defineTool({
-    id,
-    title: id,
-    description: id,
-    toolset: "issues",
-    class: "add",
-    targets: githubTargets({ repo: "repo" }),
-    input,
-    output,
-    describe,
-    async execute(args, ctx) {
-      return { tool: id, cwd: ctx.cwd, count: args.count, own_dir: ctx.ownDir }
-    },
-  })
-}
-
-const specs: ToolSpec[] = [
-  fixture(READ_ID, "issues", "read"),
-  fixture(ADD_ID, "issues", "add"),
-  fixture(ADMIN_ID, "releases", "administrative"),
-  failingWith(MISSING_ID, "overwrite", async () => {
-    throw new ToolError("not_found", "No such issue.")
-  }),
-  failingWith(BROKEN_ID, "overwrite", async () => {
-    throw new TypeError("boom")
-  }),
-  failingWith(SLOW_ID, "idempotent", (signal) => {
-    return new Promise((_resolve, reject) => {
-      if (signal?.aborted) reject(abortError(signal))
-      signal?.addEventListener("abort", () => reject(abortError(signal)))
-    })
-  }),
-  failingWith(DETAILED_ID, "overwrite", async () => {
-    throw new ToolError("invalid_argument", "The thing has problems.", {
-      details: { problems: [{ field: "name", reason: "empty" }] },
-    })
-  }),
-  describing(DESCRIBED_ID, (args) => ({
-    headline: { text: "Label the repository {repo}", values: { repo: String(args.repo ?? "here") } },
-    facts: [{ label: "Repository", value: String(args.repo ?? "here") }],
-    text: { label: "Body", body: "Body\u202E line\r\nnext" },
-  })),
-  describing(HANGING_DESCRIBE_ID, () => new Promise(() => {})),
-]
-
-type Run = { code: number; stdout: string; stderr: string }
-
-async function cli(argv: string[], stdin = "", overrides: Partial<CliIo> = {}): Promise<Run> {
-  let stdout = ""
-  let stderr = ""
-  const code = await runCli(argv, {
-    specs,
-    env: {},
-    readStdin: async () => stdin,
-    stdout: (text) => (stdout += text),
-    stderr: (text) => (stderr += text),
-    ...overrides,
-  })
-  return { code, stdout, stderr }
-}
-
-const json = (run: Run): any => JSON.parse(run.stdout)
+import { EXIT_FAILED, EXIT_OK, EXIT_USAGE, type CliIo } from "./cli"
+import {
+  ADD_ID,
+  ADMIN_ID,
+  BROKEN_ID,
+  DESCRIBED_ID,
+  DETAILED_ID,
+  HANGING_DESCRIBE_ID,
+  MISSING_ID,
+  PROFILE,
+  READ_ID,
+  SLOW_ID,
+  cli,
+  json,
+  specs,
+} from "./testing"
 
 describe("list", () => {
   test("describes the tools the settings select, in order", async () => {
@@ -127,19 +25,19 @@ describe("list", () => {
     expect(run.stderr).toBe("")
     const listed = json(run)
     expect(listed.map((entry: { id: string }) => entry.id)).toEqual(
-      selectTools(specs, {}, PROJECT_PROFILE.toolsets).map((spec) => spec.id),
+      selectTools(specs, {}, PROFILE.toolsets).map((spec) => spec.id),
     )
     expect(listed[0]).toEqual({
       id: READ_ID,
       title: `Title of ${READ_ID}`,
       description: `Description of ${READ_ID}`,
-      toolset: "issues",
+      toolset: "alpha",
       class: "read",
       annotations: annotations(specs[0]!),
       input_schema: expect.objectContaining({
         type: "object",
         additionalProperties: false,
-        properties: expect.objectContaining({ repo: expect.objectContaining({ description: expect.any(String) }) }),
+        properties: expect.objectContaining({ area: expect.objectContaining({ description: expect.any(String) }) }),
       }),
       output_schema: expect.objectContaining({ type: "object" }),
     })
@@ -149,7 +47,7 @@ describe("list", () => {
     const ids = async (...flags: string[]) =>
       json(await cli(["list", ...flags])).map((entry: { id: string }) => entry.id)
     expect(await ids("--toolsets", "all")).toContain(ADMIN_ID)
-    expect(await ids("--toolsets=releases")).toEqual([ADMIN_ID])
+    expect(await ids("--toolsets=beta")).toEqual([ADMIN_ID])
     expect(await ids("--toolsets", "all", "--read-only")).toEqual([READ_ID])
     expect(await ids("--tools", ADMIN_ID, "--exclude-tools", READ_ID)).toEqual([
       ADD_ID,
@@ -172,12 +70,23 @@ describe("list", () => {
   })
 
   test("reads the environment behind the flags", async () => {
-    const run = await cli(["list"], "", { env: { GITHUB_TOOLS_TOOLSETS: "releases" } })
+    const run = await cli(["list"], "", { env: { DEMO_TOOLSETS: "beta" } })
     expect(json(run).map((entry: { id: string }) => entry.id)).toEqual([ADMIN_ID])
   })
 
   test("lists nothing as an empty array", async () => {
-    expect(json(await cli(["list", "--toolsets", "projects"]))).toEqual([])
+    expect(json(await cli(["list", "--toolsets", "beta", "--exclude-tools", ADMIN_ID]))).toEqual([])
+    expect(json(await cli(["list"], "", { specs: [] }))).toEqual([])
+  })
+
+  test("knows the package's own toolsets and variables unless given a profile", async () => {
+    const own: Partial<CliIo> = { profile: undefined, specs: [] }
+    expect(json(await cli(["list", "--toolsets", "all"], "", own))).toEqual([])
+    const variable = `${PROJECT.envPrefix}_READ_ONLY`
+    const badVariable = await cli(["list"], "", { ...own, env: { [variable]: "yes" } })
+    expect(badVariable.code).toBe(EXIT_USAGE)
+    expect(badVariable.stderr).toContain(variable)
+    expect((await cli(["list", "--toolsets", "unknown-toolset"], "", own)).code).toBe(EXIT_USAGE)
   })
 })
 
@@ -192,8 +101,8 @@ describe("run", () => {
   })
 
   test("hands the install directory to the tool", async () => {
-    const run = await cli(["run", ADD_ID, "--cwd", "/work/tree"], "", { ownDir: "/opt/github-tools" })
-    expect(json(run).result).toEqual({ tool: ADD_ID, cwd: "/work/tree", own_dir: "/opt/github-tools" })
+    const run = await cli(["run", ADD_ID, "--cwd", "/work/tree"], "", { ownDir: "/opt/install" })
+    expect(json(run).result).toEqual({ tool: ADD_ID, cwd: "/work/tree", own_dir: "/opt/install" })
   })
 
   test("takes --cwd after the settings flags and in its --cwd=dir form", async () => {
@@ -208,7 +117,7 @@ describe("run", () => {
   test("maps a tool failure to its code and message", async () => {
     const run = await cli(["run", MISSING_ID, "--cwd", "/x"])
     expect(run.code).toBe(EXIT_FAILED)
-    expect(json(run)).toEqual({ error: { code: "not_found", message: "No such issue." } })
+    expect(json(run)).toEqual({ error: { code: "not_found", message: "No such thing." } })
   })
 
   test("maps a tool failure with details to code, message and details", async () => {
@@ -238,7 +147,7 @@ describe("run", () => {
 
   test("an unknown tool, and one the settings leave out, are invalid_argument", async () => {
     for (const argv of [
-      ["run", "github_nonexistent_read", "--cwd", "/x"],
+      ["run", "demo_nonexistent_read", "--cwd", "/x"],
       ["run", ADMIN_ID, "--cwd", "/x"],
       ["run", ADD_ID, "--cwd", "/x", "--read-only"],
     ]) {
@@ -255,6 +164,7 @@ describe("run", () => {
     expect(json(run).error.code).toBe("internal_error")
     expect(json(run).error.message).not.toContain("boom")
     expect(run.stderr).toContain("boom")
+    expect(run.stderr).toStartWith(`${PROJECT.cli}: `)
   })
 
   test("stops a running tool when the signal aborts", async () => {
@@ -276,7 +186,7 @@ describe("usage", () => {
     [["list", "--confirm=elicitation"], "--confirm"],
     [["list", "--nope"], "--nope"],
     [["list", "--toolsets", "bogus"], "bogus"],
-    [["list", "--tools", "github_nonexistent_read"], "github_nonexistent_read"],
+    [["list", "--tools", "demo_nonexistent_read"], "demo_nonexistent_read"],
     [["list", ADD_ID], ADD_ID],
     [["run"], "needs a tool id"],
     [["run", "--cwd", "/x"], "needs a tool id"],
@@ -293,9 +203,10 @@ describe("usage", () => {
     expect(run.stdout).toBe("")
     expect(run.stderr.trimEnd().split("\n")).toHaveLength(1)
     expect(run.stderr).toContain(message)
+    expect(run.stderr).toStartWith(`${PROJECT.cli}: `)
   })
 
-  test("ignores GITHUB_TOOLS_CONFIRM", async () => {
-    expect((await cli(["list"], "", { env: { GITHUB_TOOLS_CONFIRM: "ask" } })).code).toBe(EXIT_OK)
+  test("ignores DEMO_CONFIRM", async () => {
+    expect((await cli(["list"], "", { env: { DEMO_CONFIRM: "ask" } })).code).toBe(EXIT_OK)
   })
 })
