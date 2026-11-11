@@ -30,7 +30,7 @@ export {
   type RefContext,
   type RepoName,
 } from "./refs"
-export { ANY_TARGET, writeTargets } from "./targets"
+export { ANY_TARGET, writeTargets, type TargetKind } from "./github/targets"
 export {
   REQUIRES_USER_INTERACTION,
   StepErrors,
@@ -48,7 +48,6 @@ export {
   type CallText,
   type CallValue,
   type ConfirmRequest,
-  type TargetKind,
   type ToolAnnotations,
   type ToolContext,
   type ToolSettings,

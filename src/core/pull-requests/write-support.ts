@@ -12,7 +12,8 @@ import {
 import { given, lastUrl } from "../write-support"
 import { pause } from "../poll"
 import { parseNumberRef, type RepoName } from "../refs"
-import type { CallFact, StepErrors, TargetKind, ToolContext } from "../tool"
+import type { TargetKind } from "../github/targets"
+import type { CallFact, StepErrors, ToolContext } from "../tool"
 import { issueKey } from "./closes"
 
 /** What the pull request write tools share: their reference argument, `gh pr edit` and the notes about closing issues. */

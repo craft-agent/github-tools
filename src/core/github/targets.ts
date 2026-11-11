@@ -1,4 +1,14 @@
-import { isAbortError } from "./errors"
+import { isAbortError } from "../errors"
+import {
+  isBareNumber,
+  parseNumberRef,
+  parseRepo,
+  resolveRepo,
+  type RefAccept,
+  type RefContext,
+  type RepoName,
+} from "../refs"
+import type { ToolSpec } from "../tool"
 import {
   CURRENT_USER,
   boardOwnerLogin,
@@ -11,18 +21,22 @@ import {
   resolveBoard,
   viewerLogin,
   type BoardSelector,
-} from "./github/projects"
-import { isBareRunId, parseRunUrl } from "./github/workflow-runs"
-import {
-  isBareNumber,
-  parseNumberRef,
-  parseRepo,
-  resolveRepo,
-  type RefAccept,
-  type RefContext,
-  type RepoName,
-} from "./refs"
-import type { TargetKind, ToolSpec } from "./tool"
+} from "./projects"
+import { isBareRunId, parseRunUrl } from "./workflow-runs"
+
+/**
+ * What an argument that names what a call writes to holds: `"repo"` an
+ * `owner/name`, `"issue"` one issue reference (`12`, `#12`, `owner/repo#12` or
+ * a URL), `"issues"` a list of them, `"board"` the board that `project` (a
+ * reference or a title), `owner` and `repo` choose together (declared on
+ * `project`), `"item"` a project item's node ID (`PVTI_…`), whose board is
+ * written to, `"owner"` a user or organization login (or `@me`) that a board is
+ * about to be created for, `"pull"` one pull request reference (`12`, `#12`,
+ * `owner/repo#12` or a pull URL), `"optional_board"` a board that `project`
+ * names, which the call writes to only when the argument is given, `"run"`
+ * a workflow run id or a run URL.
+ */
+export type TargetKind = "repo" | "issue" | "issues" | "pull" | "board" | "optional_board" | "item" | "owner" | "run"
 
 /** What stands for a repository or board that cannot be told. */
 export const ANY_TARGET = "*"

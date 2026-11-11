@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { ToolError, isAbortError, isToolError } from "./errors"
+import type { TargetKind } from "./github/targets"
 
 /** The toolsets of a package: every name, in the order `all` lists them, and the ones on when a setting names none. */
 export type Toolsets = { names: readonly string[]; defaults: readonly string[] }
@@ -8,20 +9,6 @@ export type Toolsets = { names: readonly string[]; defaults: readonly string[] }
 export type WriteClass = "read" | "add" | "idempotent" | "overwrite" | "administrative"
 
 export type ConfirmRequest = { tool: string; message: string }
-
-/**
- * What an argument that names what a call writes to holds: `"repo"` an
- * `owner/name`, `"issue"` one issue reference (`12`, `#12`, `owner/repo#12` or
- * a URL), `"issues"` a list of them, `"board"` the board that `project` (a
- * reference or a title), `owner` and `repo` choose together (declared on
- * `project`), `"item"` a project item's node ID (`PVTI_…`), whose board is
- * written to, `"owner"` a user or organization login (or `@me`) that a board is
- * about to be created for, `"pull"` one pull request reference (`12`, `#12`,
- * `owner/repo#12` or a pull URL), `"optional_board"` a board that `project`
- * names, which the call writes to only when the argument is given, `"run"`
- * a workflow run id or a run URL.
- */
-export type TargetKind = "repo" | "issue" | "issues" | "pull" | "board" | "optional_board" | "item" | "owner" | "run"
 
 /** A fact's value as a template the tool picks, such as `{bytes} bytes`, and the values it holds; the entry point fills them in unquoted. */
 export type CallValue = { text: string; values?: Record<string, string | number> }
