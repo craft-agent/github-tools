@@ -22,7 +22,7 @@ FAKE_CLI = Path(__file__).resolve().parent / "fake_cli.py"
 
 CWD = "/work/tree"
 IMPL = "_impl"
-ROOT_NAME = "hermes_plugins_github_tools"
+ROOT_NAME = "hermes_plugins_agent_tool_starter"
 
 
 def load_root(root: Path, name: str) -> types.ModuleType:
@@ -92,7 +92,7 @@ def tool_entry(tool_id: str, toolset: str, write_class: str, title: str | None =
         "toolset": toolset,
         "class": write_class,
         "annotations": {},
-        "input_schema": {"type": "object", "properties": {"repo": {"type": "string"}}, "additionalProperties": False},
+        "input_schema": {"type": "object", "properties": {"target": {"type": "string"}}, "additionalProperties": False},
         "output_schema": {"type": "object"},
     }
 
@@ -136,7 +136,7 @@ class FakeCliCase(unittest.TestCase):
     replies: dict[str, dict[str, Any]]
 
     def setUp(self) -> None:
-        self.dir = Path(tempfile.mkdtemp(prefix="github-tools-hermes-"))
+        self.dir = Path(tempfile.mkdtemp(prefix="agent-tool-starter-hermes-"))
         self.addCleanup(shutil.rmtree, self.dir, True)
         self.log = self.dir / "calls.jsonl"
         self.fixture = self.dir / "fixture.json"

@@ -28,21 +28,6 @@ class RegisterTest(FakeCliCase):
         self.assertEqual(comment["description"], "Comment on an issue")
         self.assertTrue(callable(comment["handler"]))
 
-    def test_groups_tools_by_toolset_with_an_emoji_each(self) -> None:
-        ctx = self.register()
-        self.assertEqual(
-            {tool_id: (tool["toolset"], tool["emoji"]) for tool_id, tool in ctx.tools.items()},
-            {
-                "github_issue_read": (f"{project.PLUGIN_NAME}-issues", "🎫"),
-                "github_issue_comment": (f"{project.PLUGIN_NAME}-issues", "🎫"),
-                "github_pr_merge": (f"{project.PLUGIN_NAME}-pull-requests", "🔀"),
-                "github_project_item_add": (f"{project.PLUGIN_NAME}-projects", "📋"),
-                "github_repo_edit": (f"{project.PLUGIN_NAME}-repos", "📦"),
-                "github_release_publish": (f"{project.PLUGIN_NAME}-releases", "🚀"),
-                "github_run_rerun": (f"{project.PLUGIN_NAME}-actions", "🤖"),
-            },
-        )
-
     def test_groups_tools_by_toolset_with_configured_emoji(self) -> None:
         with mock.patch.dict(tools.TOOLSET_EMOJI, {"issues": "🧩", "pull_requests": "🔀"}, clear=True):
             ctx = self.register()

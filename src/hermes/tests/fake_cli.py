@@ -5,7 +5,7 @@ is ``list``, ``run <tool-id>`` or ``target <tool-id>``; a reply is
 ``{"stdout": str, "stderr": str, "code": int, "sleep": seconds}``, every field optional. Each
 call appends ``{"argv": [...], "stdin": str}`` to the log.
 
-A reply with ``pid_dir`` also starts a long-lived child (as the real command line starts ``gh``)
+A reply with ``pid_dir`` also starts a long-lived child (as the real command line starts a subprocess)
 and writes its own pid and the child's to ``<pid_dir>/fake`` and ``<pid_dir>/child``. With
 ``ignore_sigterm`` both ignore ``SIGTERM``.
 """
