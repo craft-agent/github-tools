@@ -114,4 +114,5 @@ Read the outcome of either with `github_run_read` `view`, which waits.
 | `rate_limited`     | wait before retrying                                                                                                               |
 | `unauthenticated`  | the GitHub CLI is not logged in; the user runs `gh auth login`                                                                     |
 | `gh_missing`       | the GitHub CLI is not installed; the user installs it                                                                              |
-| `github_error`     | anything else GitHub or the CLI reported; read the message before retrying                                                         |
+| `upstream_error`   | anything else GitHub or the CLI reported; read the message before retrying                                                         |
+| `internal_error`   | a fault in the package; report it rather than retrying                                                                             |
