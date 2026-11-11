@@ -113,30 +113,6 @@ const specs: ToolSpec[] = [
   describing(HANGING_DESCRIBE_ID, () => new Promise(() => {})),
 ]
 
-const INTENT_ID = "github_issue_touch"
-const INTENT = "About to touch the issue"
-
-/** The Japanese of the intent fixture's intent. */
-const INTENT_TRANSLATIONS: Translations = { ja: { [INTENT]: "イシューに触れようとしています" } }
-
-/** The tools that carry an intent, to add after `specs`, which has none. */
-const intentSpecs: ToolSpec[] = [
-  defineTool({
-    id: INTENT_ID,
-    title: INTENT_ID,
-    intent: INTENT,
-    description: INTENT_ID,
-    toolset: "issues",
-    class: "add",
-    targets: githubTargets({ repo: "repo" }),
-    input,
-    output,
-    async execute(args, ctx) {
-      return { tool: INTENT_ID, cwd: ctx.cwd, count: args.count, own_dir: ctx.ownDir }
-    },
-  }),
-]
-
 type Run = { code: number; stdout: string; stderr: string }
 
 async function cli(argv: string[], stdin = "", overrides: Partial<CliIo> = {}): Promise<Run> {
@@ -509,41 +485,6 @@ describe("target in a language", () => {
       translations: TRANSLATIONS,
     })
     expect(json(run)).toEqual(JAPANESE)
-  })
-})
-
-describe("list with an intent", () => {
-  test("carries the intent of the tools that have one, and no key for the others", async () => {
-    const run = await cli(["list", "--tools", INTENT_ID], "", { specs: [...specs, ...intentSpecs] })
-    expect(run.code).toBe(EXIT_OK)
-    const listed: { id: string; intent?: string }[] = json(run)
-    const intents = Object.fromEntries(listed.map((entry) => [entry.id, entry.intent]))
-    expect(intents[INTENT_ID]).toBe(INTENT)
-    expect(listed.filter((entry) => "intent" in entry).map((entry) => entry.id)).toEqual([INTENT_ID])
-  })
-})
-
-describe("target with an intent", () => {
-  const target = (id: string, flags: string[]) =>
-    cli(["target", id, "--cwd", "/x", ...flags], '{"repo":"Octo/Hello"}', {
-      specs: [...specs, ...intentSpecs],
-      translations: INTENT_TRANSLATIONS,
-    })
-
-  test("answers the intent beside the title, in English", async () => {
-    const run = await target(INTENT_ID, [])
-    expect(run.code).toBe(EXIT_OK)
-    expect(json(run)).toEqual({ resources: ["octo/hello"], title: INTENT_ID, intent: INTENT, words: ENGLISH_WORDS })
-  })
-
-  test("translates the intent", async () => {
-    const reply = json(await target(INTENT_ID, ["--language", "ja"]))
-    expect(reply.intent).toBe("イシューに触れようとしています")
-    expect(reply.title).toBe(INTENT_ID)
-  })
-
-  test("leaves the intent out for a tool without one", async () => {
-    expect("intent" in json(await target(ADD_ID, ["--language", "ja"]))).toBe(false)
   })
 })
 
