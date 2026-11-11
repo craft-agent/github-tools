@@ -162,9 +162,9 @@ async function runTool(command: Extract<Command, { name: "run" }>, io: CliIo): P
     return EXIT_OK
   } catch (error) {
     if (isToolError(error)) return writeError(io, error.code, error.message, error.details)
-    if (isAbortError(error)) return writeError(io, "github_error", `${spec.id} was cancelled.`)
+    if (isAbortError(error)) return writeError(io, "internal_error", `${spec.id} was cancelled.`)
     io.stderr(`${PROGRAM}: unexpected error while running ${spec.id}: ${errorDetail(error)}\n`)
-    return writeError(io, "github_error", `Unexpected error while running ${spec.id}; see standard error.`)
+    return writeError(io, "internal_error", `Unexpected error while running ${spec.id}; see standard error.`)
   }
 }
 
@@ -191,9 +191,9 @@ async function targetOf(command: Extract<Command, { name: "target" }>, io: CliIo
     return EXIT_OK
   } catch (error) {
     if (isToolError(error)) return writeError(io, error.code, error.message, error.details)
-    if (isAbortError(error)) return writeError(io, "github_error", "The call was cancelled.")
+    if (isAbortError(error)) return writeError(io, "internal_error", "The call was cancelled.")
     io.stderr(`${PROGRAM}: unexpected error while resolving the target: ${errorDetail(error)}\n`)
-    return writeError(io, "github_error", "Unexpected error while resolving the target; see standard error.")
+    return writeError(io, "internal_error", "Unexpected error while resolving the target; see standard error.")
   }
 }
 

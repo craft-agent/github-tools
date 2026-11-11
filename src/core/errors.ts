@@ -5,10 +5,12 @@ export type ErrorCode =
   | "invalid_argument"
   | "stale"
   | "unauthenticated"
-  | "gh_missing"
-  | "gh_too_old"
   | "rate_limited"
   | "declined"
+  | "upstream_error"
+  | "internal_error"
+  | "gh_missing"
+  | "gh_too_old"
   | "github_error"
 
 /** A value that JSON can carry. */

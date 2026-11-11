@@ -241,7 +241,7 @@ function describeResult(result: unknown): string {
  * Runs a tool the way every entry point does: validates the raw arguments
  * as strict (`invalid_argument` on a bad or unknown one), executes, and
  * validates the result against the output schema. A result that does not
- * match is a bug in the tool; it throws `github_error` carrying the raw
+ * match is a bug in the tool; it throws `internal_error` carrying the raw
  * result, so whatever the call already created stays visible. Errors from
  * `execute` pass through unchanged.
  */
@@ -260,7 +260,7 @@ export async function invoke<I extends z.ZodObject<any>, O extends z.ZodObject<a
   const output = spec.output.safeParse(result)
   if (!output.success) {
     throw new ToolError(
-      "github_error",
+      "internal_error",
       `${spec.id} returned a result that does not match its output schema (${describeIssues(output.error)}). The call may have gone through; its result was: ${describeResult(result)}`,
       { cause: output.error },
     )

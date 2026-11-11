@@ -450,10 +450,10 @@ describe("invoke", () => {
   const returning = (result: unknown) =>
     tool((async () => result) as unknown as ToolSpec<typeof input, typeof output>["execute"])
 
-  test("a result that breaks the output schema is a github_error carrying the raw result", async () => {
+  test("a result that breaks the output schema is an internal_error carrying the raw result", async () => {
     const bad = returning({ total: "many", created: "https://github.com/o/r/issues/7" })
     const error = await thrown(invoke(bad, { count: 1 }, CTX))
-    expect(isToolError(error) && error.code).toBe("github_error")
+    expect(isToolError(error) && error.code).toBe("internal_error")
     const message = (error as Error).message
     expect(message).toContain("github_issue_count returned a result that does not match its output schema")
     expect(message).toContain("total")
@@ -462,15 +462,15 @@ describe("invoke", () => {
 
   test("the raw result in that message is capped", async () => {
     const error = await thrown(invoke(returning({ total: "x".repeat(10_000) }), { count: 1 }, CTX))
-    expect(isToolError(error) && error.code).toBe("github_error")
+    expect(isToolError(error) && error.code).toBe("internal_error")
     expect((error as Error).message.length).toBeLessThan(2600)
   })
 
-  test("a result that cannot be serialized still reports github_error", async () => {
+  test("a result that cannot be serialized still reports internal_error", async () => {
     const circular: Record<string, unknown> = {}
     circular.self = circular
     const error = await thrown(invoke(returning(circular), { count: 1 }, CTX))
-    expect(isToolError(error) && error.code).toBe("github_error")
+    expect(isToolError(error) && error.code).toBe("internal_error")
   })
 
   test("a ToolError from execute passes through unchanged", async () => {
