@@ -109,6 +109,15 @@ describe("V2 setup", () => {
     const { tools } = await setUp({ options: { toolsets: ["beta"], exclude_tools: [ADMIN_ID] } })
     expect(tools.size).toBe(0)
   })
+
+  test("without a profile it knows the package's own toolsets", async () => {
+    const fake = fakeContext({ options: { toolsets: "all" } })
+    await createV2Setup([], { env: {} })(fake.ctx)
+    expect(fake.tools.size).toBe(0)
+    await expect(
+      createV2Setup([], { env: {} })(fakeContext({ options: { toolsets: ["unknown-toolset"] } }).ctx),
+    ).rejects.toThrow('Unknown toolset "unknown-toolset"')
+  })
 })
 
 describe("V2 tool calls", () => {
