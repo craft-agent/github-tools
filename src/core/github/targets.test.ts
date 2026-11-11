@@ -35,8 +35,9 @@ import { prCreate } from "../pull-requests/create"
 import { prEdit } from "../pull-requests/edit"
 import { prReady } from "../pull-requests/ready"
 import { prReopen } from "../pull-requests/reopen"
-import type { ToolSpec } from "../tool"
-import { writeTargets } from "./targets"
+import type { RefContext } from "../refs"
+import { writeTargets as writeCallTargets } from "../targets"
+import { githubTargets, targetKinds, type TargetMap } from "./targets"
 
 const repos: TempRepo[] = []
 let fake: FakeGh | undefined
@@ -61,9 +62,9 @@ function tree(origin?: string): string {
 
 const WITH_ORIGIN = "https://github.com/Octo/Self.git"
 
-const issueTargets: ToolSpec["targets"] = { issue: "issue", repo: "repo" }
+const issueTargets: TargetMap = { issue: "issue", repo: "repo" }
 
-const relateTargets: ToolSpec["targets"] = {
+const relateTargets: TargetMap = {
   issue: "issue",
   repo: "repo",
   parent: "issue",
@@ -76,6 +77,11 @@ function abortedSignal(): AbortSignal {
   const controller = new AbortController()
   controller.abort()
   return controller.signal
+}
+
+/** What `githubTargets` gives for `args` and the kinds in `spec.targets`; no kinds is just the call's own repository. */
+function writeTargets(spec: { targets?: TargetMap }, args: unknown, ctx: RefContext): Promise<string[]> {
+  return githubTargets(spec.targets ?? {})(args, ctx)
 }
 
 describe("writeTargets", () => {
@@ -126,7 +132,7 @@ describe("writeTargets", () => {
   })
 
   test("a branch repository beside the issue's asks for both", async () => {
-    const targets: ToolSpec["targets"] = { ...issueTargets, branch_repo: "repo" }
+    const targets: TargetMap = { ...issueTargets, branch_repo: "repo" }
     const cwd = tree(WITH_ORIGIN)
     expect(await writeTargets({ targets }, { issue: "3", branch_repo: "Fork/Self" }, { cwd })).toEqual([
       "fork/self",
@@ -135,7 +141,7 @@ describe("writeTargets", () => {
   })
 
   test("a call without repo or other targets has the working tree's repository as its own", async () => {
-    const targets: ToolSpec["targets"] = { repo: "repo", parent: "issue", blocked_by: "issues" }
+    const targets: TargetMap = { repo: "repo", parent: "issue", blocked_by: "issues" }
     const cwd = tree(WITH_ORIGIN)
     expect(await writeTargets({ targets }, { title: "t" }, { cwd })).toEqual(["octo/self"])
     expect(await writeTargets({ targets }, { parent: "a/b#1", blocked_by: ["2", "c/d#3"] }, { cwd })).toEqual([
@@ -305,17 +311,17 @@ describe("the issue write tools' targets", () => {
     ],
     [issueDevelop.id, issueDevelop, { issue: "issue", repo: "repo", branch_repo: "repo" }],
   ] as const)("%s", (_id, spec, expected) => {
-    expect(spec.targets).toEqual(expected)
+    expect(targetKinds(spec.targets)).toEqual(expected)
   })
 
   test("closing as a duplicate writes nothing to the original's repository", async () => {
     const args = { issue: "a/b#1", reason: "duplicate", duplicate_of: "c/d#2" }
-    expect(await writeTargets(issueClose, args, { cwd: tree() })).toEqual(["a/b"])
+    expect(await writeCallTargets(issueClose, args, { cwd: tree() })).toEqual(["a/b"])
   })
 })
 
 describe("pull request targets", () => {
-  const pullTargets: ToolSpec["targets"] = { pr: "pull", repo: "repo" }
+  const pullTargets: TargetMap = { pr: "pull", repo: "repo" }
 
   test("a qualified pull request or a pull URL names its own repository", async () => {
     const cwd = tree(WITH_ORIGIN)
@@ -355,13 +361,14 @@ describe("pull request targets", () => {
   test("the tools that write to one pull request", async () => {
     const cwd = tree(WITH_ORIGIN)
     for (const spec of [prEdit, prComment, prReady, prClose, prReopen]) {
-      expect(await writeTargets(spec, { pr: "other/repo#3" }, { cwd })).toEqual(["other/repo"])
+      const kinds = targetKinds(spec.targets)
+      expect(await writeTargets({ targets: kinds }, { pr: "other/repo#3" }, { cwd })).toEqual(["other/repo"])
     }
   })
 })
 
 describe("run targets", () => {
-  const runTargets: ToolSpec["targets"] = { run: "run", repo: "repo" }
+  const runTargets: TargetMap = { run: "run", repo: "repo" }
 
   test("a run URL names its own repository, not the working tree's", async () => {
     const cwd = tree(WITH_ORIGIN)
@@ -397,7 +404,7 @@ describe("run targets", () => {
 })
 
 describe("an optional board target", () => {
-  const createTargets: ToolSpec["targets"] = { repo: "repo", project: "optional_board" }
+  const createTargets: TargetMap = { repo: "repo", project: "optional_board" }
 
   test("absent adds nothing and runs no lookup: just the repository", async () => {
     const installed = useFake([])
@@ -456,20 +463,20 @@ describe("an optional board target", () => {
   test("pull request create names the repository and the board", async () => {
     useFake([])
     const args = { head: "x", title: "t", project: "craftsamo/1", repo: "a/b" }
-    expect(await writeTargets(prCreate, args, { cwd: tree() })).toEqual(["a/b", "craftsamo/projects/1"])
+    expect(await writeCallTargets(prCreate, args, { cwd: tree() })).toEqual(["a/b", "craftsamo/projects/1"])
   })
 
   test("issue create names the repository and the board", async () => {
     useFake([])
     const args = { title: "t", project: "craftsamo/1", repo: "a/b" }
-    expect(await writeTargets(issueCreate, args, { cwd: tree() })).toEqual(["a/b", "craftsamo/projects/1"])
+    expect(await writeCallTargets(issueCreate, args, { cwd: tree() })).toEqual(["a/b", "craftsamo/projects/1"])
   })
 })
 
 describe("board and item targets", () => {
-  const boardOnly: ToolSpec["targets"] = { project: "board" }
-  const boardAndRepos: ToolSpec["targets"] = { project: "board", repo: "repo", link_repo: "repo" }
-  const itemOnly: ToolSpec["targets"] = { item: "item" }
+  const boardOnly: TargetMap = { project: "board" }
+  const boardAndRepos: TargetMap = { project: "board", repo: "repo", link_repo: "repo" }
+  const itemOnly: TargetMap = { item: "item" }
 
   describe("a named board needs no gh", () => {
     test("owner/N and a URL name the board, lowercased, and no own repository", async () => {
@@ -672,7 +679,7 @@ describe("board and item targets", () => {
 
     test("a board spec's issue targets still mean the repository named", async () => {
       useFake([])
-      const targets: ToolSpec["targets"] = { project: "board", item: "issue", repo: "repo" }
+      const targets: TargetMap = { project: "board", item: "issue", repo: "repo" }
       const args = { project: "a/1", item: "c/d#2", repo: "x/y" }
       expect(await writeTargets({ targets }, args, { cwd: tree() })).toEqual(["a/projects/1", "c/d", "x/y"])
     })
@@ -697,7 +704,7 @@ describe("board and item targets", () => {
     test("anything else is chosen by the board selectors", async () => {
       const installed = useFake([])
       const ctx = { cwd: tree(WITH_ORIGIN) }
-      const targets: ToolSpec["targets"] = { item: "item" }
+      const targets: TargetMap = { item: "item" }
       expect(await writeTargets({ targets }, { item: "octo/hello#5", project: "9", owner: "acme" }, ctx)).toEqual([
         "acme/projects/9",
       ])
@@ -724,14 +731,14 @@ describe("board and item targets", () => {
 
     test("the item's board and a named board are listed once each", async () => {
       useFake([itemBoardRule("PVTI_abc", rawBoard(3))])
-      const targets: ToolSpec["targets"] = { project: "board", item: "item" }
+      const targets: TargetMap = { project: "board", item: "item" }
       const args = { project: "octo/3", item: "PVTI_abc" }
       expect(await writeTargets({ targets }, args, { cwd: tree() })).toEqual(["octo/projects/3"])
     })
   })
 
   describe("an owner a board is created for", () => {
-    const ownerOnly: ToolSpec["targets"] = { owner: "owner" }
+    const ownerOnly: TargetMap = { owner: "owner" }
 
     test("is owner/projects/new, lowercased, without gh", async () => {
       const installed = useFake([])
@@ -757,7 +764,7 @@ describe("board and item targets", () => {
 
     test("names no own repository, and a repo target beside it is the one named", async () => {
       useFake([])
-      const targets: ToolSpec["targets"] = { owner: "owner", link_repo: "repo" }
+      const targets: TargetMap = { owner: "owner", link_repo: "repo" }
       const ctx = { cwd: tree(WITH_ORIGIN) }
       expect(await writeTargets({ targets }, { owner: "acme" }, ctx)).toEqual(["acme/projects/new"])
       expect(await writeTargets({ targets }, { owner: "acme", link_repo: "Acme/Widgets" }, ctx)).toEqual([
@@ -774,11 +781,11 @@ describe("board and item targets", () => {
       [projectLink, { project: "acme/2", repo: "acme/w" }, ["acme/projects/2", "acme/w"]],
       [projectLink, { project: "acme/2" }, ["acme/projects/2", "octo/self"]],
       [projectUnlink, { project: "acme/2", repo: "Acme/W" }, ["acme/projects/2", "acme/w"]],
-      [projectFieldEnsure, { project: "acme/2", repo: "x/y" }, ["acme/projects/2"]],
-      [projectViewEnsure, { project: "acme/2", repo: "x/y" }, ["acme/projects/2"]],
+      [projectFieldEnsure, { project: "acme/2", name: "Size", type: "text", repo: "x/y" }, ["acme/projects/2"]],
+      [projectViewEnsure, { project: "acme/2", name: "Plan", layout: "table", repo: "x/y" }, ["acme/projects/2"]],
     ])("%#", async (spec, args, expected) => {
       useFake([])
-      expect(await writeTargets(spec, args, { cwd: tree(WITH_ORIGIN) })).toEqual(expected)
+      expect(await writeCallTargets(spec, args, { cwd: tree(WITH_ORIGIN) })).toEqual(expected)
     })
   })
 
@@ -793,14 +800,14 @@ describe("board and item targets", () => {
       [projectItemConvert, { item: "12", project: "acme/2" }, ["acme/projects/2", "octo/self"]],
     ])("%#", async (spec, args, expected) => {
       useFake([])
-      expect(await writeTargets(spec, args, { cwd: tree(WITH_ORIGIN) })).toEqual(expected)
+      expect(await writeCallTargets(spec, args, { cwd: tree(WITH_ORIGIN) })).toEqual(expected)
     })
 
     test.each([projectItemEdit, projectItemArchive, projectItemUnarchive, projectItemConvert])(
       "the board of an item ID is the one it sits on: %#",
       async (spec) => {
         useFake([itemBoardRule("PVTI_abc", rawBoard(3, { owner: { __typename: "Organization", login: "Acme" } }))])
-        const targets = await writeTargets(spec, { item: "PVTI_abc", repo: "Acme/W" }, { cwd: tree(WITH_ORIGIN) })
+        const targets = await writeCallTargets(spec, { item: "PVTI_abc", repo: "Acme/W" }, { cwd: tree(WITH_ORIGIN) })
         expect(targets).toEqual(spec === projectItemConvert ? ["acme/projects/3", "acme/w"] : ["acme/projects/3"])
       },
     )

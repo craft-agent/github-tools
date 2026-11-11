@@ -15,7 +15,7 @@ import { failure } from "../../testing/issue-fixtures"
 import { fieldsRule, linkedBoardsRule, octoBoardRules, rawBoard } from "../../testing/project-fixtures"
 import { createdRule, issueFieldsRule, writeRules, writes } from "../../testing/write-fixtures"
 import { writeHarness } from "../../testing/write-harness"
-import { writeTargets } from "../github/targets"
+import { writeTargets } from "../targets"
 import { issueCreate } from "./create"
 
 const { use, run } = writeHarness(issueCreate)

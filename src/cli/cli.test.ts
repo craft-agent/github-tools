@@ -6,6 +6,7 @@ import {
   abortError,
   annotations,
   defineTool,
+  githubTargets,
   selectTools,
   type ToolSpec,
   type Translations,
@@ -44,7 +45,7 @@ function fixture(id: string, toolset: ToolSpec["toolset"], writeClass: ToolSpec[
     description: `Description of ${id}`,
     toolset,
     class: writeClass,
-    ...(id === ADD_ID && { targets: { issue: "issue", repo: "repo", parent: "issue" } as const }),
+    ...(id === ADD_ID && { targets: githubTargets({ issue: "issue", repo: "repo", parent: "issue" }) }),
     input: id === ADD_ID ? writeInput : input,
     output,
     async execute(args, ctx) {
@@ -73,7 +74,7 @@ function describing(id: string, describe: ToolSpec["describe"]): ToolSpec {
     description: id,
     toolset: "issues",
     class: "add",
-    targets: { repo: "repo" },
+    targets: githubTargets({ repo: "repo" }),
     input,
     output,
     describe,
@@ -127,7 +128,7 @@ const intentSpecs: ToolSpec[] = [
     description: INTENT_ID,
     toolset: "issues",
     class: "add",
-    targets: { repo: "repo" },
+    targets: githubTargets({ repo: "repo" }),
     input,
     output,
     async execute(args, ctx) {
@@ -388,7 +389,7 @@ describe("target", () => {
   test("is the repository a qualified issue names, not the working tree's", async () => {
     const repo = tempRepo("git@github.com:Octo/Hello.git")
     cleanups.push(repo.cleanup)
-    const stdin = JSON.stringify({ issue: "Other/Repo#4", body: "x" })
+    const stdin = JSON.stringify({ issue: "Other/Repo#4" })
     expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir], stdin))).toEqual(answer(ADD_ID, ["other/repo"]))
   })
 
@@ -562,7 +563,7 @@ describe("pin", () => {
     class: "add",
     input,
     output: z.object({ runs: z.number() }),
-    targets: { repo: "repo" },
+    targets: githubTargets({ repo: "repo" }),
     describe: () => ({ facts: [{ label: "Value", value: state.value }] }),
     async execute() {
       return { runs: ++state.runs }

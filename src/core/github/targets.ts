@@ -8,6 +8,7 @@ import {
   type RefContext,
   type RepoName,
 } from "../refs"
+import { ANY_TARGET } from "../targets"
 import type { ToolSpec } from "../tool"
 import {
   CURRENT_USER,
@@ -38,8 +39,8 @@ import { isBareRunId, parseRunUrl } from "./workflow-runs"
  */
 export type TargetKind = "repo" | "issue" | "issues" | "pull" | "board" | "optional_board" | "item" | "owner" | "run"
 
-/** What stands for a repository or board that cannot be told. */
-export const ANY_TARGET = "*"
+/** The kind of each argument a call writes to, by the argument's name. */
+export type TargetMap = Readonly<Record<string, TargetKind>>
 
 type Args = Readonly<Record<string, unknown>>
 type OwnRepository = () => Promise<RepoName | undefined>
@@ -87,22 +88,17 @@ function argumentRepository(args: Args, ctx: RefContext): OwnRepository {
  * when it names one, else `repo`, else the working tree's `origin`. The origin
  * is read on the first call that needs it, and the answer is kept.
  */
-function ownRepository(
-  spec: Pick<ToolSpec, "targets">,
-  args: Args,
-  fromArguments: OwnRepository,
-  ctx: RefContext,
-): OwnRepository {
+function ownRepository(kinds: TargetMap, args: Args, fromArguments: OwnRepository, ctx: RefContext): OwnRepository {
   return once(async () => {
     for (const { name, kind, accept } of SUBJECT_ARGUMENTS) {
       const value = args[name]
-      if (spec.targets?.[name] === kind && typeof value === "string" && !isBareNumber(value)) {
+      if (kinds[name] === kind && typeof value === "string" && !isBareNumber(value)) {
         const named = await attempt(() => parseNumberRef(value, undefined, ctx, { accept }))
         if (named) return named.repo
       }
     }
     const runValue = args.run
-    if (spec.targets?.run === "run" && typeof runValue === "string") {
+    if (kinds.run === "run" && typeof runValue === "string") {
       const named = parseRunUrl(runValue)
       if (named) return named.repo
     }
@@ -210,33 +206,20 @@ async function targetRepository(
   return typeof value === "string" ? attempt(() => parseRepo(value)) : undefined
 }
 
-/** The kind of each argument a call writes to, by the argument's name. */
-export type TargetMap = Readonly<Record<string, TargetKind>>
-
-/** The targets of a tool whose arguments `kinds` declares: the repositories and boards the call writes to (see `writeTargets`). */
-export function githubTargets(kinds: TargetMap): TargetMap {
-  return kinds
-}
-
-/** The kinds `githubTargets` was given for a tool's targets, or `undefined` for a tool that has none. */
-export function targetKinds(targets: ToolSpec["targets"]): TargetMap | undefined {
-  return targets
-}
-
 /**
  * What a call writes to, as the permission rule of an entry point names it:
  * the call's own repository (`owner/name`), and each repository the arguments
- * declared in `spec.targets` name. A bare issue or pull request number, or
+ * declared in `kinds` name. A bare issue or pull request number, or
  * workflow run id, means the call's own repository: that of the qualified
  * `issue` (`"issue"`), `pr` (`"pull"`) or `run` (`"run"`) argument, else `repo`,
  * else the working tree's. A `"pull"` target takes a pull request reference and
  * refuses an issue URL (`*`). A `"run"` target takes a workflow run id or a run
  * URL, and names the URL's repository or for a bare id the call's own repository
  * (`*` for anything else). Anything that cannot be told (an invalid or non-string
- * value, a working tree without a GitHub `origin`) is `*`. A spec without
- * `targets` has just its own repository.
+ * value, a working tree without a GitHub `origin`) is `*`. An empty `kinds`
+ * has just its own repository.
  *
- * A spec with a `"board"`, `"item"` or `"owner"` target names no own repository:
+ * Kinds with a `"board"`, `"item"` or `"owner"` target name no own repository:
  * it writes to a board (`owner/projects/N`), and to a repository only through a
  * `repo` argument declared as a `"repo"` target (the working tree's when `repo`
  * is absent). An `"owner"` target names the board to be created for that owner,
@@ -251,16 +234,16 @@ export function targetKinds(targets: ToolSpec["targets"]): TargetMap | undefined
  * An `"optional_board"` target is a board the call writes to only when the
  * argument is given: absent, it adds nothing and runs no lookup; given, it is
  * told like a `"board"` target, beside the call's own repository, which it
- * does not replace (it does not make the spec one that names a board).
+ * does not replace (it does not make the kinds ones that name a board).
  *
  * Lowercase, without repeats, sorted, with `*` last.
  */
-export async function writeTargets(spec: Pick<ToolSpec, "targets">, args: unknown, ctx: RefContext): Promise<string[]> {
+async function resolveTargets(kinds: TargetMap, args: unknown, ctx: RefContext): Promise<string[]> {
   const given: Args = typeof args === "object" && args !== null ? (args as Args) : {}
-  const targets = Object.entries(spec.targets ?? {})
+  const targets = Object.entries(kinds)
   const namesBoard = targets.some(([, kind]) => isBoardKind(kind))
   const fromArguments = argumentRepository(given, ctx)
-  const own = ownRepository(spec, given, fromArguments, ctx)
+  const own = ownRepository(kinds, given, fromArguments, ctx)
   const found = new Set<string>()
   const addResource = (resource: string | undefined) => found.add(resource ?? ANY_TARGET)
   const add = (repo: RepoName | undefined) => addResource(repo?.full.toLowerCase())
@@ -293,9 +276,31 @@ export async function writeTargets(spec: Pick<ToolSpec, "targets">, args: unknow
       if (!isBlank(item)) add(await targetRepository(kind, item, own, ctx))
     }
   }
-  if (namesBoard && spec.targets?.[REPO_ARGUMENT] === "repo") add(await fromArguments())
+  if (namesBoard && kinds[REPO_ARGUMENT] === "repo") add(await fromArguments())
   if (found.size === 0) addResource(undefined)
 
   const resources = [...found].filter((resource) => resource !== ANY_TARGET).sort()
   return found.has(ANY_TARGET) ? [...resources, ANY_TARGET] : resources
+}
+
+/** A tool's `targets` resolver made by `githubTargets`. */
+type GithubTargets = (args: unknown, ctx: RefContext) => Promise<string[]>
+
+/** The kinds each resolver of `githubTargets` was made from. */
+const KINDS = new WeakMap<GithubTargets, TargetMap>()
+
+/**
+ * The `targets` resolver of a tool whose arguments `kinds` declares: the
+ * repositories and boards the call writes to (see `resolveTargets`), lowercase,
+ * with `*` for what cannot be told.
+ */
+export function githubTargets(kinds: TargetMap): GithubTargets {
+  const resolver: GithubTargets = (args, ctx) => resolveTargets(kinds, args, ctx)
+  KINDS.set(resolver, kinds)
+  return resolver
+}
+
+/** The kinds a resolver of `githubTargets` was made from, or `undefined` for any other resolver. */
+export function targetKinds(resolver: ToolSpec["targets"]): TargetMap | undefined {
+  return resolver && KINDS.get(resolver as GithubTargets)
 }

@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { ToolError, defineTool, type ToolSpec, type Translations, type WriteClass } from "../core"
+import { ToolError, defineTool, githubTargets, type ToolSpec, type Translations, type WriteClass } from "../core"
 
 /** Fixtures the OpenCode plugin tests share. */
 
@@ -16,7 +16,7 @@ export const toolOutput = z.object({
 
 /** What a write fixture takes beyond a read one: an issue, and a second repository it may write to. */
 const writeInput = toolInput.extend({ issue: z.string().optional(), branch_repo: z.string().optional() })
-const WRITE_TARGETS = { issue: "issue", repo: "repo", branch_repo: "repo" } as const
+const WRITE_TARGETS = githubTargets({ issue: "issue", repo: "repo", branch_repo: "repo" })
 
 export const READ_ID = "github_issue_read"
 export const ADD_ID = "github_issue_comment"

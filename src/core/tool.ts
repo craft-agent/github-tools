@@ -1,6 +1,5 @@
 import { z } from "zod"
 import { ToolError, isAbortError, isToolError } from "./errors"
-import type { TargetKind } from "./github/targets"
 
 /** The toolsets of a package: every name, in the order `all` lists them, and the ones on when a setting names none. */
 export type Toolsets = { names: readonly string[]; defaults: readonly string[] }
@@ -54,8 +53,8 @@ export type ToolSpec<I extends z.ZodObject<any> = z.ZodObject<any>, O extends z.
   description: string
   toolset: string
   class: WriteClass
-  /** The arguments that name a repository or board the call writes to, by name; each must be an argument of `input`. */
-  targets?: Readonly<Record<string, TargetKind>>
+  /** What the call writes to, as the permission rules of an entry point name it. */
+  targets?(args: z.output<I>, ctx: ToolContext): string[] | Promise<string[]>
   /**
    * What the call will do, for the person approving it: a headline template
    * (the intent, else the title, stands without one), facts such as the kind
@@ -76,9 +75,9 @@ const READ_TOOL_SUFFIX = "_read"
 
 /**
  * Returns the spec after checking what a type cannot: the ID's shape and
- * length, that a read tool is named `_read`, that the output schema is an
- * object (a tool returns its data as a plain object), and that every target
- * is an argument of the input.
+ * length, that a read tool is named `_read`, and that the output schema is an
+ * object (a tool returns its data as a plain object). The ID's prefix is the
+ * package's to check.
  */
 export function defineTool<I extends z.ZodObject<any>, O extends z.ZodObject<any>>(
   spec: ToolSpec<I, O>,
@@ -94,10 +93,6 @@ export function defineTool<I extends z.ZodObject<any>, O extends z.ZodObject<any
   }
   if (!(spec.output instanceof z.ZodObject)) {
     throw new Error(`Tool "${spec.id}" must have an object output schema, since a result is an object.`)
-  }
-  const unknownTarget = Object.keys(spec.targets ?? {}).find((name) => !Object.hasOwn(spec.input.shape, name))
-  if (unknownTarget !== undefined) {
-    throw new Error(`Tool "${spec.id}" declares the target "${unknownTarget}", which is not one of its arguments.`)
   }
   if (spec.intent !== undefined && spec.intent.trim() === "") {
     throw new Error(`Tool "${spec.id}" must give an intent that is not blank, or none.`)
