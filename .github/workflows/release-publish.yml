@@ -42,11 +42,31 @@ jobs:
     secrets:
       RELEASE_DEPLOY_KEY: ${{ secrets.RELEASE_DEPLOY_KEY }}
 
+  # A package.json with `"private": true` has nothing to publish, so the npm
+  # and registry jobs skip it. The flag is read from the commit that was
+  # dispatched, which the release does not change.
+  package:
+    name: Read package.json
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      private: ${{ steps.read.outputs.private }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Read the private flag
+        id: read
+        run: echo "private=$(node -p 'require("./package.json").private === true')" >> "$GITHUB_OUTPUT"
+
   npm:
     name: Publish to npm
-    needs: release
+    needs: [release, package]
     if: >-
       needs.release.result == 'success' &&
+      needs.package.outputs.private != 'true' &&
       github.event_name == 'workflow_dispatch'
     # One run at a time, so two releases cannot publish in the wrong order.
     concurrency:
@@ -153,14 +173,15 @@ jobs:
 
   mcp-registry:
     name: Publish to the MCP Registry
-    needs: [release, npm]
+    needs: [release, package, npm]
     if: >-
       needs.npm.result == 'success' &&
+      needs.package.outputs.private != 'true' &&
       github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # id-token for the registry's GitHub OIDC login, which proves the
-    # `io.github.craft-agent` namespace without a token.
+    # `io.github.<owner>` namespace of the repository's owner without a token.
     permissions:
       contents: read
       id-token: write

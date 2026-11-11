@@ -8,13 +8,12 @@ import { forwardedVariables, settingVariables } from "../src/entry/settings"
 import { PROJECT } from "../src/project"
 import { CODEX_MANIFEST } from "./codex-env.mjs"
 import { PLUGIN_NAME } from "./package-name.mjs"
-import { DESCRIPTION, serverJson } from "./server-json.mjs"
+import { DESCRIPTION_LIMIT, serverJson } from "./server-json.mjs"
 import { VERSION_FILES } from "./version-files.mjs"
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url))
 const MCP_ENTRY = "dist/mcp.js"
 const CLI_ENTRY = "dist/cli.js"
-const REGISTRY_DESCRIPTION_LIMIT = 100
 
 /** Each MCP configuration and the variable its harness expands to the plugin's install directory. */
 const MCP_CONFIGS = {
@@ -162,12 +161,15 @@ describe("server.json", () => {
     expect(pkg.mcpName).toBe(`io.github.${OWNER}/${REPOSITORY}`)
   })
 
-  test("describes the server within the registry's limit", () => {
-    expect(DESCRIPTION.length).toBeLessThanOrEqual(REGISTRY_DESCRIPTION_LIMIT)
+  test("takes the description from package.json, within the registry's limit", () => {
+    expect(serverJson(pkg).description).toBe(pkg.description)
+    expect(pkg.description.length).toBeLessThanOrEqual(DESCRIPTION_LIMIT)
+    expect(() => serverJson({ ...pkg, description: "x".repeat(DESCRIPTION_LIMIT + 1) })).toThrow(/description/)
+    expect(() => serverJson({ ...pkg, description: undefined })).toThrow(/description/)
   })
 
   test("the script writes the same document", () => {
-    const dir = mkdtempSync(join(tmpdir(), "github-tools-server-json-"))
+    const dir = mkdtempSync(join(tmpdir(), "server-json-"))
     try {
       const output = join(dir, "server.json")
       const run = spawnSync(process.execPath, [join(ROOT, "scripts/server-json.mjs"), output], { encoding: "utf8" })

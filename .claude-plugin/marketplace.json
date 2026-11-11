@@ -10,7 +10,7 @@
     {
       "name": "github-tools",
       "source": "./",
-      "description": "GitHub tools for coding agents: issues, project boards, pull requests, repositories, releases and Actions.",
+      "description": "GitHub tools for coding agents: issues, boards, pull requests, repositories, releases and Actions.",
       "category": "development"
     }
   ]

@@ -7,7 +7,7 @@ const CLI = fileURLToPath(new URL("../dist/cli.js", import.meta.url))
 const SERVER = fileURLToPath(new URL("../dist/mcp.js", import.meta.url))
 const EXIT_FAILED = 1
 const EXIT_USAGE = 2
-const UNKNOWN_TOOL = "github_nonexistent_read"
+const UNKNOWN_TOOL = "unknown_nonexistent_read"
 
 function expect(condition, message) {
   if (!condition) throw new Error(message)
