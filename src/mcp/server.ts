@@ -18,13 +18,15 @@ import {
   type ErrorDetails,
   type ToolContext,
   type ToolSpec,
+  type Toolsets,
 } from "../core"
 import { errorBody } from "../entry/errors"
+import { PROJECT_PROFILE } from "../entry/profile"
 import type { EntrySettings } from "../entry/settings"
+import { PROJECT } from "../project"
 import { elicitationConfirm } from "./confirm"
 import { createWorkingDirResolver } from "./roots"
 
-const SERVER_NAME = "github-tools"
 const DEFAULT_VERSION = "0.0.0"
 
 export type ServerOptions = {
@@ -32,6 +34,8 @@ export type ServerOptions = {
   cwd?: () => string
   /** Where the tools are installed: never a call's working tree, so a client root inside it is skipped. */
   ownDir?: string
+  /** The toolsets the settings select from; defaults to this package's. */
+  toolsets?: Toolsets
   /** The version the server reports; defaults to `0.0.0`. */
   version?: string
   /** Receives the full text of an unexpected error, which the client never sees; defaults to stderr. */
@@ -67,11 +71,12 @@ function describeTool(spec: ToolSpec): Tool {
 export function createServer(specs: ToolSpec[], settings: EntrySettings, options: ServerOptions = {}): Server {
   const log = options.log ?? ((entry: string) => process.stderr.write(`${entry}\n`))
   const server = new Server(
-    { name: SERVER_NAME, version: options.version ?? DEFAULT_VERSION },
+    { name: PROJECT.name, version: options.version ?? DEFAULT_VERSION },
     { capabilities: { tools: {} } },
   )
   const workingDir = createWorkingDirResolver(server, options.cwd ?? (() => process.cwd()), options.ownDir)
-  const selected = new Map(selectTools(specs, settings).map((spec) => [spec.id, spec]))
+  const toolsets = options.toolsets ?? PROJECT_PROFILE.toolsets
+  const selected = new Map(selectTools(specs, settings, toolsets).map((spec) => [spec.id, spec]))
   const tools = [...selected.values()].map(describeTool)
 
   server.setRequestHandler(ListToolsRequestSchema, () => ({ tools }))

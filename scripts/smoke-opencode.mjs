@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { fileURLToPath, pathToFileURL } from "node:url"
+import { PLUGIN_NAME } from "./package-name.mjs"
 
 const PLUGIN = fileURLToPath(new URL("../dist/opencode.js", import.meta.url))
 const SERVER = fileURLToPath(new URL("../dist/mcp.js", import.meta.url))
@@ -26,6 +27,7 @@ try {
     typeof plugin?.id === "string" && typeof plugin.setup === "function" && typeof plugin.server === "function",
     `Expected a default export with id, setup and server, got ${JSON.stringify(Object.keys(plugin ?? {}))}.`,
   )
+  expect(plugin.id === PLUGIN_NAME, `Expected the plugin to be named ${PLUGIN_NAME}, got ${plugin.id}.`)
   console.log(`The OpenCode plugin ${plugin.id} exports setup and server.`)
 
   const expected = await mcpToolNames()

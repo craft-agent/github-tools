@@ -9,7 +9,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js"
 import { pathToFileURL } from "node:url"
 import { z } from "zod"
-import { confirmWrite, defineTool, type ToolContext, type ToolSpec, type Toolset, type WriteClass } from "../core"
+import { confirmWrite, defineTool, type ToolContext, type ToolSpec, type WriteClass } from "../core"
 import type { EntrySettings } from "../entry/settings"
 import { createServer, type ServerOptions } from "./server"
 
@@ -21,7 +21,7 @@ export const toolInput = z.object({ count: z.number().int().optional() })
 export const toolOutput = z.object({ tool: z.string(), count: z.number().optional() })
 
 /** A spec that records every call it executes; an administrative one asks first, as a real one does. */
-export function tool(id: string, toolset: Toolset, writeClass: WriteClass, calls: Call[]): ToolSpec {
+export function tool(id: string, toolset: string, writeClass: WriteClass, calls: Call[]): ToolSpec {
   const self: ToolSpec = defineTool({
     id,
     title: `Title of ${id}`,

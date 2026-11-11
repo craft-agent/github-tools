@@ -1,4 +1,6 @@
-import { TOOLSETS, ToolError, type ToolSettings, type Toolset } from "../core"
+import { ToolError, type ToolSettings, type Toolsets } from "../core"
+import { PROJECT } from "../project"
+import { PROJECT_PROFILE, type EntryProfile } from "./profile"
 
 /** Who asks the person before an administrative tool acts: the harness, or the tool through the client's form. */
 export type ConfirmMode = "harness" | "elicitation"
@@ -12,28 +14,32 @@ const FALSE_VALUES: readonly string[] = ["0", "false"]
 
 type OptionName = "toolsets" | "read_only" | "tools" | "exclude_tools" | "confirm"
 
-/** A setting's command-line flag and environment variable; a boolean flag takes no value. */
-type Option = { flag: string; env: string; boolean?: true }
+/** A setting's command-line flag and the end of its environment variable, which follows the profile's prefix; a boolean flag takes no value. */
+type Option = { flag: string; envSuffix: string; boolean?: true }
 
 const OPTIONS: Record<OptionName, Option> = {
-  toolsets: { flag: "--toolsets", env: "GITHUB_TOOLS_TOOLSETS" },
-  read_only: { flag: "--read-only", env: "GITHUB_TOOLS_READ_ONLY", boolean: true },
-  tools: { flag: "--tools", env: "GITHUB_TOOLS_TOOLS" },
-  exclude_tools: { flag: "--exclude-tools", env: "GITHUB_TOOLS_EXCLUDE_TOOLS" },
-  confirm: { flag: "--confirm", env: "GITHUB_TOOLS_CONFIRM" },
+  toolsets: { flag: "--toolsets", envSuffix: "TOOLSETS" },
+  read_only: { flag: "--read-only", envSuffix: "READ_ONLY", boolean: true },
+  tools: { flag: "--tools", envSuffix: "TOOLS" },
+  exclude_tools: { flag: "--exclude-tools", envSuffix: "EXCLUDE_TOOLS" },
+  confirm: { flag: "--confirm", envSuffix: "CONFIRM" },
+}
+
+function envName(name: OptionName, profile: EntryProfile): string {
+  return `${profile.envPrefix}_${OPTIONS[name].envSuffix}`
 }
 
 /** The environment variables the settings are read from, in the order the settings are listed. */
-export function settingVariables(): string[] {
-  return (Object.keys(OPTIONS) as OptionName[]).map((name) => OPTIONS[name].env)
+export function settingVariables(profile: EntryProfile = PROJECT_PROFILE): string[] {
+  return (Object.keys(OPTIONS) as OptionName[]).map((name) => envName(name, profile))
 }
 
-/** The environment variables the tools read besides the settings, which Codex forwards to the server after them. */
-export const TOOL_VARIABLES: readonly string[] = []
-
-/** The environment variables a harness that forwards only named variables must pass the server: the settings' variables, then `TOOL_VARIABLES`. */
-export function forwardedVariables(toolVariables: readonly string[] = TOOL_VARIABLES): string[] {
-  return [...settingVariables(), ...toolVariables]
+/** The environment variables a harness that forwards only named variables must pass the server: the settings' variables, then the package's `toolVariables`. */
+export function forwardedVariables(
+  profile: EntryProfile = PROJECT_PROFILE,
+  toolVariables: readonly string[] = PROJECT.toolVariables,
+): string[] {
+  return [...settingVariables(profile), ...toolVariables]
 }
 
 function readFlags(argv: string[]): Partial<Record<OptionName, string>> {
@@ -68,16 +74,17 @@ function splitList(value: string): string[] {
     .filter((item) => item !== "")
 }
 
-function checkToolsets(names: string[], source: string): Toolset[] | "all" | undefined {
+function checkToolsets(names: string[], source: string, toolsets: Toolsets): string[] | "all" | undefined {
   if (names.includes(ALL_TOOLSETS)) return ALL_TOOLSETS
-  const unknown = names.find((name) => !(TOOLSETS as readonly string[]).includes(name))
+  const unknown = names.find((name) => !toolsets.names.includes(name))
   if (unknown !== undefined) {
-    throw new ToolError(
-      "invalid_argument",
-      `Unknown toolset "${unknown}" in ${source}; use one of ${TOOLSETS.join(", ")} or "${ALL_TOOLSETS}".`,
-    )
+    const known =
+      toolsets.names.length > 0
+        ? `use one of ${toolsets.names.join(", ")} or "${ALL_TOOLSETS}"`
+        : "no toolsets are defined"
+    throw new ToolError("invalid_argument", `Unknown toolset "${unknown}" in ${source}; ${known}.`)
   }
-  return names.length ? (names as Toolset[]) : undefined
+  return names.length ? names : undefined
 }
 
 function parseBoolean(value: string, source: string): boolean {
@@ -104,25 +111,34 @@ function parseConfirm(value: string, source: string): ConfirmMode {
 /** A setting given as text, and where it came from, for error messages. */
 type SettingText = { text: string; source: string }
 
-function envText(name: OptionName, env: Record<string, string | undefined>): SettingText | undefined {
-  const option = OPTIONS[name]
-  const text = env[option.env]
-  return text === undefined || text.trim() === "" ? undefined : { text, source: option.env }
+function envText(
+  name: OptionName,
+  env: Record<string, string | undefined>,
+  profile: EntryProfile,
+): SettingText | undefined {
+  const variable = envName(name, profile)
+  const text = env[variable]
+  return text === undefined || text.trim() === "" ? undefined : { text, source: variable }
 }
 
 /**
  * Reads the settings every entry point takes from its command line and
- * environment. A flag wins over its environment variable; an empty list
- * item is dropped. A mistake is `invalid_argument` naming the culprit.
+ * environment (`<envPrefix>_<SETTING>` variables). A flag wins over its
+ * environment variable; an empty list item is dropped. A mistake is
+ * `invalid_argument` naming the culprit.
  */
-export function parseSettings(argv: string[], env: Record<string, string | undefined>): EntrySettings {
+export function parseSettings(
+  argv: string[],
+  env: Record<string, string | undefined>,
+  profile: EntryProfile = PROJECT_PROFILE,
+): EntrySettings {
   const flags = readFlags(argv)
   const value = (name: OptionName): SettingText | undefined =>
-    flags[name] !== undefined ? { text: flags[name], source: OPTIONS[name].flag } : envText(name, env)
+    flags[name] !== undefined ? { text: flags[name], source: OPTIONS[name].flag } : envText(name, env, profile)
 
   const settings: EntrySettings = { confirm: "harness" }
   const toolsets = value("toolsets")
-  if (toolsets) settings.toolsets = checkToolsets(splitList(toolsets.text), toolsets.source)
+  if (toolsets) settings.toolsets = checkToolsets(splitList(toolsets.text), toolsets.source, profile.toolsets)
   const readOnly = value("read_only")
   if (readOnly) settings.read_only = parseBoolean(readOnly.text, readOnly.source)
   const tools = value("tools")
@@ -137,15 +153,23 @@ export function parseSettings(argv: string[], env: Record<string, string | undef
 /**
  * Reads the tool settings from a command line that has no `confirm` setting,
  * for entry points whose caller does the confirming: `--confirm` is
- * `invalid_argument`, and `GITHUB_TOOLS_CONFIRM` is ignored. Everything else
+ * `invalid_argument`, and `<envPrefix>_CONFIRM` is ignored. Everything else
  * is read as `parseSettings` reads it.
  */
-export function parseToolSettings(argv: string[], env: Record<string, string | undefined>): ToolSettings {
-  const { flag, env: confirmEnv } = OPTIONS.confirm
+export function parseToolSettings(
+  argv: string[],
+  env: Record<string, string | undefined>,
+  profile: EntryProfile = PROJECT_PROFILE,
+): ToolSettings {
+  const { flag } = OPTIONS.confirm
   if (argv.some((arg) => arg === flag || arg.startsWith(`${flag}=`))) {
     throw new ToolError("invalid_argument", `Option ${flag} is not available here.`)
   }
-  const { confirm: _confirm, ...settings } = parseSettings(argv, { ...env, [confirmEnv]: undefined })
+  const { confirm: _confirm, ...settings } = parseSettings(
+    argv,
+    { ...env, [envName("confirm", profile)]: undefined },
+    profile,
+  )
   return settings
 }
 
@@ -160,11 +184,11 @@ function optionError(name: string, expected: string): ToolError {
   return new ToolError("invalid_argument", `Option "${name}" must be ${expected}.`)
 }
 
-function toolsetsOption(value: unknown): Toolset[] | "all" | undefined {
+function toolsetsOption(value: unknown, toolsets: Toolsets): string[] | "all" | undefined {
   if (value === ALL_TOOLSETS) return ALL_TOOLSETS
   const names = stringList(value)
   if (!names) throw optionError("toolsets", `a list of toolset names or "${ALL_TOOLSETS}"`)
-  return checkToolsets(names, 'option "toolsets"')
+  return checkToolsets(names, 'option "toolsets"', toolsets)
 }
 
 function booleanOption(value: unknown): boolean {
@@ -183,8 +207,10 @@ function listOption(name: "tools" | "exclude_tools"): (value: unknown) => string
 const LANGUAGE_OPTION = "language"
 const PLUGIN_OPTION_NAMES: readonly string[] = [...TOOL_OPTION_NAMES, LANGUAGE_OPTION]
 
-/** The environment variable of the `language` setting; it is no setting variable the manifests forward. */
-export const LANGUAGE_VARIABLE = "GITHUB_TOOLS_LANGUAGE"
+/** The environment variable of the `language` setting: `<envPrefix>_LANGUAGE`. */
+export function languageVariable(profile: EntryProfile = PROJECT_PROFILE): string {
+  return `${profile.envPrefix}_LANGUAGE`
+}
 
 /** The tool settings plus the language of a native plugin's approval prompt, as given (matched later against the package's translations). */
 export type PluginSettings = ToolSettings & { language?: string }
@@ -194,13 +220,14 @@ function nonBlank(text: string | undefined): string | undefined {
   return trimmed === "" ? undefined : trimmed
 }
 
-/** The language of the prompt from a command line's `--language` value, else `GITHUB_TOOLS_LANGUAGE`, else the harness's own display language; blank values count as unset. */
+/** The language of the prompt from a command line's `--language` value, else `<envPrefix>_LANGUAGE`, else the harness's own display language; blank values count as unset. */
 export function promptLanguage(
   flag: string | undefined,
   env: Record<string, string | undefined>,
   harness: string | undefined,
+  profile: EntryProfile = PROJECT_PROFILE,
 ): string | undefined {
-  return nonBlank(flag) ?? nonBlank(env[LANGUAGE_VARIABLE]) ?? nonBlank(harness)
+  return nonBlank(flag) ?? nonBlank(env[languageVariable(profile)]) ?? nonBlank(harness)
 }
 
 function languageOption(value: unknown): string | undefined {
@@ -212,7 +239,7 @@ function languageOption(value: unknown): string | undefined {
  * Reads the tool settings and the prompt language from the options a plugin
  * is configured with, for entry points that have no command line. An option
  * wins over its environment variable (`language` falls back to
- * `GITHUB_TOOLS_LANGUAGE`, blank meaning unset, and is not checked against any
+ * `<envPrefix>_LANGUAGE`, blank meaning unset, and is not checked against any
  * list); an option of the wrong type, or one this function does not know, is
  * `invalid_argument` naming it. `confirm` is not an option here: the harness
  * asks.
@@ -220,6 +247,7 @@ function languageOption(value: unknown): string | undefined {
 export function settingsFromOptions(
   options: Record<string, unknown> | undefined,
   env: Record<string, string | undefined>,
+  profile: EntryProfile = PROJECT_PROFILE,
 ): PluginSettings {
   const given = options ?? {}
   const unknown = Object.keys(given).find((name) => !PLUGIN_OPTION_NAMES.includes(name))
@@ -236,12 +264,16 @@ export function settingsFromOptions(
     fromText: (text: SettingText) => T,
   ): T | undefined => {
     if (given[name] !== undefined) return fromOption(given[name])
-    const text = envText(name, env)
+    const text = envText(name, env, profile)
     return text !== undefined ? fromText(text) : undefined
   }
 
   const settings: PluginSettings = {}
-  const toolsets = resolve("toolsets", toolsetsOption, ({ text, source }) => checkToolsets(splitList(text), source))
+  const toolsets = resolve(
+    "toolsets",
+    (value) => toolsetsOption(value, profile.toolsets),
+    ({ text, source }) => checkToolsets(splitList(text), source, profile.toolsets),
+  )
   if (toolsets !== undefined) settings.toolsets = toolsets
   const readOnly = resolve("read_only", booleanOption, ({ text, source }) => parseBoolean(text, source))
   if (readOnly !== undefined) settings.read_only = readOnly
@@ -252,7 +284,7 @@ export function settingsFromOptions(
   const language =
     given[LANGUAGE_OPTION] !== undefined
       ? languageOption(given[LANGUAGE_OPTION])
-      : promptLanguage(undefined, env, undefined)
+      : promptLanguage(undefined, env, undefined, profile)
   if (language !== undefined) settings.language = language
   return settings
 }

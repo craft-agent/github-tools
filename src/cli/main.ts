@@ -1,4 +1,5 @@
 import { packageRoot } from "../entry/package-root"
+import { PROJECT } from "../project"
 import { ALL_TOOLS } from "../tools"
 import { ALL_TRANSLATIONS } from "../words"
 import { EXIT_FAILED, runCli } from "./cli"
@@ -33,6 +34,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  process.stderr.write(`github-tools-cli: ${error instanceof Error ? error.message : String(error)}\n`)
+  process.stderr.write(`${PROJECT.cli}: ${error instanceof Error ? error.message : String(error)}\n`)
   process.exitCode = EXIT_FAILED
 })

@@ -2,6 +2,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { isToolError } from "../core"
 import { packageRoot } from "../entry/package-root"
 import { parseSettings } from "../entry/settings"
+import { PROJECT } from "../project"
 import { ALL_TOOLS } from "../tools"
 import { createServer } from "./server"
 
@@ -18,7 +19,7 @@ async function main(): Promise<void> {
     })
   } catch (error) {
     if (!isToolError(error)) throw error
-    process.stderr.write(`github-tools: ${error.message}\n`)
+    process.stderr.write(`${PROJECT.name}: ${error.message}\n`)
     process.exitCode = EXIT_USAGE
     return
   }
@@ -26,6 +27,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  process.stderr.write(`github-tools: ${error instanceof Error ? error.message : String(error)}\n`)
+  process.stderr.write(`${PROJECT.name}: ${error instanceof Error ? error.message : String(error)}\n`)
   process.exitCode = 1
 })

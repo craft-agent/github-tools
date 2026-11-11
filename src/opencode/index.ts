@@ -1,11 +1,10 @@
 import { packageRoot } from "../entry/package-root"
+import { PROJECT } from "../project"
 import { ALL_TOOLS } from "../tools"
 import { ALL_TRANSLATIONS } from "../words"
 import { createV1Server } from "./v1"
 import { createV2Setup } from "./v2"
 import type { OpenCodePlugin } from "./types"
-
-const PLUGIN_ID = "github-tools"
 
 /** The skills sit in the package root, one level above the built `dist/opencode.js`. */
 const SKILLS_DIR = new URL("../skills/", import.meta.url)
@@ -15,7 +14,7 @@ const OWN_DIR = packageRoot(import.meta.url)
 
 /** The OpenCode plugin: V2 reads `id` and `setup`, V1 reads `server`. */
 const plugin: OpenCodePlugin = {
-  id: PLUGIN_ID,
+  id: PROJECT.name,
   setup: createV2Setup(ALL_TOOLS, { skillsDir: SKILLS_DIR, ownDir: OWN_DIR, translations: ALL_TRANSLATIONS }),
   server: createV1Server(ALL_TOOLS, { ownDir: OWN_DIR, translations: ALL_TRANSLATIONS }),
 }

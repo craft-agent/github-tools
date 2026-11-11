@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { isToolError } from "../core"
 import {
-  LANGUAGE_VARIABLE,
+  languageVariable,
   parseSettings,
   parseToolSettings,
   promptLanguage,
@@ -22,10 +22,10 @@ function failure(run: () => unknown): Error {
 const fromOptions = (options: Record<string, unknown> | undefined, env: Record<string, string | undefined> = {}) =>
   settingsFromOptions(options, env)
 
-describe("LANGUAGE_VARIABLE", () => {
+describe("languageVariable", () => {
   test("is GITHUB_TOOLS_LANGUAGE, and no setting variable", () => {
-    expect(LANGUAGE_VARIABLE).toBe("GITHUB_TOOLS_LANGUAGE")
-    expect(settingVariables()).not.toContain(LANGUAGE_VARIABLE)
+    expect(languageVariable()).toBe("GITHUB_TOOLS_LANGUAGE")
+    expect(settingVariables()).not.toContain(languageVariable())
   })
 })
 

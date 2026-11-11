@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { ToolError, defineTool, type ToolSpec, type Toolset, type Translations, type WriteClass } from "../core"
+import { ToolError, defineTool, type ToolSpec, type Translations, type WriteClass } from "../core"
 
 /** Fixtures the OpenCode plugin tests share. */
 
@@ -42,7 +42,7 @@ export const ENGLISH_LABEL =
 export const JAPANESE_LABEL =
   'リポジトリ "Octo/Hello" にラベルを付ける\n\n--- 詳細 ---\n\n対象: octo/hello\nリポジトリ: Octo/Hello\n\n--- 本文 ---\n\nBody<U+202E>'
 
-function fixture(id: string, toolset: Toolset, writeClass: WriteClass, events: string[]): ToolSpec {
+function fixture(id: string, toolset: string, writeClass: WriteClass, events: string[]): ToolSpec {
   return defineTool({
     id,
     title: `Title of ${id}`,

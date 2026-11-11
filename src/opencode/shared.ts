@@ -12,14 +12,17 @@ import { DESCRIBE_TIMEOUT_MS, approvalPrompt, standIn, type ShownDescription } f
 import { errorText } from "../entry/errors"
 import { ANY_RESOURCE } from "../entry/permission"
 import { checkPin } from "../entry/pin"
+import { PROJECT_PROFILE, type EntryProfile } from "../entry/profile"
 import { settingsFromOptions } from "../entry/settings"
 import { promptTranslator, promptWords } from "../entry/words"
 import type { PluginOptions } from "./types"
 
 /** What a plugin takes from its surroundings; each has a default, and a test supplies its own. */
 export type PluginDeps = {
-  /** Where the `GITHUB_TOOLS_*` settings fall back to; defaults to `process.env`. */
+  /** Where the `<envPrefix>_*` settings fall back to; defaults to `process.env`. */
   env?: Record<string, string | undefined>
+  /** The settings' environment prefix and the toolsets; defaults to this package's. */
+  profile?: EntryProfile
   /** The directory holding `<name>/SKILL.md` files, for the harness version that registers skills. */
   skillsDir?: URL | string
   /** Where the plugin is installed: never a call's working tree, so a bare number there fails. */
@@ -63,9 +66,10 @@ export function selectedTools(
   options: PluginOptions | undefined,
   deps: PluginDeps,
 ): { specs: ToolSpec[]; translator: Translator } {
-  const settings = settingsFromOptions(options, deps.env ?? process.env)
+  const profile = deps.profile ?? PROJECT_PROFILE
+  const settings = settingsFromOptions(options, deps.env ?? process.env, profile)
   return {
-    specs: selectTools(specs, settings),
+    specs: selectTools(specs, settings, profile.toolsets),
     translator: promptTranslator(deps.translations ?? {}, settings.language),
   }
 }

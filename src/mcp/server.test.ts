@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { z } from "zod"
 import { REQUIRES_USER_INTERACTION, ToolError, annotations, defineTool, selectTools } from "../core"
 import type { EntrySettings } from "../entry/settings"
+import { PROJECT_PROFILE } from "../entry/profile"
 import { ALL_TOOLS } from "../tools"
 import { createServer } from "./server"
 import {
@@ -35,7 +36,7 @@ describe("tool list", () => {
   }
 
   test("follows selectTools: the default toolsets", async () => {
-    expect(await names(settings())).toEqual(selectTools(specs, {}).map((s) => s.id))
+    expect(await names(settings())).toEqual(selectTools(specs, {}, PROJECT_PROFILE.toolsets).map((s) => s.id))
     expect(await names(settings())).toEqual([
       "github_issue_read",
       "github_issue_create",
@@ -52,7 +53,7 @@ describe("tool list", () => {
       { exclude_tools: ["github_issue_edit"] },
       { toolsets: ["repos" as const], exclude_tools: ["github_repo_read"] },
     ]) {
-      expect(await names(settings(given))).toEqual(selectTools(specs, given).map((s) => s.id))
+      expect(await names(settings(given))).toEqual(selectTools(specs, given, PROJECT_PROFILE.toolsets).map((s) => s.id))
     }
   })
 

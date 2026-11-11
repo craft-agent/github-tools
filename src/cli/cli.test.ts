@@ -11,6 +11,8 @@ import {
   type Translations,
 } from "../core"
 import { tempRepo } from "../testing/git-repo"
+import { PROJECT_PROFILE } from "../entry/profile"
+import { PROJECT } from "../project"
 import { EXIT_FAILED, EXIT_OK, EXIT_USAGE, runCli, type CliIo } from "./cli"
 
 const input = z.object({
@@ -199,7 +201,9 @@ describe("list", () => {
     expect(run.code).toBe(EXIT_OK)
     expect(run.stderr).toBe("")
     const listed = json(run)
-    expect(listed.map((entry: { id: string }) => entry.id)).toEqual(selectTools(specs, {}).map((spec) => spec.id))
+    expect(listed.map((entry: { id: string }) => entry.id)).toEqual(
+      selectTools(specs, {}, PROJECT_PROFILE.toolsets).map((spec) => spec.id),
+    )
     expect(listed[0]).toEqual({
       id: READ_ID,
       title: `Title of ${READ_ID}`,
@@ -644,7 +648,7 @@ describe("pin", () => {
         const result = await run(["run", STAMP_ID, "--cwd", "/x", ...flags])
         expect(result.code).toBe(EXIT_USAGE)
         expect(result.stdout).toBe("")
-        expect(result.stderr).toStartWith("github-tools-cli: Option --pin needs")
+        expect(result.stderr).toStartWith(`${PROJECT.cli}: Option --pin needs`)
       }
       expect(state.runs).toBe(0)
     })
@@ -655,7 +659,7 @@ describe("pin", () => {
         expect(result).toEqual({
           code: EXIT_USAGE,
           stdout: "",
-          stderr: "github-tools-cli: Option --pin needs a value.\n",
+          stderr: `${PROJECT.cli}: Option --pin needs a value.\n`,
         })
       }
     })
@@ -682,7 +686,7 @@ describe("target flags", () => {
       expect(run).toEqual({
         code: EXIT_USAGE,
         stdout: "",
-        stderr: `github-tools-cli: Option ${flag} needs a value.\n`,
+        stderr: `${PROJECT.cli}: Option ${flag} needs a value.\n`,
       })
     }
   })

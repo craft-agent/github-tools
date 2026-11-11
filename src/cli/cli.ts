@@ -15,16 +15,18 @@ import {
 } from "../core"
 import { errorBody } from "../entry/errors"
 import { approvalOf, checkPin } from "../entry/pin"
+import { PROJECT_PROFILE, type EntryProfile } from "../entry/profile"
 import { parseToolSettings, promptLanguage } from "../entry/settings"
 import { visible } from "../entry/visible"
 import { promptTranslator, promptWords } from "../entry/words"
+import { PROJECT } from "../project"
 
 /** The exit codes of a command: it did its work, the work failed, or the command line was wrong. */
 export const EXIT_OK = 0
 export const EXIT_FAILED = 1
 export const EXIT_USAGE = 2
 
-const PROGRAM = "github-tools-cli"
+const PROGRAM = PROJECT.cli
 const CWD_FLAG = "--cwd"
 const LANGUAGE_FLAG = "--language"
 const HARNESS_LANGUAGE_FLAG = "--harness-language"
@@ -34,8 +36,10 @@ const PIN_FLAG = "--pin"
 export type CliIo = {
   /** The tools the command line can select from. */
   specs: ToolSpec[]
-  /** Where the `GITHUB_TOOLS_*` settings fall back to. */
+  /** Where the `<envPrefix>_*` settings fall back to. */
   env: Record<string, string | undefined>
+  /** The settings' environment prefix and the toolsets; defaults to this package's. */
+  profile?: EntryProfile
   /** Reads standard input to its end; an empty string when there is none. */
   readStdin(): Promise<string>
   /** Receives the JSON document a command answers with. */
@@ -81,10 +85,12 @@ function takeFlag(argv: string[], flag: string): { value: string | undefined; re
 }
 
 /** Reads the command line; a mistake in it, in the settings or in the tool selection is `invalid_argument`. */
-function parseCommand(argv: string[], io: Pick<CliIo, "specs" | "env">): Command {
+function parseCommand(argv: string[], io: Pick<CliIo, "specs" | "env" | "profile">): Command {
+  const profile = io.profile ?? PROJECT_PROFILE
+  const select = (flags: string[]) => selectTools(io.specs, parseToolSettings(flags, io.env, profile), profile.toolsets)
   const [name, ...args] = argv
   if (name === "list") {
-    return { name, selected: selectTools(io.specs, parseToolSettings(args, io.env)) }
+    return { name, selected: select(args) }
   }
   if (name !== "run" && name !== "target") {
     const given = name === undefined ? "No command given" : `Unknown command "${name}"`
@@ -101,13 +107,13 @@ function parseCommand(argv: string[], io: Pick<CliIo, "specs" | "env">): Command
     const { value: language, rest: afterLanguage } = takeFlag(rest, LANGUAGE_FLAG)
     const { value: harnessLanguage, rest: unknown } = takeFlag(afterLanguage, HARNESS_LANGUAGE_FLAG)
     if (unknown.length > 0) throw usageError(`Unknown option "${unknown[0]}".`)
-    return { name, toolId, cwd, language: promptLanguage(language, io.env, harnessLanguage) }
+    return { name, toolId, cwd, language: promptLanguage(language, io.env, harnessLanguage, profile) }
   }
   const { value: pin, rest: selection } = takeFlag(rest, PIN_FLAG)
   if (pin !== undefined && !PIN_PATTERN.test(pin)) {
     throw usageError(`Option ${PIN_FLAG} needs the 64 lowercase hexadecimal digits \`target\` answered with.`)
   }
-  return { name, toolId, cwd, pin, selected: selectTools(io.specs, parseToolSettings(selection, io.env)) }
+  return { name, toolId, cwd, pin, selected: select(selection) }
 }
 
 function describeSpec(spec: ToolSpec) {
@@ -212,7 +218,7 @@ function errorDetail(error: unknown): string {
  * a cut value or text left out, and `dropped` the number of facts left out
  * past the eighth, each present only when it is above zero), and a `pin` (64 hex digits, independent of the
  * language) of that description and the resources when there is a description.
- * `target` takes `--language <tag>`, else `GITHUB_TOOLS_LANGUAGE`, else
+ * `target` takes `--language <tag>`, else `<envPrefix>_LANGUAGE`, else
  * `--harness-language <tag>` (the harness's own
  * display language) as the prompt language; none, or one without a table,
  * keeps English. Standard output carries only the JSON document; a

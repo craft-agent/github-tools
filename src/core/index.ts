@@ -32,10 +32,8 @@ export {
 } from "./refs"
 export { ANY_TARGET, writeTargets } from "./targets"
 export {
-  DEFAULT_TOOLSETS,
   REQUIRES_USER_INTERACTION,
   StepErrors,
-  TOOLSETS,
   annotations,
   confirmWrite,
   defineTool,
@@ -55,7 +53,7 @@ export {
   type ToolContext,
   type ToolSettings,
   type ToolSpec,
-  type Toolset,
+  type Toolsets,
   type WriteClass,
 } from "./tool"
 export {

@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test"
 import { z } from "zod"
+import { PROJECT_PROFILE } from "../entry/profile"
+import { PROJECT } from "../project"
 import { ToolError, isToolError } from "./errors"
 import {
-  DEFAULT_TOOLSETS,
   REQUIRES_USER_INTERACTION,
   StepErrors,
-  TOOLSETS,
   annotations,
   confirmWrite,
   defineTool,
@@ -16,14 +16,13 @@ import {
   toolMeta,
   type ToolContext,
   type ToolSpec,
-  type Toolset,
   type WriteClass,
 } from "./tool"
 
 const input = z.object({ count: z.number().int(), label: z.string().optional() })
 const output = z.object({ total: z.number() })
 
-function spec(id: string, toolset: Toolset, writeClass: WriteClass): ToolSpec {
+function spec(id: string, toolset: string, writeClass: WriteClass): ToolSpec {
   return defineTool({
     id,
     title: id,
@@ -61,20 +60,22 @@ describe("defineTool", () => {
     expect(defineTool(given)).toBe(given)
   })
 
-  test.each(["github_issue_create", "github_project_item_add", "github_issue_read"])("accepts %s", (id) => {
+  test.each(["demo_thing_create", "demo_thing_item_add", "demo_thing_read", "a_b_c"])("accepts %s", (id) => {
     expect(() => defineTool({ ...base, id })).not.toThrow()
   })
 
   test.each([
-    "issue_create",
-    "github_issue",
-    "github_Issue_create",
-    "github_issue_create2",
-    "github__issue",
-    "github_issue-create",
-    "mcp_github_issue_create",
+    "thing_create",
+    "demo_thing",
+    "demo",
+    "demo_Thing_create",
+    "demo_thing_create2",
+    "demo__thing_create",
+    "demo_thing-create",
+    "_demo_thing_create",
+    "demo_thing_create_",
   ])("rejects the id %s", (id) => {
-    expect(() => defineTool({ ...base, id })).toThrow(/github_<domain>_<verb>/)
+    expect(() => defineTool({ ...base, id })).toThrow(/<prefix>_<domain>_<verb>/)
   })
 
   test("rejects an id over 40 characters", () => {
@@ -257,10 +258,11 @@ describe("selectTools", () => {
     spec("github_project_item_add", "projects", "add"),
     spec("github_release_create", "releases", "add"),
   ]
-  const ids = (settings?: Parameters<typeof selectTools>[1]) => selectTools(all, settings).map((s) => s.id)
+  const ids = (settings: Parameters<typeof selectTools>[1] = {}) =>
+    selectTools(all, settings, PROJECT_PROFILE.toolsets).map((s) => s.id)
 
   test("defaults to issues, pull_requests and projects", () => {
-    expect(DEFAULT_TOOLSETS).toEqual(["issues", "pull_requests", "projects"])
+    expect(PROJECT.defaultToolsets).toEqual(["issues", "pull_requests", "projects"])
     expect(ids()).toEqual([
       "github_issue_read",
       "github_issue_create",
@@ -320,20 +322,20 @@ describe("selectTools", () => {
   test("an unknown toolset is invalid_argument naming it", () => {
     const error = (() => {
       try {
-        selectTools(all, { toolsets: ["issues", "nope" as Toolset] })
+        selectTools(all, { toolsets: ["issues", "nope"] }, PROJECT_PROFILE.toolsets)
       } catch (e) {
         return e
       }
     })()
     expect(isToolError(error) && error.code).toBe("invalid_argument")
     expect((error as Error).message).toContain("nope")
-    for (const name of TOOLSETS) expect((error as Error).message).toContain(name)
+    for (const name of PROJECT.toolsets) expect((error as Error).message).toContain(name)
   })
 
   test("an unknown tool id in tools or exclude_tools is invalid_argument naming it", () => {
     for (const settings of [{ tools: ["github_nope_read"] }, { exclude_tools: ["github_nope_read"] }]) {
       try {
-        selectTools(all, settings)
+        selectTools(all, settings, PROJECT_PROFILE.toolsets)
         throw new Error("expected selectTools to throw")
       } catch (error) {
         expect(isToolError(error) && error.code).toBe("invalid_argument")
@@ -344,7 +346,7 @@ describe("selectTools", () => {
 
   test("duplicate ids are a plain Error", () => {
     try {
-      selectTools([all[0]!, all[0]!])
+      selectTools([all[0]!, all[0]!], {}, PROJECT_PROFILE.toolsets)
       throw new Error("expected selectTools to throw")
     } catch (error) {
       expect(isToolError(error)).toBe(false)
