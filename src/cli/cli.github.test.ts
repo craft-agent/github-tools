@@ -33,6 +33,16 @@ async function target(cwd: string, args = {}, ownDir?: string) {
 }
 
 describe("GitHub targets", () => {
+  test("reads GITHUB_TOOLS_LANGUAGE with the package profile", async () => {
+    const run = await cli(["target", spec.id, "--cwd", "/x"], '{"repo":"Octo/Hello"}', {
+      specs: [spec],
+      profile: undefined,
+      env: { GITHUB_TOOLS_LANGUAGE: "ja" },
+    })
+    expect(run.code).toBe(EXIT_OK)
+    expect(json(run).words.details).toBe("詳細")
+  })
+
   test("is the lowercased repo argument", async () => {
     expect(await target("/x", { repo: "Octo/Hello" })).toEqual(["octo/hello"])
   })
