@@ -1,8 +1,7 @@
-import { realpath } from "node:fs/promises"
-import { isAbsolute, relative, sep } from "node:path"
 import { ToolError } from "./errors"
 import { exec, type ExecResult } from "./exec"
 import { passthroughEnv } from "./gh"
+import { isWithin } from "./paths"
 import type { ToolContext } from "./tool"
 
 export type RepoName = { owner: string; name: string; full: string }
@@ -119,16 +118,6 @@ function gitEnv(): Record<string, string> {
     if (value !== undefined) env[name] = value
   }
   return { ...env, GIT_TERMINAL_PROMPT: "0" }
-}
-
-/** Whether `dir` is `root` or inside it, compared by real path; a path that cannot be resolved is not. */
-export async function isWithin(dir: string, root: string): Promise<boolean> {
-  try {
-    const path = relative(await realpath(root), await realpath(dir))
-    return path === "" || !(path === ".." || path.startsWith(`..${sep}`) || isAbsolute(path))
-  } catch {
-    return false
-  }
 }
 
 /**

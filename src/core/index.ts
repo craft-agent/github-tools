@@ -1,5 +1,6 @@
 export { ToolError, isAbortError, isToolError, type ErrorCode, type ErrorDetails, type JsonValue } from "./errors"
 export { abortError, exec, type ExecOptions, type ExecResult } from "./exec"
+export { isWithin } from "./paths"
 export {
   DEFAULT_GH_TIMEOUT_MS,
   GraphQLToolError,
@@ -20,7 +21,6 @@ export {
   type Vars,
 } from "./gh"
 export {
-  isWithin,
   parseNumberRef,
   parseRepo,
   repoFromOrigin,
