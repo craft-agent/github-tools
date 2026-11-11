@@ -16,11 +16,11 @@ class SkillsTest(FakeCliCase):
         return path
 
     def test_registers_each_skill_without_the_skill_prefix(self) -> None:
-        issues = self.skill("issues", f"---\nname: {project.SKILL_PREFIX}issues\ndescription: Work with issues\n---\n# Issues\n")
-        boards = self.skill("boards", f'---\nname: "{project.SKILL_PREFIX}project-boards"\ndescription: \'It\'\'s a board\'\n---\nBody')
+        items = self.skill("items", f"---\nname: {project.SKILL_PREFIX}items\ndescription: Work with items\n---\n# Items\n")
+        widgets = self.skill("widgets", f'---\nname: "{project.SKILL_PREFIX}widgets"\ndescription: \'It\'\'s a widget\'\n---\nBody')
         self.assertEqual(
             self.register().skills,
-            [("project-boards", boards, "It's a board"), ("issues", issues, "Work with issues")],
+            [("items", items, "Work with items"), ("widgets", widgets, "It's a widget")],
         )
 
     def test_a_skill_without_a_name_takes_its_folder_name(self) -> None:
@@ -40,8 +40,8 @@ class SkillsTest(FakeCliCase):
         self.assertEqual(self.register().skills, [(project.SKILL_PREFIX, path, "")])
 
     def test_the_first_of_two_skills_with_one_name_wins(self) -> None:
-        first = self.skill("a", f"---\nname: {project.SKILL_PREFIX}issues\n---\nA")
-        self.skill("b", f"---\nname: {project.SKILL_PREFIX}issues\n---\nB")
+        first = self.skill("a", f"---\nname: {project.SKILL_PREFIX}items\n---\nA")
+        self.skill("b", f"---\nname: {project.SKILL_PREFIX}items\n---\nB")
         self.assertEqual([path for _, path, _ in self.register().skills], [first])
 
     def test_folders_without_a_skill_file_and_plain_files_are_skipped(self) -> None:

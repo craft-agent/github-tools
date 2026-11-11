@@ -18,19 +18,19 @@ class SettingsFlagsTest(unittest.TestCase):
     def test_each_setting_becomes_its_flag(self) -> None:
         self.assertEqual(
             self.flags(
-                toolsets=["issues", "projects"],
+                toolsets=["things", "widgets"],
                 read_only=True,
-                tools=["github_repo_read"],
-                exclude_tools=["github_pr_merge", "github_repo_edit"],
+                tools=["demo_thing_read"],
+                exclude_tools=["demo_widget_update", "demo_gadget_edit"],
             ),
             [
                 "--toolsets",
-                "issues,projects",
+                "things,widgets",
                 "--read-only",
                 "--tools",
-                "github_repo_read",
+                "demo_thing_read",
                 "--exclude-tools",
-                "github_pr_merge,github_repo_edit",
+                "demo_widget_update,demo_gadget_edit",
             ],
         )
 
@@ -43,10 +43,10 @@ class SettingsFlagsTest(unittest.TestCase):
 
     def test_a_wrong_type_is_refused(self) -> None:
         for config in (
-            {"toolsets": "issues"},
+            {"toolsets": "things"},
             {"toolsets": 3},
             {"read_only": "true"},
-            {"tools": "github_repo_read"},
+            {"tools": "demo_thing_read"},
             {"exclude_tools": [1]},
         ):
             with self.subTest(config=config), self.assertRaises(settings.SettingsError):

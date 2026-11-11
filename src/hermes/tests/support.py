@@ -22,7 +22,7 @@ FAKE_CLI = Path(__file__).resolve().parent / "fake_cli.py"
 
 CWD = "/work/tree"
 IMPL = "_impl"
-ROOT_NAME = "hermes_plugins_github_tools"
+ROOT_NAME = "hermes_plugins_agent_tool_starter"
 
 
 def load_root(root: Path, name: str) -> types.ModuleType:
@@ -92,19 +92,19 @@ def tool_entry(tool_id: str, toolset: str, write_class: str, title: str | None =
         "toolset": toolset,
         "class": write_class,
         "annotations": {},
-        "input_schema": {"type": "object", "properties": {"repo": {"type": "string"}}, "additionalProperties": False},
+        "input_schema": {"type": "object", "properties": {"target": {"type": "string"}}, "additionalProperties": False},
         "output_schema": {"type": "object"},
     }
 
 
 LISTING = [
-    tool_entry("github_issue_read", "issues", "read"),
-    tool_entry("github_issue_comment", "issues", "add", "Comment on an issue"),
-    tool_entry("github_pr_merge", "pull_requests", "administrative", "Merge a pull request"),
-    tool_entry("github_project_item_add", "projects", "add"),
-    tool_entry("github_repo_edit", "repos", "overwrite"),
-    tool_entry("github_release_publish", "releases", "administrative"),
-    tool_entry("github_run_rerun", "actions", "idempotent"),
+    tool_entry("demo_thing_read", "things", "read"),
+    tool_entry("demo_thing_create", "things", "add", "Create a thing"),
+    tool_entry("demo_widget_update", "widgets", "administrative", "Update a widget"),
+    tool_entry("demo_item_add", "items", "add"),
+    tool_entry("demo_gadget_edit", "gadgets", "overwrite"),
+    tool_entry("demo_bundle_publish", "bundles", "administrative"),
+    tool_entry("demo_task_run", "tasks", "idempotent"),
 ]
 
 
@@ -136,7 +136,7 @@ class FakeCliCase(unittest.TestCase):
     replies: dict[str, dict[str, Any]]
 
     def setUp(self) -> None:
-        self.dir = Path(tempfile.mkdtemp(prefix="github-tools-hermes-"))
+        self.dir = Path(tempfile.mkdtemp(prefix="agent-tool-starter-hermes-"))
         self.addCleanup(shutil.rmtree, self.dir, True)
         self.log = self.dir / "calls.jsonl"
         self.fixture = self.dir / "fixture.json"

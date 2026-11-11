@@ -11,10 +11,10 @@ from support import FAKE_CLI, FakeCliCase, StubContext, listing, plugin, project
 
 class ToolInfoIntentTest(unittest.TestCase):
     def info(self, **fields: Any) -> Any:
-        return listing.ToolInfo.from_listing({**tool_entry("github_issue_comment", "issues", "add"), **fields})
+        return listing.ToolInfo.from_listing({**tool_entry("demo_thing_create", "things", "add"), **fields})
 
     def test_the_intent_is_read(self) -> None:
-        self.assertEqual(self.info(intent="About to comment on an issue").intent, "About to comment on an issue")
+        self.assertEqual(self.info(intent="About to create a thing").intent, "About to create a thing")
 
     def test_an_absent_blank_or_wrong_intent_is_none_and_the_tool_is_still_listed(self) -> None:
         self.assertIsNone(self.info().intent)
@@ -22,15 +22,15 @@ class ToolInfoIntentTest(unittest.TestCase):
             with self.subTest(intent=intent):
                 tool = self.info(intent=intent)
                 self.assertIsNone(tool.intent)
-                self.assertEqual(tool.id, "github_issue_comment")
+                self.assertEqual(tool.id, "demo_thing_create")
 
 
 class ListingTest(FakeCliCase):
     def test_passes_the_settings_to_list_as_flags(self) -> None:
-        self.register({"toolsets": ["repos"], "read_only": True, "exclude_tools": ["github_repo_edit"]})
+        self.register({"toolsets": ["gadgets"], "read_only": True, "exclude_tools": ["demo_gadget_edit"]})
         self.assertEqual(
             [call["argv"] for call in self.calls()],
-            [["list", "--toolsets", "repos", "--read-only", "--exclude-tools", "github_repo_edit"]],
+            [["list", "--toolsets", "gadgets", "--read-only", "--exclude-tools", "demo_gadget_edit"]],
         )
 
     def test_an_empty_list_registers_no_tool(self) -> None:
@@ -61,7 +61,7 @@ class ListingTest(FakeCliCase):
             {"code": 2, "stderr": f"{project.CLI_NAME}: Unknown toolset \"bogus\"\n"},
             {"code": 0, "stdout": "not json"},
             {"code": 0, "stdout": '{"not": "a list"}'},
-            {"code": 0, "stdout": '[{"id": "github_issue_read"}]'},
+            {"code": 0, "stdout": '[{"id": "demo_thing_read"}]'},
         ):
             with self.subTest(fields=fields), self.assertLogs(plugin.logger, "WARNING") as logs:
                 self.reply("list", **fields)

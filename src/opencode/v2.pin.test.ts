@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { ADD_ID, PIN_ID, PIN_STALE, fixtureSpecs, pinSpecs, type PinState } from "./testing"
+import { ADD_ID, PIN_ID, PIN_STALE, PROFILE, fixtureSpecs, pinSpecs, type PinState } from "./testing"
 import type { V2Context, V2Tool } from "./types"
 import { createV2Setup } from "./v2"
 
@@ -19,10 +19,10 @@ async function call(id: string, state: PinState, answer: () => void = () => {}) 
     tool: { transform: async (callback) => callback({ add: (tool) => tools.set(tool.name, tool) }) },
     skill: { transform: async () => {} },
   }
-  await createV2Setup([...fixtureSpecs(events), ...pinSpecs(events, state)], { env: {} })(ctx)
+  await createV2Setup([...fixtureSpecs(events), ...pinSpecs(events, state)], { env: {}, profile: PROFILE })(ctx)
   const error = await tools
     .get(id)!
-    .execute({ repo: "Octo/Hello" }, { sessionID: "ses_1", signal: new AbortController().signal })
+    .execute({ area: "north" }, { sessionID: "ses_1", signal: new AbortController().signal })
     .then(
       () => undefined,
       (failure: Error) => failure.message,

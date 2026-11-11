@@ -7,6 +7,7 @@ import {
   JAPANESE_ADD,
   JAPANESE_LABEL,
   LABEL_ID,
+  PROFILE,
   TRANSLATIONS,
   fixtureSpecs,
 } from "./testing"
@@ -28,8 +29,8 @@ async function asked(
       asks.push(request)
     },
   }
-  const { tool } = await createV1Server(fixtureSpecs([]), { env, translations })({}, options)
-  await tool[id]!.execute({ repo: "Octo/Hello" }, context)
+  const { tool } = await createV1Server(fixtureSpecs([]), { env, profile: PROFILE, translations })({}, options)
+  await tool[id]!.execute({ area: "north" }, context)
   return asks[0]!
 }
 
@@ -46,8 +47,8 @@ describe("V1 permission prompt in a language", () => {
   })
 
   test("the environment variable sets the language, and the option wins over it", async () => {
-    expect((await asked({}, { GITHUB_TOOLS_LANGUAGE: "ja" })).metadata.message).toBe(JAPANESE_ADD)
-    expect((await asked({ language: "en" }, { GITHUB_TOOLS_LANGUAGE: "ja" })).metadata.message).toBe(ENGLISH_ADD)
+    expect((await asked({}, { DEMO_LANGUAGE: "ja" })).metadata.message).toBe(JAPANESE_ADD)
+    expect((await asked({ language: "en" }, { DEMO_LANGUAGE: "ja" })).metadata.message).toBe(ENGLISH_ADD)
   })
 
   test("an unknown language, a blank one and none keep today's English", async () => {
@@ -59,7 +60,7 @@ describe("V1 permission prompt in a language", () => {
 
   test("a package without translations still has the plugin's own words in Japanese", async () => {
     const request = await asked({ language: "ja" }, {}, ADD_ID, {})
-    expect(request.metadata.message).toBe(`Title of ${ADD_ID}\n\n--- 詳細 ---\n\n対象: octo/hello`)
+    expect(request.metadata.message).toBe(`Title of ${ADD_ID}\n\n--- 詳細 ---\n\n対象: north`)
   })
 
   test("a language option that is not text is the invalid option error", async () => {

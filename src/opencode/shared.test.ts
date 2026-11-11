@@ -51,10 +51,10 @@ describe("permissionMetadata", () => {
 /** Runs a read tool that throws `error`, and resolves to what `runTool` threw. */
 async function failure(error: Error): Promise<unknown> {
   const spec = defineTool({
-    id: "github_issue_fail_read",
-    title: "github_issue_fail_read",
-    description: "github_issue_fail_read",
-    toolset: "issues",
+    id: "demo_thing_fail_read",
+    title: "demo_thing_fail_read",
+    description: "demo_thing_fail_read",
+    toolset: "alpha",
     class: "read",
     input: z.object({}),
     output: z.object({ ok: z.boolean() }),

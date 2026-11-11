@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { ADD_ID, PIN_ID, PIN_STALE, fixtureSpecs, pinSpecs, type PinState } from "./testing"
+import { ADD_ID, PIN_ID, PIN_STALE, PROFILE, fixtureSpecs, pinSpecs, type PinState } from "./testing"
 import type { V1ToolContext } from "./types"
 import { createV1Server } from "./v1"
 
@@ -15,8 +15,11 @@ async function call(id: string, state: PinState, answer: () => void = () => {}) 
       answer()
     },
   }
-  const { tool } = await createV1Server([...fixtureSpecs(events), ...pinSpecs(events, state)], { env: {} })({}, {})
-  const error = await tool[id]!.execute({ repo: "Octo/Hello" }, context).then(
+  const { tool } = await createV1Server([...fixtureSpecs(events), ...pinSpecs(events, state)], {
+    env: {},
+    profile: PROFILE,
+  })({}, {})
+  const error = await tool[id]!.execute({ area: "north" }, context).then(
     () => undefined,
     (failure: Error) => failure.message,
   )

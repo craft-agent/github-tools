@@ -10,6 +10,7 @@ import {
   JAPANESE_ADD,
   JAPANESE_INTENT,
   JAPANESE_INTENT_LABEL,
+  PROFILE,
   TRANSLATIONS,
   fixtureSpecs,
   intentSpecs,
@@ -33,8 +34,8 @@ async function message(id: string, language?: string): Promise<string> {
     tool: { transform: async (callback) => callback({ add: (tool) => tools.set(tool.name, tool) }) },
     skill: { transform: async () => {} },
   }
-  await createV2Setup([...fixtureSpecs([]), ...intentSpecs([])], { env: {}, translations })(ctx)
-  await tools.get(id)!.execute({ repo: "Octo/Hello" }, { sessionID: "ses_1", signal: new AbortController().signal })
+  await createV2Setup([...fixtureSpecs([]), ...intentSpecs([])], { env: {}, profile: PROFILE, translations })(ctx)
+  await tools.get(id)!.execute({ area: "north" }, { sessionID: "ses_1", signal: new AbortController().signal })
   return String(asserts[0]?.metadata?.message)
 }
 

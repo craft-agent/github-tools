@@ -67,14 +67,14 @@ class LinkedSkillsTest(FakeCliCase):
         return [name for name, _, _ in ctx.skills]
 
     def test_a_skill_follows_the_toolsets_of_the_listed_tools(self) -> None:
-        self.skill("linked", "issues")
+        self.skill("linked", "things")
         self.skill("missing", "no-such-toolset")
         self.skill("free")
         self.assertEqual(self.names(self.register()), ["free", "linked"])
 
     def test_a_toolset_no_selected_tool_has_leaves_its_skill_out(self) -> None:
         self.replies["list"] = {"stdout": "[]"}
-        self.skill("linked", "issues")
+        self.skill("linked", "things")
         self.skill("free")
         self.assertEqual(self.names(self.register()), ["free"])
 

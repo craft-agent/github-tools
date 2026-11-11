@@ -15,8 +15,8 @@ from unittest import mock
 from support import CWD, FAKE_CLI, LISTING, FakeCliCase, StubContext, approval, listing, project, runtime
 
 
-CREATE = "Comment on an issue"
-UPDATE = "Merge a pull request"
+CREATE = "Create a thing"
+UPDATE = "Update a widget"
 DETAILS = "\n\n--- Details ---\n\n"
 
 
@@ -38,32 +38,32 @@ class ApprovalHookTest(FakeCliCase):
         return [call for call in self.calls() if call["argv"][0] == "target"]
 
     def test_a_write_is_sent_to_approval_with_message_and_rule_key(self) -> None:
-        self.reply("target github_issue_comment", stdout='{"resources":["octo/hello"]}\n')
-        decision = self.hook()(tool_name="github_issue_comment", args={"repo": "Octo/Hello", "body": "hi"}, task_id="t")
+        self.reply("target demo_thing_create", stdout='{"resources":["target/one"]}\n')
+        decision = self.hook()(tool_name="demo_thing_create", args={"target": "target/one", "body": "hi"}, task_id="t")
         self.assertEqual(
             decision,
             {
                 "action": "approve",
-                "message": f"{CREATE}{DETAILS}Target: octo/hello",
-                "rule_key": key("github_issue_comment", "octo/hello"),
+                "message": f"{CREATE}{DETAILS}Target: target/one",
+                "rule_key": key("demo_thing_create", "target/one"),
             },
         )
         [call] = self.target_calls()
-        self.assertEqual(call["argv"], ["target", "github_issue_comment", "--cwd", CWD])
-        self.assertEqual(json.loads(call["stdin"]), {"repo": "Octo/Hello", "body": "hi"})
+        self.assertEqual(call["argv"], ["target", "demo_thing_create", "--cwd", CWD])
+        self.assertEqual(json.loads(call["stdin"]), {"target": "target/one", "body": "hi"})
 
     def test_every_non_read_class_is_sent_to_approval(self) -> None:
-        for tool_id in ("github_pr_merge", "github_project_item_add", "github_repo_edit", "github_run_rerun"):
-            self.reply(f"target {tool_id}", stdout='{"resources":["octo/hello"]}')
+        for tool_id in ("demo_widget_update", "demo_item_add", "demo_gadget_edit", "demo_task_run"):
+            self.reply(f"target {tool_id}", stdout='{"resources":["target/one"]}')
             with self.subTest(tool=tool_id):
                 self.assertEqual(self.hook()(tool_name=tool_id, args={})["action"], "approve")
 
     def test_a_description_without_a_surface_uses_the_strictest_card(self) -> None:
         self.reply(
-            "target github_issue_comment",
+            "target demo_thing_create",
             stdout=json.dumps(
                 {
-                    "resources": ["octo/hello"],
+                    "resources": ["target/one"],
                     "description": {
                         "headline": 'Create the thing "a_b"',
                         "facts": [{"label": "Kind", "value": "group_chat"}],
@@ -72,24 +72,24 @@ class ApprovalHookTest(FakeCliCase):
                 }
             ),
         )
-        decision = self.hook()(tool_name="github_issue_comment", args={})
+        decision = self.hook()(tool_name="demo_thing_create", args={})
         self.assertEqual(
             decision,
             {
                 "action": "approve",
                 "message": 'Create the thing "a\\_b"'
-                f"{DETAILS}Target: octo/hello\nKind: group\\_chat\n\n--- Note ---\n\nhi \\@everyone",
-                "rule_key": key("github_issue_comment", "octo/hello"),
+                f"{DETAILS}Target: target/one\nKind: group\\_chat\n\n--- Note ---\n\nhi \\@everyone",
+                "rule_key": key("demo_thing_create", "target/one"),
             },
         )
         self.assertEqual(len(self.target_calls()), 1)
 
     def test_a_description_is_fitted_to_the_session_surface(self) -> None:
         self.reply(
-            "target github_issue_comment",
+            "target demo_thing_create",
             stdout=json.dumps(
                 {
-                    "resources": ["octo/hello"],
+                    "resources": ["target/one"],
                     "description": {
                         "facts": [{"label": "Kind", "value": "group_chat"}],
                         "text": {"label": "Note", "body": "hi <@everyone> & all"},
@@ -100,19 +100,19 @@ class ApprovalHookTest(FakeCliCase):
         for surface, text in (("cli", "hi <@everyone> & all"), ("slack", "hi &lt;@everyone&gt; &amp; all")):
             with self.subTest(surface=surface), mock.patch.object(SurfaceContext, "session_surface", return_value=surface):
                 ctx = self.register(ctx=SurfaceContext())
-                decision = ctx.hooks[0][1](tool_name="github_issue_comment", args={})
+                decision = ctx.hooks[0][1](tool_name="demo_thing_create", args={})
                 self.assertEqual(
                     decision["message"],
-                    f"{CREATE}{DETAILS}Target: octo/hello\nKind: group_chat\n\n--- Note ---\n\n{text}",
+                    f"{CREATE}{DETAILS}Target: target/one\nKind: group_chat\n\n--- Note ---\n\n{text}",
                 )
-                self.assertEqual(decision["rule_key"], key("github_issue_comment", "octo/hello"))
+                self.assertEqual(decision["rule_key"], key("demo_thing_create", "target/one"))
 
     def test_an_unavailable_surface_still_approves_with_the_strictest_card(self) -> None:
         self.reply(
-            "target github_issue_comment",
+            "target demo_thing_create",
             stdout=json.dumps(
                 {
-                    "resources": ["octo/hello"],
+                    "resources": ["target/one"],
                     "description": {"facts": [], "text": {"label": "Note", "body": "hi <@everyone> & all"}},
                 }
             ),
@@ -125,19 +125,19 @@ class ApprovalHookTest(FakeCliCase):
         ):
             with self.subTest(fields=fields), mock.patch.object(SurfaceContext, "session_surface", **fields):
                 ctx = self.register(ctx=SurfaceContext())
-                decision = ctx.hooks[0][1](tool_name="github_issue_comment", args={})
+                decision = ctx.hooks[0][1](tool_name="demo_thing_create", args={})
                 self.assertEqual(decision["action"], "approve")
                 self.assertEqual(
                     decision["message"],
-                    f"{CREATE}{DETAILS}Target: octo/hello\n\n--- Note ---\n\nhi &lt;\\@everyone&gt; &amp; all",
+                    f"{CREATE}{DETAILS}Target: target/one\n\n--- Note ---\n\nhi &lt;\\@everyone&gt; &amp; all",
                 )
 
     def test_the_surface_is_read_even_without_a_description(self) -> None:
-        self.reply("target github_issue_comment", stdout='{"resources":["octo/hello"]}')
+        self.reply("target demo_thing_create", stdout='{"resources":["target/one"]}')
         with mock.patch.object(SurfaceContext, "session_surface", return_value="slack") as surface:
             ctx = self.register(ctx=SurfaceContext())
-            decision = ctx.hooks[0][1](tool_name="github_issue_comment", args={})
-            self.assertEqual(decision["message"], f"{CREATE}{DETAILS}Target: octo/hello")
+            decision = ctx.hooks[0][1](tool_name="demo_thing_create", args={})
+            self.assertEqual(decision["message"], f"{CREATE}{DETAILS}Target: target/one")
             surface.assert_called_once_with()
 
     def test_a_bad_description_preserves_the_message_and_resources(self) -> None:
@@ -149,58 +149,60 @@ class ApprovalHookTest(FakeCliCase):
             {"facts": [{"label": "a", "value": "b"}], "text": {"label": "Note"}},
         ):
             self.reply(
-                "target github_issue_comment", stdout=json.dumps({"resources": ["octo/hello"], "description": description})
+                "target demo_thing_create", stdout=json.dumps({"resources": ["target/one"], "description": description})
             )
             with self.subTest(description=description):
-                decision = self.hook()(tool_name="github_issue_comment", args={})
-                self.assertEqual(decision["message"], f"{CREATE}{DETAILS}Target: octo/hello")
-                self.assertEqual(decision["rule_key"], key("github_issue_comment", "octo/hello"))
+                decision = self.hook()(tool_name="demo_thing_create", args={})
+                self.assertEqual(decision["message"], f"{CREATE}{DETAILS}Target: target/one")
+                self.assertEqual(decision["rule_key"], key("demo_thing_create", "target/one"))
 
     def test_a_description_with_unresolved_resources_keeps_the_single_use_key(self) -> None:
         self.reply(
-            "target github_pr_merge",
+            "target demo_widget_update",
             stdout=json.dumps(
                 {"resources": ["*"], "description": {"facts": [], "text": {"label": "Note", "body": "hi @everyone"}}}
             ),
         )
-        decision = self.assert_single_use("github_pr_merge", key("github_pr_merge", "*"), args={})
+        decision = self.assert_single_use("demo_widget_update", key("demo_widget_update", "*"), args={})
         self.assertEqual(decision["message"], f"{UPDATE}\n\n--- Note ---\n\nhi \\@everyone")
 
     def test_control_characters_in_a_description_are_marked(self) -> None:
         self.reply(
-            "target github_issue_comment",
+            "target demo_thing_create",
             stdout=json.dumps(
-                {"resources": ["octo/hello"], "description": {"facts": [{"label": "Name", "value": "a\u202eb"}]}}
+                {"resources": ["target/one"], "description": {"facts": [{"label": "Name", "value": "a\u202eb"}]}}
             ),
         )
         ctx = self.register(ctx=SurfaceContext())
-        decision = ctx.hooks[0][1](tool_name="github_issue_comment", args={})
-        self.assertEqual(decision["message"], f"{CREATE}{DETAILS}Target: octo/hello\nName: a<U+202E>b")
+        decision = ctx.hooks[0][1](tool_name="demo_thing_create", args={})
+        self.assertEqual(decision["message"], f"{CREATE}{DETAILS}Target: target/one\nName: a<U+202E>b")
 
     def test_invalid_resources_do_not_discard_a_description(self) -> None:
         self.reply(
-            "target github_pr_merge",
-            stdout=json.dumps({"resources": [], "description": {"facts": [], "text": {"label": "Note", "body": "hi"}}}),
+            "target demo_widget_update",
+            stdout=json.dumps(
+                {"resources": [], "description": {"facts": [], "text": {"label": "Note", "body": "hi"}}}
+            ),
         )
-        decision = self.assert_single_use("github_pr_merge", key("github_pr_merge", "*"), args={})
+        decision = self.assert_single_use("demo_widget_update", key("demo_widget_update", "*"), args={})
         self.assertEqual(decision["message"], f"{UPDATE}\n\n--- Note ---\n\nhi")
 
     def test_a_failed_target_does_not_show_its_description(self) -> None:
         self.reply(
-            "target github_pr_merge",
+            "target demo_widget_update",
             code=1,
             stdout=json.dumps(
-                {"resources": ["octo/hello"], "description": {"facts": [], "text": {"label": "Note", "body": "hi"}}}
+                {"resources": ["target/one"], "description": {"facts": [], "text": {"label": "Note", "body": "hi"}}}
             ),
         )
-        decision = self.assert_single_use("github_pr_merge", key("github_pr_merge", "*"), args={})
+        decision = self.assert_single_use("demo_widget_update", key("demo_widget_update", "*"), args={})
         self.assertEqual(decision["message"], UPDATE)
 
     def test_a_card_that_cannot_be_built_still_asks_with_the_card_without_a_description(self) -> None:
         self.reply(
-            "target github_issue_comment",
+            "target demo_thing_create",
             stdout=json.dumps(
-                {"resources": ["octo/hello"], "description": {"facts": [], "text": {"label": "Note", "body": "hi"}}}
+                {"resources": ["target/one"], "description": {"facts": [], "text": {"label": "Note", "body": "hi"}}}
             ),
         )
         hook = self.hook()
@@ -216,51 +218,51 @@ class ApprovalHookTest(FakeCliCase):
             return build(title, resources, description, surface, words)
 
         with mock.patch.object(approval.card, "build_message", side_effect=failing_with_a_description):
-            decision = hook(tool_name="github_issue_comment", args={})
+            decision = hook(tool_name="demo_thing_create", args={})
         self.assertEqual(
             decision,
             {
                 "action": "approve",
-                "message": f"{CREATE}{DETAILS}Target: octo/hello",
-                "rule_key": key("github_issue_comment", "octo/hello"),
+                "message": f"{CREATE}{DETAILS}Target: target/one",
+                "rule_key": key("demo_thing_create", "target/one"),
             },
         )
         self.assertEqual(built, [(False, None), (True, None)])
 
     def test_a_card_that_cannot_be_built_at_all_still_asks_with_the_title(self) -> None:
-        self.reply("target github_issue_comment", stdout='{"resources":["octo/hello"]}')
+        self.reply("target demo_thing_create", stdout='{"resources":["target/one"]}')
         hook = self.hook()
         with mock.patch.object(approval.card, "build_message", side_effect=RuntimeError("boom")):
-            decision = hook(tool_name="github_issue_comment", args={})
+            decision = hook(tool_name="demo_thing_create", args={})
         self.assertEqual(
             decision,
             {
                 "action": "approve",
                 "message": CREATE,
-                "rule_key": key("github_issue_comment", "octo/hello"),
+                "rule_key": key("demo_thing_create", "target/one"),
             },
         )
 
     def test_a_read_is_left_alone_without_asking_the_cli(self) -> None:
-        self.assertIsNone(self.hook()(tool_name="github_issue_read", args={}))
+        self.assertIsNone(self.hook()(tool_name="demo_thing_read", args={}))
         self.assertEqual(self.target_calls(), [])
 
     def test_a_tool_of_another_plugin_is_left_alone(self) -> None:
         self.assertIsNone(self.hook()(tool_name="write_file", args={"path": "/tmp/x"}))
         self.assertEqual(self.target_calls(), [])
 
-    def test_every_repository_a_write_names_is_in_the_message_and_the_rule_key(self) -> None:
-        self.reply("target github_issue_comment", stdout='{"resources":["octo/hello","other/repo"]}')
-        decision = self.hook()(tool_name="github_issue_comment", args={"issue": "other/repo#2", "body": "hi"})
-        self.assertEqual(decision["message"], f"{CREATE}{DETAILS}Target: octo/hello\nTarget: other/repo")
-        self.assertEqual(decision["rule_key"], key("github_issue_comment", "octo/hello", "other/repo"))
+    def test_every_resource_a_write_names_is_in_the_message_and_the_rule_key(self) -> None:
+        self.reply("target demo_thing_create", stdout='{"resources":["target/one","target/two"]}')
+        decision = self.hook()(tool_name="demo_thing_create", args={"target": "target/two", "body": "hi"})
+        self.assertEqual(decision["message"], f"{CREATE}{DETAILS}Target: target/one\nTarget: target/two")
+        self.assertEqual(decision["rule_key"], key("demo_thing_create", "target/one", "target/two"))
 
     def test_resources_with_a_comma_never_share_a_rule_key_with_a_longer_list(self) -> None:
         hook = self.hook()
-        self.reply("target github_issue_comment", stdout='{"resources":["a,b"]}')
-        joined = hook(tool_name="github_issue_comment", args={})["rule_key"]
-        self.reply("target github_issue_comment", stdout='{"resources":["a","b"]}')
-        split = hook(tool_name="github_issue_comment", args={})["rule_key"]
+        self.reply("target demo_thing_create", stdout='{"resources":["a,b"]}')
+        joined = hook(tool_name="demo_thing_create", args={})["rule_key"]
+        self.reply("target demo_thing_create", stdout='{"resources":["a","b"]}')
+        split = hook(tool_name="demo_thing_create", args={})["rule_key"]
         self.assertNotEqual(joined, split)
 
     def assert_single_use(self, tool_id: str, key_prefix: str, **call: Any) -> dict[str, str]:
@@ -274,20 +276,20 @@ class ApprovalHookTest(FakeCliCase):
         return first
 
     def test_an_unresolved_target_is_any_resource_and_leaves_nothing_to_reuse(self) -> None:
-        self.reply("target github_pr_merge", stdout='{"resources":["*"]}')
-        decision = self.assert_single_use("github_pr_merge", key("github_pr_merge", "*"), args={})
+        self.reply("target demo_widget_update", stdout='{"resources":["*"]}')
+        decision = self.assert_single_use("demo_widget_update", key("demo_widget_update", "*"), args={})
         self.assertEqual(decision["message"], UPDATE)
 
     def test_a_resource_that_cannot_be_told_stays_beside_the_others_and_leaves_nothing_to_reuse(self) -> None:
-        self.reply("target github_pr_merge", stdout='{"resources":["octo/hello","*"]}')
-        decision = self.assert_single_use("github_pr_merge", key("github_pr_merge", "octo/hello", "*"), args={})
-        self.assertEqual(decision["message"], f"{UPDATE}{DETAILS}Target: octo/hello\nTarget: \\*")
+        self.reply("target demo_widget_update", stdout='{"resources":["target/one","*"]}')
+        decision = self.assert_single_use("demo_widget_update", key("demo_widget_update", "target/one", "*"), args={})
+        self.assertEqual(decision["message"], f"{UPDATE}{DETAILS}Target: target/one\nTarget: \\*")
 
-    def test_a_rule_key_that_names_only_known_repositories_is_stable(self) -> None:
-        self.reply("target github_issue_comment", stdout='{"resources":["octo/hello"]}')
+    def test_a_rule_key_that_names_only_known_resources_is_stable(self) -> None:
+        self.reply("target demo_thing_create", stdout='{"resources":["target/one"]}')
         hook = self.hook()
-        keys = {hook(tool_name="github_issue_comment", args={})["rule_key"] for _ in range(2)}
-        self.assertEqual(keys, {key("github_issue_comment", "octo/hello")})
+        keys = {hook(tool_name="demo_thing_create", args={})["rule_key"] for _ in range(2)}
+        self.assertEqual(keys, {key("demo_thing_create", "target/one")})
 
     def test_a_failing_target_falls_back_to_any_resource(self) -> None:
         for fields in (
@@ -295,39 +297,39 @@ class ApprovalHookTest(FakeCliCase):
             {"code": 2, "stderr": "usage"},
             {"code": 0, "stdout": "not json"},
             {"code": 0, "stdout": "[]"},
-            {"code": 0, "stdout": '{"resources": "octo/hello"}'},
+            {"code": 0, "stdout": '{"resources": "target/one"}'},
             {"code": 0, "stdout": '{"resources": []}'},
             {"code": 0, "stdout": '{"resources": [3]}'},
-            {"code": 0, "stdout": '{"resources": ["octo/hello", ""]}'},
-            {"code": 0, "stdout": '{"resource": "octo/hello"}'},
+            {"code": 0, "stdout": '{"resources": ["target/one", ""]}'},
+            {"code": 0, "stdout": '{"resource": "target/one"}'},
         ):
-            self.reply("target github_pr_merge", **fields)
+            self.reply("target demo_widget_update", **fields)
             with self.subTest(fields=fields):
-                self.assert_single_use("github_pr_merge", key("github_pr_merge", "*"), args={})
+                self.assert_single_use("demo_widget_update", key("demo_widget_update", "*"), args={})
 
     def test_a_target_that_times_out_or_cannot_start_falls_back_to_any_resource(self) -> None:
-        self.reply("target github_pr_merge", sleep=5, stdout='{"resources":["octo/hello"]}')
+        self.reply("target demo_widget_update", sleep=5, stdout='{"resources":["target/one"]}')
         hook = self.hook()
         with mock.patch.object(approval, "TARGET_TIMEOUT_SECONDS", 0.3):
-            decision = hook(tool_name="github_pr_merge", args={})
-        self.assertRegex(decision["rule_key"], rf"^{re.escape(key('github_pr_merge', '*'))}:once-[0-9a-f]{{32}}$")
+            decision = hook(tool_name="demo_widget_update", args={})
+        self.assertRegex(decision["rule_key"], rf"^{re.escape(key('demo_widget_update', '*'))}:once-[0-9a-f]{{32}}$")
         broken = runtime.Runtime(
             node=str(self.dir / "no-node"), cli=FAKE_CLI, skills_dir=self.skills_dir, find_node=lambda: None
         )
         tool = listing.ToolInfo.from_listing(LISTING[2])
-        decision = approval.make_hook(broken, [tool])(tool_name="github_pr_merge", args={})
-        self.assertRegex(decision["rule_key"], rf"^{re.escape(key('github_pr_merge', '*'))}:once-[0-9a-f]{{32}}$")
+        decision = approval.make_hook(broken, [tool])(tool_name="demo_widget_update", args={})
+        self.assertRegex(decision["rule_key"], rf"^{re.escape(key('demo_widget_update', '*'))}:once-[0-9a-f]{{32}}$")
 
     def test_arguments_that_are_not_a_dict_still_ask(self) -> None:
-        self.reply("target github_pr_merge", stdout='{"resources":["octo/hello"]}')
-        decision = self.hook()(tool_name="github_pr_merge", args=None)
+        self.reply("target demo_widget_update", stdout='{"resources":["target/one"]}')
+        decision = self.hook()(tool_name="demo_widget_update", args=None)
         self.assertEqual(decision["action"], "approve")
         self.assertEqual(json.loads(self.target_calls()[0]["stdin"]), {})
 
     def test_it_does_not_look_for_a_person_itself(self) -> None:
-        self.reply("target github_pr_merge", stdout='{"resources":["octo/hello"]}')
+        self.reply("target demo_widget_update", stdout='{"resources":["target/one"]}')
         with mock.patch.dict("os.environ", {"HERMES_CRON": "1", "HERMES_YOLO_MODE": "1"}):
-            self.assertEqual(self.hook()(tool_name="github_pr_merge", args={})["action"], "approve")
+            self.assertEqual(self.hook()(tool_name="demo_widget_update", args={})["action"], "approve")
 
 
 class ApprovalLanguageTest(FakeCliCase):
@@ -340,14 +342,14 @@ class ApprovalLanguageTest(FakeCliCase):
 
     def ask(self, config: dict[str, Any] | None = None, display: Any = None) -> tuple[dict[str, str], list[str]]:
         """The decision of one call and the argv ``target`` ran with, the display language being ``display``."""
-        self.reply("target github_issue_comment", stdout='{"resources":["octo/hello"]}')
+        self.reply("target demo_thing_create", stdout='{"resources":["target/one"]}')
         with mock.patch.object(approval, "display_language", **display or {"return_value": None}):
             hook = self.register(config).hooks[0][1]
-            decision = hook(tool_name="github_issue_comment", args={})
+            decision = hook(tool_name="demo_thing_create", args={})
         return decision, self.target_argv()
 
     def test_the_setting_and_the_display_language_become_flags_in_a_stable_order(self) -> None:
-        base = ["target", "github_issue_comment", "--cwd", CWD]
+        base = ["target", "demo_thing_create", "--cwd", CWD]
         for config, display, flags in (
             ({}, None, []),
             ({"language": "ja"}, None, ["--language=ja"]),
@@ -363,11 +365,11 @@ class ApprovalLanguageTest(FakeCliCase):
                 self.assertEqual(argv, [*base, *flags])
 
     def test_the_display_language_is_read_on_every_call(self) -> None:
-        self.reply("target github_issue_comment", stdout='{"resources":["octo/hello"]}')
+        self.reply("target demo_thing_create", stdout='{"resources":["target/one"]}')
         hook = self.register().hooks[0][1]
         for display in ("ja", "fr"):
             with mock.patch.object(approval, "display_language", return_value=display):
-                hook(tool_name="github_issue_comment", args={})
+                hook(tool_name="demo_thing_create", args={})
         argvs = [call["argv"] for call in self.target_calls()]
         self.assertEqual([argv[4:] for argv in argvs], [["--harness-language=ja"], ["--harness-language=fr"]])
 
@@ -383,12 +385,12 @@ class ApprovalLanguageTest(FakeCliCase):
             with self.subTest(fields=fields):
                 self.log.unlink(missing_ok=True)
                 decision, argv = self.ask({"language": "ja"}, fields)
-                self.assertEqual(argv, ["target", "github_issue_comment", "--cwd", CWD, "--language=ja"])
-                self.assertEqual(decision["message"], f"{CREATE}{DETAILS}Target: octo/hello")
-                self.assertEqual(decision["rule_key"], key("github_issue_comment", "octo/hello"))
+                self.assertEqual(argv, ["target", "demo_thing_create", "--cwd", CWD, "--language=ja"])
+                self.assertEqual(decision["message"], f"{CREATE}{DETAILS}Target: target/one")
+                self.assertEqual(decision["rule_key"], key("demo_thing_create", "target/one"))
 
     def test_an_injected_reader_that_fails_or_is_junk_knows_nothing(self) -> None:
-        self.reply("target github_issue_comment", stdout='{"resources":["octo/hello"]}')
+        self.reply("target demo_thing_create", stdout='{"resources":["target/one"]}')
         self.write_fixture()
         tool = listing.ToolInfo.from_listing(LISTING[1])
 
@@ -399,16 +401,16 @@ class ApprovalLanguageTest(FakeCliCase):
             with self.subTest(read=read):
                 self.log.unlink(missing_ok=True)
                 decision = approval.make_hook(self.runtime, [tool], harness_language=read)(
-                    tool_name="github_issue_comment", args={}
+                    tool_name="demo_thing_create", args={}
                 )
-                self.assertEqual(self.target_argv(), ["target", "github_issue_comment", "--cwd", CWD])
-                self.assertEqual(decision["message"], f"{CREATE}{DETAILS}Target: octo/hello")
+                self.assertEqual(self.target_argv(), ["target", "demo_thing_create", "--cwd", CWD])
+                self.assertEqual(decision["message"], f"{CREATE}{DETAILS}Target: target/one")
 
     def test_list_and_run_get_no_language_flag(self) -> None:
-        self.reply("run github_issue_comment", stdout='{"result":{}}')
+        self.reply("run demo_thing_create", stdout='{"result":{}}')
         with mock.patch.object(approval, "display_language", return_value="ja"):
             ctx = self.register({"language": "ja"})
-            ctx.tools["github_issue_comment"]["handler"]({"repo": "octo/hello"})
+            ctx.tools["demo_thing_create"]["handler"]({"target": "target/one"})
         for call in self.calls():
             if call["argv"][0] in ("list", "run"):
                 with self.subTest(argv=call["argv"]):
@@ -429,10 +431,10 @@ class ApprovalWordsTest(FakeCliCase):
     def answer(self, **fields: Any) -> dict[str, Any]:
         """The decision for a call whose ``target`` answers its resources and description with ``fields`` added."""
         description = {"facts": [{"label": "サイズ", "value": "1 byte"}], "text": {"label": "メモの本文", "body": "x"}}
-        document = {"resources": ["octo/hello"], "description": description, **fields}
-        self.reply("target github_issue_comment", stdout=json.dumps(document, ensure_ascii=False))
+        document = {"resources": ["target/one"], "description": description, **fields}
+        self.reply("target demo_thing_create", stdout=json.dumps(document, ensure_ascii=False))
         ctx = self.register(ctx=SurfaceContext())
-        return ctx.hooks[0][1](tool_name="github_issue_comment", args={})
+        return ctx.hooks[0][1](tool_name="demo_thing_create", args={})
 
     def test_the_title_and_the_words_of_the_answer_draw_the_card(self) -> None:
         decision = self.answer(title="メモを作成する", words=JAPANESE_WORDS)
@@ -440,8 +442,8 @@ class ApprovalWordsTest(FakeCliCase):
             decision,
             {
                 "action": "approve",
-                "message": "メモを作成する\n\n--- 詳細 ---\n\n対象: octo/hello\nサイズ: 1 byte\n\n--- メモの本文 ---\n\nx",
-                "rule_key": key("github_issue_comment", "octo/hello"),
+                "message": "メモを作成する\n\n--- 詳細 ---\n\n対象: target/one\nサイズ: 1 byte\n\n--- メモの本文 ---\n\nx",
+                "rule_key": key("demo_thing_create", "target/one"),
             },
         )
 
@@ -452,29 +454,29 @@ class ApprovalWordsTest(FakeCliCase):
         }
         self.assertEqual(
             self.answer(description=description, words=JAPANESE_WORDS)["message"],
-            f"{CREATE}\n\n--- 詳細 ---\n\n対象: octo/hello\nサイズ: 1 byte… （ほか 1 文字）"
+            f"{CREATE}\n\n--- 詳細 ---\n\n対象: target/one\nサイズ: 1 byte… （ほか 1 文字）"
             "\n\n--- メモの本文 ---\n\nx…\n（ほか 12 文字）",
         )
         self.assertEqual(
             self.answer(description=description)["message"],
-            f"{CREATE}{DETAILS}Target: octo/hello\nサイズ: 1 byte… (+1 more character)"
+            f"{CREATE}{DETAILS}Target: target/one\nサイズ: 1 byte… (+1 more character)"
             "\n\n--- メモの本文 ---\n\nx…\n(+12 more characters)",
         )
 
     def test_without_a_title_or_words_the_card_is_the_english_one(self) -> None:
         decision = self.answer()
         self.assertEqual(
-            decision["message"], f"{CREATE}{DETAILS}Target: octo/hello\nサイズ: 1 byte\n\n--- メモの本文 ---\n\nx"
+            decision["message"], f"{CREATE}{DETAILS}Target: target/one\nサイズ: 1 byte\n\n--- メモの本文 ---\n\nx"
         )
 
     def test_words_are_used_beside_the_registered_title_and_a_title_beside_english_words(self) -> None:
         self.assertEqual(
             self.answer(words=JAPANESE_WORDS)["message"],
-            f"{CREATE}\n\n--- 詳細 ---\n\n対象: octo/hello\nサイズ: 1 byte\n\n--- メモの本文 ---\n\nx",
+            f"{CREATE}\n\n--- 詳細 ---\n\n対象: target/one\nサイズ: 1 byte\n\n--- メモの本文 ---\n\nx",
         )
         self.assertEqual(
             self.answer(title="メモを作成する")["message"],
-            "メモを作成する" + f"{DETAILS}Target: octo/hello\nサイズ: 1 byte\n\n--- メモの本文 ---\n\nx",
+            "メモを作成する" + f"{DETAILS}Target: target/one\nサイズ: 1 byte\n\n--- メモの本文 ---\n\nx",
         )
 
     def test_a_bad_title_is_the_registered_one_and_changes_nothing_else(self) -> None:
@@ -483,9 +485,9 @@ class ApprovalWordsTest(FakeCliCase):
                 decision = self.answer(title=title, words=JAPANESE_WORDS)
                 self.assertEqual(
                     decision["message"],
-                    f"{CREATE}\n\n--- 詳細 ---\n\n対象: octo/hello\nサイズ: 1 byte\n\n--- メモの本文 ---\n\nx",
+                    f"{CREATE}\n\n--- 詳細 ---\n\n対象: target/one\nサイズ: 1 byte\n\n--- メモの本文 ---\n\nx",
                 )
-                self.assertEqual(decision["rule_key"], key("github_issue_comment", "octo/hello"))
+                self.assertEqual(decision["rule_key"], key("demo_thing_create", "target/one"))
 
     def test_bad_words_are_the_english_ones_and_change_neither_the_title_nor_the_description_nor_the_resources(self) -> None:
         good = JAPANESE_WORDS
@@ -510,9 +512,9 @@ class ApprovalWordsTest(FakeCliCase):
                 decision = self.answer(title="メモを作成する", words=words)
                 self.assertEqual(
                     decision["message"],
-                    "メモを作成する" + f"{DETAILS}Target: octo/hello\nサイズ: 1 byte\n\n--- メモの本文 ---\n\nx",
+                    "メモを作成する" + f"{DETAILS}Target: target/one\nサイズ: 1 byte\n\n--- メモの本文 ---\n\nx",
                 )
-                self.assertEqual(decision["rule_key"], key("github_issue_comment", "octo/hello"))
+                self.assertEqual(decision["rule_key"], key("demo_thing_create", "target/one"))
 
     def test_words_and_title_survive_resources_that_cannot_be_told(self) -> None:
         decision = self.answer(resources=[], title="メモを作成する", words=JAPANESE_WORDS)
@@ -521,10 +523,10 @@ class ApprovalWordsTest(FakeCliCase):
 
     def test_the_card_that_falls_back_keeps_the_title_and_the_words(self) -> None:
         self.reply(
-            "target github_issue_comment",
+            "target demo_thing_create",
             stdout=json.dumps(
                 {
-                    "resources": ["octo/hello"],
+                    "resources": ["target/one"],
                     "title": "メモを作成する",
                     "words": JAPANESE_WORDS,
                     "description": {"facts": [{"label": "a", "value": "b"}]},
@@ -541,15 +543,15 @@ class ApprovalWordsTest(FakeCliCase):
             return build(*args)
 
         with mock.patch.object(approval.card, "build_message", side_effect=failing_with_a_description):
-            decision = hook(tool_name="github_issue_comment", args={})
-        self.assertEqual(decision["message"], "メモを作成する\n\n--- 詳細 ---\n\n対象: octo/hello")
+            decision = hook(tool_name="demo_thing_create", args={})
+        self.assertEqual(decision["message"], "メモを作成する\n\n--- 詳細 ---\n\n対象: target/one")
         with mock.patch.object(approval.card, "build_message", side_effect=RuntimeError("boom")):
-            decision = hook(tool_name="github_issue_comment", args={})
+            decision = hook(tool_name="demo_thing_create", args={})
         self.assertEqual(decision["message"], "メモを作成する")
 
     def test_a_failed_target_is_the_registered_title_in_english(self) -> None:
-        self.reply("target github_issue_comment", code=1, stdout=json.dumps({"title": "メモを作成する", "words": JAPANESE_WORDS}))
-        decision = self.register().hooks[0][1](tool_name="github_issue_comment", args={})
+        self.reply("target demo_thing_create", code=1, stdout=json.dumps({"title": "メモを作成する", "words": JAPANESE_WORDS}))
+        decision = self.register().hooks[0][1](tool_name="demo_thing_create", args={})
         self.assertEqual(decision["message"], CREATE)
 
 
@@ -560,21 +562,21 @@ TARGET_TITLE = "Create the thing target one"
 
 class ApprovalIntentTest(FakeCliCase):
     def decide(self, listed_intent: Any = LISTED_INTENT, code: int = 0, **fields: Any) -> dict[str, str]:
-        """The decision for a call of ``github_issue_comment``, listed with ``listed_intent`` and answered with ``fields``."""
+        """The decision for a call of ``demo_thing_create``, listed with ``listed_intent`` and answered with ``fields``."""
         entries = [
-            {**entry, "intent": listed_intent} if entry["id"] == "github_issue_comment" else entry for entry in LISTING
+            {**entry, "intent": listed_intent} if entry["id"] == "demo_thing_create" else entry for entry in LISTING
         ]
         self.reply("list", stdout=json.dumps(entries))
-        self.reply("target github_issue_comment", code=code, stdout=json.dumps({"resources": ["octo/hello"], **fields}))
-        return self.register().hooks[0][1](tool_name="github_issue_comment", args={})
+        self.reply("target demo_thing_create", code=code, stdout=json.dumps({"resources": ["target/one"], **fields}))
+        return self.register().hooks[0][1](tool_name="demo_thing_create", args={})
 
     def assert_card(self, decision: dict[str, str], line: str) -> None:
         self.assertEqual(
             decision,
             {
                 "action": "approve",
-                "message": f"{line}{DETAILS}Target: octo/hello",
-                "rule_key": key("github_issue_comment", "octo/hello"),
+                "message": f"{line}{DETAILS}Target: target/one",
+                "rule_key": key("demo_thing_create", "target/one"),
             },
         )
 
@@ -604,20 +606,20 @@ class ApprovalIntentTest(FakeCliCase):
                 self.assert_card(self.decide(intent=intent), LISTED_INTENT)
 
     def test_the_last_resort_card_is_the_line_alone(self) -> None:
-        self.reply("target github_issue_comment", stdout=json.dumps({"resources": ["octo/hello"], "title": TARGET_TITLE}))
+        self.reply("target demo_thing_create", stdout=json.dumps({"resources": ["target/one"], "title": TARGET_TITLE}))
         self.reply("list", stdout=json.dumps([{**LISTING[1], "intent": LISTED_INTENT}]))
         hook = self.register().hooks[0][1]
         with mock.patch.object(approval.card, "build_message", side_effect=RuntimeError("boom")):
-            self.assertEqual(hook(tool_name="github_issue_comment", args={})["message"], TARGET_TITLE)
-        self.reply("target github_issue_comment", stdout=json.dumps({"resources": ["octo/hello"]}))
+            self.assertEqual(hook(tool_name="demo_thing_create", args={})["message"], TARGET_TITLE)
+        self.reply("target demo_thing_create", stdout=json.dumps({"resources": ["target/one"]}))
         self.write_fixture()
         with mock.patch.object(approval.card, "build_message", side_effect=RuntimeError("boom")):
-            self.assertEqual(hook(tool_name="github_issue_comment", args={})["message"], LISTED_INTENT)
+            self.assertEqual(hook(tool_name="demo_thing_create", args={})["message"], LISTED_INTENT)
 
     def test_a_headline_is_still_shown_with_the_intent_standing_by(self) -> None:
         description = {"headline": "Create the thing x", "facts": [{"label": "Size", "value": "1"}]}
         decision = self.decide(intent=TARGET_INTENT, description=description)
-        self.assertEqual(decision["message"], f"Create the thing x{DETAILS}Target: octo/hello\nSize: 1")
+        self.assertEqual(decision["message"], f"Create the thing x{DETAILS}Target: target/one\nSize: 1")
 
 
 PIN = "0f" * 32
@@ -627,7 +629,7 @@ MODIFY_EMPTY = {"action": "modify", "args": {approval.PIN_ARGUMENT: ""}}
 
 class ApprovalPinTest(FakeCliCase):
     def answer(self, **fields: Any) -> None:
-        self.reply("target github_issue_comment", stdout=json.dumps({"resources": ["octo/hello"], **fields}))
+        self.reply("target demo_thing_create", stdout=json.dumps({"resources": ["target/one"], **fields}))
         self.write_fixture()
 
     def hooks(self) -> tuple[Any, Any]:
@@ -636,7 +638,7 @@ class ApprovalPinTest(FakeCliCase):
 
     def decide(self, pins: Any, **call: Any) -> dict[str, str]:
         tool = listing.ToolInfo.from_listing(LISTING[1])
-        return approval.make_hook(self.runtime, [tool], pins=pins)(tool_name="github_issue_comment", args={}, **call)
+        return approval.make_hook(self.runtime, [tool], pins=pins)(tool_name="demo_thing_create", args={}, **call)
 
     def test_the_pin_of_the_answer_is_parsed(self) -> None:
         for pin, expected in (
@@ -651,16 +653,16 @@ class ApprovalPinTest(FakeCliCase):
         ):
             with self.subTest(pin=pin):
                 self.answer(pin=pin)
-                self.assertEqual(approval.resolve_target(self.runtime, "github_issue_comment", {}).pin, expected)
+                self.assertEqual(approval.resolve_target(self.runtime, "demo_thing_create", {}).pin, expected)
 
     def test_an_answer_without_a_pin_has_none(self) -> None:
         self.answer()
-        self.assertIsNone(approval.resolve_target(self.runtime, "github_issue_comment", {}).pin)
+        self.assertIsNone(approval.resolve_target(self.runtime, "demo_thing_create", {}).pin)
 
     def test_the_pin_of_a_failed_target_is_none(self) -> None:
-        self.reply("target github_issue_comment", code=1, stdout=json.dumps({"resources": ["a"], "pin": PIN}))
+        self.reply("target demo_thing_create", code=1, stdout=json.dumps({"resources": ["a"], "pin": PIN}))
         self.write_fixture()
-        self.assertIsNone(approval.resolve_target(self.runtime, "github_issue_comment", {}).pin)
+        self.assertIsNone(approval.resolve_target(self.runtime, "demo_thing_create", {}).pin)
 
     def test_the_approval_hook_stashes_a_pin_and_decides_the_same_without_one(self) -> None:
         self.answer(pin=PIN)
@@ -702,19 +704,19 @@ class ApprovalPinTest(FakeCliCase):
     def test_the_pin_hook_gives_the_pin_once_then_empty(self) -> None:
         self.answer(pin=PIN)
         approve, pin_hook = self.hooks()
-        approve(tool_name="github_issue_comment", args={}, tool_call_id="c1")
-        call = {"tool_name": "github_issue_comment", "args": {}, "tool_call_id": "c1"}
+        approve(tool_name="demo_thing_create", args={}, tool_call_id="c1")
+        call = {"tool_name": "demo_thing_create", "args": {}, "tool_call_id": "c1"}
         self.assertEqual(pin_hook(**call), {"action": "modify", "args": {approval.PIN_ARGUMENT: PIN}})
         self.assertEqual(pin_hook(**call), MODIFY_EMPTY)
 
     def test_the_pin_hook_overwrites_a_value_the_model_sent(self) -> None:
         _, pin_hook = self.hooks()
-        result = pin_hook(tool_name="github_issue_comment", args={approval.PIN_ARGUMENT: PIN}, tool_call_id="c1")
+        result = pin_hook(tool_name="demo_thing_create", args={approval.PIN_ARGUMENT: PIN}, tool_call_id="c1")
         self.assertEqual(result, MODIFY_EMPTY)
 
     def test_the_arguments_that_run_leave_out_the_pin_argument(self) -> None:
-        args = {"repo": "Octo/Hello", "body": "hi", approval.PIN_ARGUMENT: PIN}
-        self.assertEqual(approval.run_arguments(args), {"repo": "Octo/Hello", "body": "hi"})
+        args = {"target": "target/one", approval.PIN_ARGUMENT: PIN}
+        self.assertEqual(approval.run_arguments(args), {"target": "target/one"})
         self.assertIn(approval.PIN_ARGUMENT, args)
         for junk in (None, [], "x", 3):
             with self.subTest(junk=junk):
@@ -726,20 +728,20 @@ class ApprovalPinTest(FakeCliCase):
         for value in ("", PIN, None):
             with self.subTest(value=value):
                 self.log.unlink(missing_ok=True)
-                args = {"repo": "Octo/Hello", "body": "hi", approval.PIN_ARGUMENT: value}
-                approve(tool_name="github_issue_comment", args=args, tool_call_id="c1")
+                args = {"target": "target/one", approval.PIN_ARGUMENT: value}
+                approve(tool_name="demo_thing_create", args=args, tool_call_id="c1")
                 [call] = [call for call in self.calls() if call["argv"][0] == "target"]
-                self.assertEqual(json.loads(call["stdin"]), {"repo": "Octo/Hello", "body": "hi"})
+                self.assertEqual(json.loads(call["stdin"]), {"target": "target/one"})
 
     def test_a_pin_argument_the_model_sent_runs_only_what_the_card_described(self) -> None:
         self.answer(pin=PIN)
-        self.reply("run github_issue_comment", stdout='{"result":{}}')
+        self.reply("run demo_thing_create", stdout='{"result":{}}')
         ctx = self.register()
         approve, pin_hook = ctx.hooks[0][1], ctx.hooks[1][1]
-        args = {"repo": "Octo/Hello", "body": "hi", approval.PIN_ARGUMENT: ""}
-        call = {"tool_name": "github_issue_comment", "args": args, "tool_call_id": "c1"}
-        self.assertEqual(approve(**call)["message"], f"{CREATE}{DETAILS}Target: octo/hello")
-        ctx.tools["github_issue_comment"]["handler"]({**args, **pin_hook(**call)["args"]})
+        args = {"target": "target/one", approval.PIN_ARGUMENT: ""}
+        call = {"tool_name": "demo_thing_create", "args": args, "tool_call_id": "c1"}
+        self.assertEqual(approve(**call)["message"], f"{CREATE}{DETAILS}Target: target/one")
+        ctx.tools["demo_thing_create"]["handler"]({**args, **pin_hook(**call)["args"]})
         calls = self.calls()
         [described] = [call for call in calls if call["argv"][0] == "target"]
         [ran] = [call for call in calls if call["argv"][0] == "run"]
@@ -750,11 +752,11 @@ class ApprovalPinTest(FakeCliCase):
         _, pin_hook = self.hooks()
         for call in ({}, {"tool_call_id": ""}, {"tool_call_id": None}, {"tool_call_id": 3}):
             with self.subTest(call=call):
-                self.assertEqual(pin_hook(tool_name="github_pr_merge", args={}, **call), MODIFY_EMPTY)
+                self.assertEqual(pin_hook(tool_name="demo_widget_update", args={}, **call), MODIFY_EMPTY)
 
     def test_the_pin_hook_leaves_reads_and_other_tools_alone(self) -> None:
         _, pin_hook = self.hooks()
-        self.assertIsNone(pin_hook(tool_name="github_issue_read", args={}, tool_call_id="c1"))
+        self.assertIsNone(pin_hook(tool_name="demo_thing_read", args={}, tool_call_id="c1"))
         self.assertIsNone(pin_hook(tool_name="write_file", args={}, tool_call_id="c1"))
 
     def test_the_pin_hook_never_raises(self) -> None:
@@ -764,7 +766,7 @@ class ApprovalPinTest(FakeCliCase):
             def take(self, key: approval.PinKey) -> str | None:
                 raise RuntimeError("boom")
 
-        result = approval.make_pin_hook([tool], Broken())(tool_name="github_issue_comment", args={}, tool_call_id="c1")
+        result = approval.make_pin_hook([tool], Broken())(tool_name="demo_thing_create", args={}, tool_call_id="c1")
         self.assertEqual(result, MODIFY_EMPTY)
 
     def test_the_stash_drops_the_oldest_beyond_its_limit(self) -> None:
@@ -794,10 +796,10 @@ class ApprovalPinTest(FakeCliCase):
     def test_each_session_gets_its_own_pin_through_the_hooks(self) -> None:
         approve, pin_hook = self.hooks()
         self.answer(pin=PIN)
-        approve(tool_name="github_issue_comment", args={}, tool_call_id="call_0", session_id="session-a")
+        approve(tool_name="demo_thing_create", args={}, tool_call_id="call_0", session_id="session-a")
         self.answer(pin=OTHER_PIN)
-        approve(tool_name="github_issue_comment", args={}, tool_call_id="call_0", session_id="session-b")
-        call = {"tool_name": "github_issue_comment", "args": {}, "tool_call_id": "call_0"}
+        approve(tool_name="demo_thing_create", args={}, tool_call_id="call_0", session_id="session-b")
+        call = {"tool_name": "demo_thing_create", "args": {}, "tool_call_id": "call_0"}
         self.assertEqual(
             pin_hook(**call, session_id="session-a"), {"action": "modify", "args": {approval.PIN_ARGUMENT: PIN}}
         )
@@ -807,7 +809,7 @@ class ApprovalPinTest(FakeCliCase):
 
     def test_each_task_without_a_session_gets_its_own_pin_through_the_hooks(self) -> None:
         approve, pin_hook = self.hooks()
-        call = {"tool_name": "github_issue_comment", "args": {}, "tool_call_id": "call_0"}
+        call = {"tool_name": "demo_thing_create", "args": {}, "tool_call_id": "call_0"}
         self.answer(pin=PIN)
         approve(**call, task_id="task-a")
         self.answer(pin=OTHER_PIN)
@@ -819,7 +821,7 @@ class ApprovalPinTest(FakeCliCase):
 
     def test_the_tasks_of_one_session_get_their_own_pins(self) -> None:
         approve, pin_hook = self.hooks()
-        call = {"tool_name": "github_issue_comment", "args": {}, "tool_call_id": "call_0", "session_id": "s"}
+        call = {"tool_name": "demo_thing_create", "args": {}, "tool_call_id": "call_0", "session_id": "s"}
         self.answer(pin=PIN)
         approve(**call, task_id="task-a")
         self.answer(pin=OTHER_PIN)
@@ -831,7 +833,7 @@ class ApprovalPinTest(FakeCliCase):
 
     def test_a_blank_or_missing_task_or_session_id_is_none(self) -> None:
         approve, pin_hook = self.hooks()
-        call = {"tool_name": "github_issue_comment", "args": {}, "tool_call_id": "c1"}
+        call = {"tool_name": "demo_thing_create", "args": {}, "tool_call_id": "c1"}
         for blank in ("", "  ", None, 3):
             with self.subTest(blank=blank):
                 self.answer(pin=PIN)
