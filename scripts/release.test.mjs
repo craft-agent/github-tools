@@ -4,7 +4,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { TOOL_VARIABLES, forwardedVariables, settingVariables } from "../src/entry/settings"
+import { forwardedVariables, settingVariables } from "../src/entry/settings"
+import { PROJECT } from "../src/project"
 import { CODEX_MANIFEST } from "./codex-env.mjs"
 import { DESCRIPTION, serverJson } from "./server-json.mjs"
 import { VERSION_FILES } from "./version-files.mjs"
@@ -102,11 +103,11 @@ describe("MCP configurations", () => {
   })
 
   test("every tool variable is a variable name, listed once and not a setting's", () => {
-    for (const variable of TOOL_VARIABLES) {
+    for (const variable of PROJECT.toolVariables) {
       expect(variable).toMatch(/^[A-Za-z_][A-Za-z0-9_]*$/)
       expect(settingVariables()).not.toContain(variable)
     }
-    expect(new Set(TOOL_VARIABLES).size).toBe(TOOL_VARIABLES.length)
+    expect(new Set(PROJECT.toolVariables).size).toBe(PROJECT.toolVariables.length)
   })
 })
 

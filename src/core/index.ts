@@ -56,6 +56,7 @@ export {
   type ToolSettings,
   type ToolSpec,
   type Toolset,
+  type Toolsets,
   type WriteClass,
 } from "./tool"
 export {

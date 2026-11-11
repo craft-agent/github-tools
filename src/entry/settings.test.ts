@@ -1,13 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { isToolError } from "../core"
-import {
-  forwardedVariables,
-  parseSettings,
-  parseToolSettings,
-  settingsFromOptions,
-  settingVariables,
-  TOOL_VARIABLES,
-} from "./settings"
+import { PROJECT } from "../project"
+import { forwardedVariables, parseSettings, parseToolSettings, settingsFromOptions, settingVariables } from "./settings"
 
 function failure(run: () => unknown): Error {
   try {
@@ -33,11 +27,11 @@ describe("settingVariables", () => {
 
 describe("forwardedVariables", () => {
   test("lists the settings' variables, then the tool variables", () => {
-    expect(forwardedVariables(["XDG_STATE_HOME"])).toEqual([...settingVariables(), "XDG_STATE_HOME"])
+    expect(forwardedVariables(undefined, ["XDG_STATE_HOME"])).toEqual([...settingVariables(), "XDG_STATE_HOME"])
   })
 
   test("uses the tool variables by default", () => {
-    expect(forwardedVariables()).toEqual([...settingVariables(), ...TOOL_VARIABLES])
+    expect(forwardedVariables()).toEqual([...settingVariables(), ...PROJECT.toolVariables])
   })
 })
 

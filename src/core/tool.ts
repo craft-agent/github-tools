@@ -1,6 +1,9 @@
 import { z } from "zod"
 import { ToolError, isAbortError, isToolError } from "./errors"
 
+/** The toolsets of a package: every name, in the order `all` lists them, and the ones on when a setting names none. */
+export type Toolsets = { names: readonly string[]; defaults: readonly string[] }
+
 export const TOOLSETS = ["issues", "pull_requests", "projects", "repos", "releases", "actions"] as const
 
 export type Toolset = (typeof TOOLSETS)[number]

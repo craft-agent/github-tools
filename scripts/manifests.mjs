@@ -9,7 +9,7 @@ import { VERSION_FILES } from "./version-files.mjs"
  * tools the built CLI lists and the variables the server reads: the top-level
  * `version` of every file in `VERSION_FILES`, `provides_tools` in `plugin.yaml`,
  * and the server's `env_vars` in `.codex-plugin/plugin.json` (the settings'
- * variables, then `TOOL_VARIABLES`). The rest of each file is written by hand.
+ * variables, then the package's `toolVariables`). The rest of each file is written by hand.
  * `--check` writes nothing and fails when a file is out of date.
  */
 
