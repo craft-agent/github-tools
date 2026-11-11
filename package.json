@@ -3,7 +3,7 @@
   "version": "0.12.0",
   "description": "GitHub tools for coding agents: issues, project boards, pull requests, repositories, releases and Actions.",
   "author": "craftsamo",
-  "license": "MIT",
+  "license": "LicenseRef-AGPL-3.0-Commons-Clause",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/craft-agent/github-tools.git"
