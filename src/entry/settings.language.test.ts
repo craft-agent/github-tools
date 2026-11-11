@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test"
-import { isToolError } from "../core"
 import {
   languageVariable,
   parseSettings,
@@ -8,24 +7,15 @@ import {
   settingsFromOptions,
   settingVariables,
 } from "./settings"
-
-function failure(run: () => unknown): Error {
-  try {
-    run()
-  } catch (error) {
-    expect(isToolError(error) && error.code).toBe("invalid_argument")
-    return error as Error
-  }
-  throw new Error("expected the settings to be rejected")
-}
+import { failure, profile } from "./settings.testing"
 
 const fromOptions = (options: Record<string, unknown> | undefined, env: Record<string, string | undefined> = {}) =>
-  settingsFromOptions(options, env)
+  settingsFromOptions(options, env, profile)
 
 describe("languageVariable", () => {
-  test("is GITHUB_TOOLS_LANGUAGE, and no setting variable", () => {
-    expect(languageVariable()).toBe("GITHUB_TOOLS_LANGUAGE")
-    expect(settingVariables()).not.toContain(languageVariable())
+  test("is the profile's prefix and LANGUAGE, and no setting variable", () => {
+    expect(languageVariable(profile)).toBe("DEMO_LANGUAGE")
+    expect(settingVariables(profile)).not.toContain("DEMO_LANGUAGE")
   })
 })
 
@@ -43,9 +33,9 @@ describe("settingsFromOptions language", () => {
   })
 
   test("falls back to the environment, and an option wins over it", () => {
-    expect(fromOptions({}, { GITHUB_TOOLS_LANGUAGE: " fr " }).language).toBe("fr")
-    expect(fromOptions({}, { GITHUB_TOOLS_LANGUAGE: " " })).toEqual({})
-    expect(fromOptions({ language: "ja" }, { GITHUB_TOOLS_LANGUAGE: "fr" }).language).toBe("ja")
+    expect(fromOptions({}, { DEMO_LANGUAGE: " fr " }).language).toBe("fr")
+    expect(fromOptions({}, { DEMO_LANGUAGE: " " })).toEqual({})
+    expect(fromOptions({ language: "ja" }, { DEMO_LANGUAGE: "fr" }).language).toBe("ja")
   })
 
   test("the unknown-option message lists language", () => {
@@ -55,34 +45,34 @@ describe("settingsFromOptions language", () => {
 
 describe("the command-line parsers", () => {
   test("reject --language as an unknown option", () => {
-    expect(failure(() => parseSettings(["--language", "ja"], {})).message).toContain("--language")
-    expect(failure(() => parseToolSettings(["--language=ja"], {})).message).toContain("--language")
+    expect(failure(() => parseSettings(["--language", "ja"], {}, profile)).message).toContain("--language")
+    expect(failure(() => parseToolSettings(["--language=ja"], {}, profile)).message).toContain("--language")
   })
 
   test("ignore the language variable", () => {
-    const env = { GITHUB_TOOLS_LANGUAGE: "ja" }
-    expect(parseSettings([], env)).toEqual({ confirm: "harness" })
-    expect(parseToolSettings([], env)).toEqual({})
+    const env = { DEMO_LANGUAGE: "ja" }
+    expect(parseSettings([], env, profile)).toEqual({ confirm: "harness" })
+    expect(parseToolSettings([], env, profile)).toEqual({})
   })
 })
 
 describe("promptLanguage", () => {
-  const env = { GITHUB_TOOLS_LANGUAGE: "fr" }
+  const env = { DEMO_LANGUAGE: "fr" }
 
   test("prefers the flag, then the environment, then the harness", () => {
-    expect(promptLanguage("ja", env, "de")).toBe("ja")
-    expect(promptLanguage(undefined, env, "de")).toBe("fr")
-    expect(promptLanguage(undefined, {}, "de")).toBe("de")
+    expect(promptLanguage("ja", env, "de", profile)).toBe("ja")
+    expect(promptLanguage(undefined, env, "de", profile)).toBe("fr")
+    expect(promptLanguage(undefined, {}, "de", profile)).toBe("de")
   })
 
   test("skips blank values and trims", () => {
-    expect(promptLanguage(" ", env, "de")).toBe("fr")
-    expect(promptLanguage(undefined, { GITHUB_TOOLS_LANGUAGE: "" }, " de ")).toBe("de")
-    expect(promptLanguage(" ja ", {}, undefined)).toBe("ja")
+    expect(promptLanguage(" ", env, "de", profile)).toBe("fr")
+    expect(promptLanguage(undefined, { DEMO_LANGUAGE: "" }, " de ", profile)).toBe("de")
+    expect(promptLanguage(" ja ", {}, undefined, profile)).toBe("ja")
   })
 
   test("is undefined when nothing is set", () => {
-    expect(promptLanguage(undefined, {}, undefined)).toBeUndefined()
-    expect(promptLanguage(" ", { GITHUB_TOOLS_LANGUAGE: " " }, "")).toBeUndefined()
+    expect(promptLanguage(undefined, {}, undefined, profile)).toBeUndefined()
+    expect(promptLanguage(" ", { DEMO_LANGUAGE: " " }, "", profile)).toBeUndefined()
   })
 })
