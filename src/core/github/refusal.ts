@@ -31,7 +31,7 @@ export async function refusalAsInvalid<T>(write: () => Promise<T>): Promise<T> {
   try {
     return await write()
   } catch (error) {
-    if (!isToolError(error) || error.code !== "github_error" || !/HTTP 422/.test(error.message)) throw error
+    if (!isToolError(error) || error.code !== "upstream_error" || !/HTTP 422/.test(error.message)) throw error
     const text = refusalText(error.message)
     throw new ToolError("invalid_argument", `GitHub refused it${text ? `: ${text}` : ""}.`, { cause: error })
   }

@@ -92,7 +92,7 @@ describe("a missing view", () => {
   test("a failed reorder says that the view was made and shows in the board's order", async () => {
     const installed = use([updateViewRule({ stderr: "HTTP 502", code: 1 }), ...orgRules()])
     const error = await failure(run({ ...BOARD, name: "Kanban", layout: "table", fields: ["Assignees", "Title"] }))
-    expect(error.code).toBe("github_error")
+    expect(error.code).toBe("upstream_error")
     expect(error.message).toContain('The view "Kanban" (number 7) was created')
     expect(error.message).toContain("board's field order")
     expect(restWrites(installed)).toHaveLength(1)

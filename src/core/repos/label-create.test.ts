@@ -73,7 +73,7 @@ test("GitHub's HTTP 422 is invalid_argument with GitHub's own words", async () =
 
 test("another failed write keeps its code", async () => {
   use([repositoryRule(), labelPages([]), restFailure("-X POST", "Server Error (HTTP 500)")])
-  expect((await failure(run({ name: "Bug" }))).code).toBe("github_error")
+  expect((await failure(run({ name: "Bug" }))).code).toBe("upstream_error")
 })
 
 test("write permission is required", async () => {

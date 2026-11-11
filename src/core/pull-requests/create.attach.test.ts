@@ -111,7 +111,7 @@ describe("attachments", () => {
     const result = await run({ head: "feature", title: "T", labels: ["feature"], attachments: [{ path: shot }] })
     expect(result.pr).toEqual({ number: 7, url: URL, title: "T" })
     expect(result.head_sha).toBe(HEAD_SHA)
-    expect(result.errors).toEqual({ attachments: `github_error: gh failed (exit 1): ${UPLOAD_FAILURE}` })
+    expect(result.errors).toEqual({ attachments: `upstream_error: gh failed (exit 1): ${UPLOAD_FAILURE}` })
     expect(result.attachments).toHaveLength(1)
     expect(prCommands(installed).map((call) => call.args[1])).toEqual(["list", "create", "edit"])
   })
@@ -128,7 +128,7 @@ describe("attachments", () => {
     )
     const result = await run({ head: "feature", title: "T", attachments: [{ path: shot }] })
     expect(result.pr.number).toBe(47)
-    expect(result.errors).toEqual({ create: `github_error: gh failed (exit 1): ${outage}` })
+    expect(result.errors).toEqual({ create: `upstream_error: gh failed (exit 1): ${outage}` })
   })
 
   test("a refusal that made nothing is thrown", async () => {

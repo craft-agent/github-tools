@@ -59,7 +59,7 @@ export class ViewColumnsError extends ToolError {
   constructor(view: ViewRef, cause: unknown) {
     const reason = cause instanceof Error ? cause.message : String(cause)
     super(
-      "github_error",
+      "upstream_error",
       `The view "${view.name}" (number ${view.number}) was created, but its columns are in the board's field order, not the requested one: ${reason}`,
       { cause },
     )
@@ -191,7 +191,8 @@ function viewBody(request: ViewRequest, fields: readonly RestField[]): ViewBody 
  */
 async function userId(login: string, ctx: RefContext): Promise<string> {
   const id = (await gh(["api", `users/${login}`, "--jq", ".id"], ctx)).trim()
-  if (!/^\d+$/.test(id)) throw new ToolError("github_error", `GitHub did not give the numeric id of the user ${login}.`)
+  if (!/^\d+$/.test(id))
+    throw new ToolError("upstream_error", `GitHub did not give the numeric id of the user ${login}.`)
   return id
 }
 
@@ -254,7 +255,7 @@ export async function createView(
   }
   if (typeof made?.number !== "number") {
     throw new ToolError(
-      "github_error",
+      "upstream_error",
       `GitHub did not return the view "${request.name}" it created; look at the board before trying again.`,
     )
   }

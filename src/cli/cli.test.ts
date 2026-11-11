@@ -327,7 +327,7 @@ describe("run", () => {
   test("an unexpected error is generic on stdout and detailed on stderr", async () => {
     const run = await cli(["run", BROKEN_ID, "--cwd", "/x"])
     expect(run.code).toBe(EXIT_FAILED)
-    expect(json(run).error.code).toBe("github_error")
+    expect(json(run).error.code).toBe("internal_error")
     expect(json(run).error.message).not.toContain("boom")
     expect(run.stderr).toContain("boom")
   })
@@ -338,7 +338,7 @@ describe("run", () => {
     controller.abort()
     const run = await pending
     expect(run.code).toBe(EXIT_FAILED)
-    expect(json(run).error.code).toBe("github_error")
+    expect(json(run).error.code).toBe("internal_error")
     expect(json(run).error.message).toContain("cancelled")
   })
 })

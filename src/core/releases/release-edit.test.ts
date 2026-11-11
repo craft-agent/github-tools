@@ -241,7 +241,7 @@ test("GitHub HTTP 422 is invalid_argument with GitHub's words", async () => {
 test("server error keeps its code", async () => {
   const current = rawRelease("v1.0.0")
   use([repositoryRule(), releaseByTagRule("v1.0.0", current), restFailure("-X PATCH", "Server Error (HTTP 500)")])
-  expect((await failure(run({ tag: "v1.0.0", notes: "Fail" }))).code).toBe("github_error")
+  expect((await failure(run({ tag: "v1.0.0", notes: "Fail" }))).code).toBe("upstream_error")
 })
 
 test("write permission is required", async () => {

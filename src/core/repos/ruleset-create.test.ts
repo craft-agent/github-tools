@@ -279,6 +279,6 @@ describe("GitHub's answer", () => {
 
   test("a reply without a ruleset is an error", async () => {
     use([repositoryViewRule(), repositoryRule(), rulesetListRule(), { match: "-X POST" }])
-    expect((await failure(run({ name: "N", rules: RULES }))).code).toBe("github_error")
+    expect((await failure(run({ name: "N", rules: RULES }))).code).toBe("upstream_error")
   })
 })

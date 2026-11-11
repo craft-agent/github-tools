@@ -99,7 +99,7 @@ function createdIssue(stdout: string): { number: number; url: string } {
   const number = url && ISSUE_URL.exec(url)?.[1]
   if (!url || !number) {
     throw new ToolError(
-      "github_error",
+      "upstream_error",
       `gh printed no issue URL, so the new issue's number is unknown; it may exist, so look in the repository before creating it again. Output: ${stdout.trim()}`,
     )
   }
@@ -124,7 +124,7 @@ async function addBlockers(
       failures.push(`${issueLabel(blocker)}: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
-  if (failures.length) throw new ToolError("github_error", failures.join("; "))
+  if (failures.length) throw new ToolError("upstream_error", failures.join("; "))
 }
 
 export const issueCreate = defineTool({

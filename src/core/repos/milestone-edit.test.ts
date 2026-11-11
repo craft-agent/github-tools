@@ -41,7 +41,7 @@ test("GitHub's HTTP 422 is invalid_argument with GitHub's own words", async () =
 
 test("another failed write keeps its code", async () => {
   use([repositoryRule(), milestonePages([MILESTONE_ROW]), restFailure("-X PATCH", "Server Error (HTTP 500)")])
-  expect((await failure(run({ milestone: 1, state: "closed" }))).code).toBe("github_error")
+  expect((await failure(run({ milestone: 1, state: "closed" }))).code).toBe("upstream_error")
 })
 
 test("title matches case-insensitively in closed state and clear_due sends null", async () => {

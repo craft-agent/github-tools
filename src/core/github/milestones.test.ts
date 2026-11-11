@@ -70,9 +70,9 @@ describe("resolveMilestone", () => {
     expect((await failure(resolveMilestone(REPO, "v1", { create: false }, CTX))).code).toBe("invalid_argument")
   })
 
-  test("a reply to the creation without a milestone is github_error", async () => {
+  test("a reply to the creation without a milestone is upstream_error", async () => {
     useFake([milestonesRule(), { match: "-X POST", stdout: "{}" }])
-    expect((await failure(resolveMilestone(REPO, "v1", { create: true }, CTX))).code).toBe("github_error")
+    expect((await failure(resolveMilestone(REPO, "v1", { create: true }, CTX))).code).toBe("upstream_error")
   })
 
   test("a failed list is the call's failure", async () => {

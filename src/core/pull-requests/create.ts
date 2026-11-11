@@ -45,7 +45,7 @@ import {
 
 const PULL_URL = /\/pull\/(\d+)$/
 /** The failures of `gh pr create` that can come after GitHub made the pull request; the others are refusals that made nothing. */
-const MAY_HAVE_CREATED: readonly ErrorCode[] = ["github_error", "stale", "not_found", "rate_limited"]
+const MAY_HAVE_CREATED: readonly ErrorCode[] = ["upstream_error", "stale", "not_found", "rate_limited"]
 const NOT_A_BRANCH = "head must be a branch of the repository; pull requests from forks are not supported yet."
 
 const input = z.object({
@@ -112,7 +112,7 @@ function createdPullRequest(stdout: string): { number: number; url: string } {
   const number = url && PULL_URL.exec(url)?.[1]
   if (!url || !number) {
     throw new ToolError(
-      "github_error",
+      "upstream_error",
       "GitHub did not print the pull request it created; look for it before running this again.",
     )
   }
@@ -411,7 +411,7 @@ export const prCreate = defineTool({
       ? await steps.record("project", async () => {
           if (!read) {
             throw new ToolError(
-              "github_error",
+              "upstream_error",
               `the pull request could not be read back, so it was not put on the board; add it with github_project_item_add (${target.full}#${created.number}).`,
             )
           }

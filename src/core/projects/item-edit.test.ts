@@ -184,7 +184,7 @@ describe("an edit that cannot be made", () => {
       setValueRule(),
     ])
     const error = await failure(run({ ...ID, fields: { Estimate: 8, Target: "2026-12-01" } }))
-    expect(error.code).toBe("github_error")
+    expect(error.code).toBe("upstream_error")
     expect(error.message).toContain("boom")
     expect(error.message).toContain("Written before it failed: Estimate.")
   })

@@ -47,7 +47,7 @@ describe("reopening", () => {
       issueFieldsRule({ state: "CLOSED" }),
       { match: "^issue reopen", stderr: "HTTP 500", code: 1 },
     ])
-    expect((await failure(run({ issue: "12" }))).code).toBe("github_error")
+    expect((await failure(run({ issue: "12" }))).code).toBe("upstream_error")
   })
 })
 

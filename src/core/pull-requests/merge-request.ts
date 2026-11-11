@@ -52,7 +52,7 @@ function progressOf(reply: RawMergeReply | null, fallbackUuid: string | null = n
   const status = MERGE_STATUSES.find((known) => known === reply?.status)
   if (!reply || !status) {
     throw new ToolError(
-      "github_error",
+      "upstream_error",
       `GitHub answered the merge request with ${reply?.status ? `the status ${reply.status}` : "nothing"}, which this tool does not know.`,
     )
   }

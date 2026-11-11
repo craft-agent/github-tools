@@ -324,7 +324,7 @@ async function readIssueData<T>(
  * other failure (auth, rate limit, a missing `gh`, the issue gone) is the
  * call's failure, not an empty list.
  */
-const DEPENDENCIES_SOFT_CODES: readonly ErrorCode[] = ["github_error", "forbidden"]
+const DEPENDENCIES_SOFT_CODES: readonly ErrorCode[] = ["upstream_error", "forbidden"]
 
 /**
  * One issue in full, from one read, plus its dependencies from a second that
@@ -543,7 +543,7 @@ export async function createLinkedBranch(
   const created = linkedBranch(data?.createLinkedBranch?.linkedBranch)
   if (!created) {
     throw new ToolError(
-      "github_error",
+      "upstream_error",
       "GitHub did not return the branch it created; look at the issue's Development panel before running this again.",
     )
   }

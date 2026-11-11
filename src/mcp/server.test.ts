@@ -169,7 +169,7 @@ describe("calls", () => {
     expect(result.isError).toBe(true)
     expect(JSON.parse(textOf(result))).toEqual({
       error: {
-        code: "github_error",
+        code: "internal_error",
         message: "Unexpected error while running github_issue_broken_read; see the server log.",
       },
     })

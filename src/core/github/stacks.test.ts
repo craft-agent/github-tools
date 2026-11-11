@@ -250,7 +250,7 @@ describe("failures", () => {
       }),
     ])
     const error = await failure(createStack(REPO, [101, 102], CTX))
-    expect(error.code).toBe("github_error")
+    expect(error.code).toBe("upstream_error")
     expect(error.message).toContain("Unprocessable Entity (HTTP 422)")
     expect(error.message).toContain("pull request #102 is already in a stack")
   })

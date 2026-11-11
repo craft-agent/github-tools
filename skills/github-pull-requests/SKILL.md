@@ -220,4 +220,5 @@ head and base.
 | `unauthenticated`  | the GitHub CLI is not logged in; the user runs `gh auth login`                    |
 | `gh_missing`       | the GitHub CLI is not installed; the user installs it                             |
 | `gh_too_old`       | the GitHub CLI is older than the call needs (2.99 for attachments); update it     |
-| `github_error`     | anything else GitHub or the CLI reported; read the message before retrying        |
+| `upstream_error`   | anything else GitHub or the CLI reported; read the message before retrying        |
+| `internal_error`   | a fault in the package; report it rather than retrying                            |

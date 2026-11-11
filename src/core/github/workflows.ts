@@ -104,7 +104,7 @@ export async function resolveWorkflow(repo: RepoName, wanted: string, ctx: RefCo
 /** One workflow, with its page on GitHub. */
 export async function readWorkflow(repo: RepoName, id: number, ctx: RefContext): Promise<Workflow> {
   const raw = await ghJson<RawWorkflowDetail>(["api", `repos/${repo.owner}/${repo.name}/actions/workflows/${id}`], ctx)
-  if (!raw) throw new ToolError("github_error", `GitHub returned nothing for workflow ${id} of ${repo.full}.`)
+  if (!raw) throw new ToolError("upstream_error", `GitHub returned nothing for workflow ${id} of ${repo.full}.`)
   return { id: raw.id, name: raw.name, path: raw.path, state: raw.state, url: raw.html_url }
 }
 

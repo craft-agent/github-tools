@@ -82,7 +82,7 @@ describe("refusals", () => {
 
   test("a failing gh is thrown", async () => {
     use([repositoryRule(), stateRule({ isDraft: true }), { match: "^pr ready", stderr: "HTTP 500", code: 1 }])
-    expect((await failure(run({ pr: "7" }))).code).toBe("github_error")
+    expect((await failure(run({ pr: "7" }))).code).toBe("upstream_error")
   })
 })
 

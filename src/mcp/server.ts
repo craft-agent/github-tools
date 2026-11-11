@@ -100,7 +100,7 @@ export function createServer(specs: ToolSpec[], settings: EntrySettings, options
       log(
         `Unexpected error while running ${spec.id}: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`,
       )
-      return errorResult("github_error", `Unexpected error while running ${spec.id}; see the server log.`)
+      return errorResult("internal_error", `Unexpected error while running ${spec.id}; see the server log.`)
     }
   })
 

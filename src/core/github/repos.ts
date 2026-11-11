@@ -357,7 +357,7 @@ export async function createRepository(
     ),
   )
   if (!raw?.full_name || !raw.html_url) {
-    throw new ToolError("github_error", "GitHub did not return the repository it created.")
+    throw new ToolError("upstream_error", "GitHub did not return the repository it created.")
   }
   return { repo: raw.full_name, url: raw.html_url, visibility: visibilitySchema.safeParse(raw.visibility).data }
 }

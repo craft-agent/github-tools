@@ -288,7 +288,7 @@ export const prReview = defineTool({
     }
 
     if (!response) {
-      throw new ToolError("github_error", "GitHub did not return the created review.")
+      throw new ToolError("upstream_error", "GitHub did not return the created review.")
     }
 
     return {

@@ -161,13 +161,13 @@ describe("GitHub's refusals", () => {
     "the other relation's duplicate wording does not excuse adding %s",
     async (_name, args, match, stderr) => {
       use(rulesFor(CURRENT, { match, stderr, code: 1 }))
-      expect((await failure(run({ issue: "12", ...args }))).code).toBe("github_error")
+      expect((await failure(run({ issue: "12", ...args }))).code).toBe("upstream_error")
     },
   )
 
   test("a refusal that is not about the link being there is a failure", async () => {
     use(rulesFor(CURRENT, { match: "--add-sub-issue 15$", stderr: "GraphQL: Sub issue limit reached", code: 1 }))
-    expect((await failure(run({ issue: "12", add_sub_issues: ["15"] }))).code).toBe("github_error")
+    expect((await failure(run({ issue: "12", add_sub_issues: ["15"] }))).code).toBe("upstream_error")
   })
 })
 
@@ -225,7 +225,7 @@ describe("dependencies that cannot be read", () => {
   test("a dependency change fails before any write, naming why", async () => {
     const installed = use(rulesFor({ ...CURRENT, dependenciesError: true }))
     const error = await failure(run({ issue: "12", add_sub_issues: ["15"], remove_blocking: ["6"] }))
-    expect(error.code).toBe("github_error")
+    expect(error.code).toBe("upstream_error")
     expect(error.message).toContain("cannot be changed here")
     expect(error.message).toContain("blockedBy")
     expect(writes(installed)).toEqual([])
@@ -258,7 +258,7 @@ describe("a failure part-way", () => {
   test("a failure of the first change says nothing was applied", async () => {
     use(rulesFor(CURRENT, { match: "--add-blocked-by 9$", stderr: "HTTP 500", code: 1 }))
     const error = await failure(run({ issue: "12", add_blocked_by: ["9"] }))
-    expect(error.code).toBe("github_error")
+    expect(error.code).toBe("upstream_error")
     expect(error.message).toContain("Applied before this failure: nothing.")
   })
 

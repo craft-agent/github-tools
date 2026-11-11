@@ -35,7 +35,8 @@ export async function readBoardOwner(login: string, ctx: RefContext): Promise<Bo
 }
 
 function boardOf(reply: BoardReply | undefined, title: string): Board {
-  if (!reply?.projectV2?.id) throw new ToolError("github_error", `GitHub did not return the board "${title}" it made.`)
+  if (!reply?.projectV2?.id)
+    throw new ToolError("upstream_error", `GitHub did not return the board "${title}" it made.`)
   return toBoard(reply.projectV2)
 }
 

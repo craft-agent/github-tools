@@ -126,7 +126,7 @@ describe("attachments", () => {
     expect(result.url).toBe(URL)
     expect(result.changed).toEqual(["title", "attachments"])
     expect(result.errors).toEqual({
-      attachments: "github_error: gh failed (exit 1): failed to upload shot.png: HTTP 500",
+      attachments: "upstream_error: gh failed (exit 1): failed to upload shot.png: HTTP 500",
     })
   })
 

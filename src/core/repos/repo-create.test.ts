@@ -95,9 +95,9 @@ describe("the endpoints", () => {
     expect((await run({ repo: "octo/new", visibility: "public" })).visibility).toBe("public")
   })
 
-  test("a reply without the repository is a github_error", async () => {
+  test("a reply without the repository is an upstream_error", async () => {
     use(rules({ match: "-X POST", stdout: "{}" }))
-    expect((await failure(run({ repo: "octo/new" }))).code).toBe("github_error")
+    expect((await failure(run({ repo: "octo/new" }))).code).toBe("upstream_error")
   })
 })
 

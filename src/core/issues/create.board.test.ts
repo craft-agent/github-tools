@@ -109,7 +109,7 @@ describe("a board", () => {
     const result = await run({ title: "T", ...BOARD, blocked_by: ["2"] })
     expect(result.relations.blocked_by).toEqual(["octo/hello#2"])
     expect(result.project?.fields).toEqual({ Status: "Todo" })
-    expect(result.errors).toEqual({ blocked_by: "github_error: gh failed (exit 1): cannot read blockers" })
+    expect(result.errors).toEqual({ blocked_by: "upstream_error: gh failed (exit 1): cannot read blockers" })
     const [, status] = mutationsOf(installed)
     expect(status).toMatchObject({
       name: "updateProjectV2ItemFieldValue",
@@ -136,7 +136,7 @@ describe("a board", () => {
     const result = await run({ title: "T", ...BOARD })
     expect(result.issue).toEqual({ number: 7, url: "https://github.com/octo/hello/issues/7", title: "T" })
     expect(result.project).toBeNull()
-    expect(result.errors).toEqual({ project: "github_error: gh failed (exit 1): boom" })
+    expect(result.errors).toEqual({ project: "upstream_error: gh failed (exit 1): boom" })
     expect(mutationNames(installed)).toEqual(["addProjectV2ItemById"])
   })
 
@@ -151,7 +151,7 @@ describe("a board", () => {
     )
     const result = await run({ title: "T", ...BOARD, fields: { Estimate: 1, Notes: "kept" } })
     expect(result.project).toEqual({ ...BOARD_SUMMARY, item_id: "PVTI_new", fields: { Notes: "kept", Status: "Todo" } })
-    expect(result.errors).toEqual({ "fields.Estimate": "github_error: gh failed (exit 1): boom" })
+    expect(result.errors).toEqual({ "fields.Estimate": "upstream_error: gh failed (exit 1): boom" })
   })
 
   test.each([

@@ -303,7 +303,7 @@ describe("closing issues and the default branch", () => {
     use(base({ match: STATE, stderr: "boom", code: 1 }))
     const result = await run({ head: "feature", title: "T", closes: ["12"] })
     expect(result.notes).toEqual([])
-    expect(result.errors).toEqual({ read: "github_error: gh failed (exit 1): boom" })
+    expect(result.errors).toEqual({ read: "upstream_error: gh failed (exit 1): boom" })
   })
 
   test("no closes, no note", async () => {
@@ -321,14 +321,14 @@ describe("the steps after the pull request exists", () => {
       head_sha: HEAD_SHA,
       draft: true,
       closing_issues: [],
-      errors: { read: "github_error: gh failed (exit 1): boom" },
+      errors: { read: "upstream_error: gh failed (exit 1): boom" },
     })
   })
 
-  test("a gh that prints no pull request URL is github_error", async () => {
+  test("a gh that prints no pull request URL is upstream_error", async () => {
     use(base({ match: "^pr create", stdout: "created\n" }))
     const error = await failure(run({ head: "feature", title: "T" }))
-    expect(error.code).toBe("github_error")
+    expect(error.code).toBe("upstream_error")
     expect(error.message).toBe(
       "GitHub did not print the pull request it created; look for it before running this again.",
     )
@@ -336,7 +336,7 @@ describe("the steps after the pull request exists", () => {
 
   test("a gh pr create that fails is thrown", async () => {
     use(base({ match: "^pr create", stderr: "HTTP 500", code: 1 }))
-    expect((await failure(run({ head: "feature", title: "T" }))).code).toBe("github_error")
+    expect((await failure(run({ head: "feature", title: "T" }))).code).toBe("upstream_error")
   })
 
   test("a repository of someone else is foreign", async () => {
@@ -381,7 +381,7 @@ describe("a board", () => {
     const result = await run({ head: "feature", title: "T", ...BOARD })
     expect(result.pr).toEqual({ number: 7, url: URL, title: "T" })
     expect(result.project).toBeNull()
-    expect(result.errors).toEqual({ project: "github_error: gh failed (exit 1): boom" })
+    expect(result.errors).toEqual({ project: "upstream_error: gh failed (exit 1): boom" })
     expect(mutationNames(installed)).toEqual(["addProjectV2ItemById"])
   })
 
@@ -396,7 +396,7 @@ describe("a board", () => {
     )
     const result = await run({ head: "feature", title: "T", ...BOARD, fields: { Estimate: 1, Notes: "kept" } })
     expect(result.project).toEqual({ ...BOARD_SUMMARY, item_id: "PVTI_new", fields: { Notes: "kept", Status: "Todo" } })
-    expect(result.errors).toEqual({ "fields.Estimate": "github_error: gh failed (exit 1): boom" })
+    expect(result.errors).toEqual({ "fields.Estimate": "upstream_error: gh failed (exit 1): boom" })
   })
 
   test("a pull request that could not be read back is not put on the board, and says so", async () => {
