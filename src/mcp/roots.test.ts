@@ -20,9 +20,9 @@ describe("working directory", () => {
 
   async function setup(client: ClientSetup, options?: ServerOptions) {
     const calls: Call[] = []
-    const connected = await connect([tool("github_issue_read", "issues", "read", calls)], settings(), client, options)
+    const connected = await connect([tool("demo_thing_read", "alpha", "read", calls)], settings(), client, options)
     const cwd = async () => {
-      await call(connected.client, "github_issue_read")
+      await call(connected.client, "demo_thing_read")
       return calls.at(-1)!.ctx.cwd
     }
     return { ...connected, calls, cwd }

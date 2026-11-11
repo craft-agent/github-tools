@@ -9,11 +9,14 @@ import {
 } from "@modelcontextprotocol/sdk/types.js"
 import { pathToFileURL } from "node:url"
 import { z } from "zod"
-import { confirmWrite, defineTool, type ToolContext, type ToolSpec, type WriteClass } from "../core"
+import { confirmWrite, defineTool, type ToolContext, type ToolSpec, type Toolsets, type WriteClass } from "../core"
 import type { EntrySettings } from "../entry/settings"
 import { createServer, type ServerOptions } from "./server"
 
 /** Fixtures the MCP server tests share. */
+
+/** The toolsets the test servers are built with; `alpha` is the one on by default. */
+export const TOOLSETS: Toolsets = { names: ["alpha", "beta"], defaults: ["alpha"] }
 
 export type Call = { tool: string; args: unknown; ctx: ToolContext }
 
@@ -31,7 +34,7 @@ export function tool(id: string, toolset: string, writeClass: WriteClass, calls:
     input: toolInput,
     output: toolOutput,
     async execute(args, ctx) {
-      await confirmWrite(self, ctx, "Delete octo/hello")
+      await confirmWrite(self, ctx, "Delete the thing")
       calls.push({ tool: id, args, ctx })
       return { tool: id, count: args.count }
     },
@@ -44,7 +47,7 @@ export function failing(id: string, error: Error): ToolSpec {
     id,
     title: id,
     description: id,
-    toolset: "issues",
+    toolset: "alpha",
     class: "read",
     input: toolInput,
     output: toolOutput,
@@ -104,7 +107,7 @@ export async function connect(
       }
     })
   }
-  const server = createServer(specs, entry, { log: (entry) => logs.push(entry), ...options })
+  const server = createServer(specs, entry, { log: (entry) => logs.push(entry), toolsets: TOOLSETS, ...options })
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair()
   await server.connect(serverSide)
   await mcpClient.connect(clientSide)
