@@ -143,7 +143,7 @@ def _stop(process: subprocess.Popen[str]) -> None:
     """Stop the child and, on POSIX, the whole process group it leads, then collect what it left.
 
     The group gets ``SIGTERM`` and ``TERMINATE_GRACE_SECONDS`` to end, then ``SIGKILL``, so a
-    ``gh`` the command line started does not outlive the call.
+    child process the command line started does not outlive the call.
     """
     try:
         if _POSIX:
@@ -196,7 +196,7 @@ def locate_runtime() -> Runtime:
 
 
 def agent_cwd() -> str:
-    """The directory the agent works in, which a bare issue number refers to."""
+    """The directory the agent works in, which relative paths or contextual targets refer to."""
     try:
         from agent.runtime_cwd import resolve_agent_cwd
     except ImportError:

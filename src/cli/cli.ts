@@ -46,7 +46,7 @@ export type CliIo = {
   stdout(text: string): void
   /** Receives usage lines and the detail of unexpected errors. */
   stderr(text: string): void
-  /** Where the tools are installed: never a call's working tree, so a bare number there fails. */
+  /** Where the tools are installed: never a call's working tree. */
   ownDir?: string
   /** Stops a running tool when it aborts. */
   signal?: AbortSignal
@@ -206,20 +206,19 @@ function errorDetail(error: unknown): string {
  * plugin: `list` answers with the selected tools, `run` runs one with the
  * arguments on standard input (with `--pin <hex>`, only if what `target`
  * answered with that `pin` is unchanged, else `stale` and nothing runs), and
- * `target` answers with the repositories a call would write to
- * (`{"resources": [...]}`), the tool's `title`, its `intent` when it has one
- * (`list` carries it too, in English), and the plugin's own `words`
- * (`{"details", "target", "more", "more_character", "more_characters"}`, the
- * last two the notices of characters left out, with a `{count}` placeholder)
- * in the prompt language, plus a `description` when the tool gives one:
+ * `target` answers with what a call would write to (`{"resources": [...]}`), the tool's `title`, its `intent` when it
+ * has one (`list` carries it too, in English), and the plugin's own
+ * `words` (`{"details", "target", "more", "more_character",
+ * "more_characters"}`, the last two the notices of characters left out, with a
+ * `{count}` placeholder) in the prompt language, plus a `description` when the
+ * tool gives one:
  * `{"headline"?: string, "facts": [{"label", "value", "omitted"?}], "dropped"?, "text"?: {"label", "body", "omitted"?}}`,
  * as the approval prompt shows it (the words translated, the headline
  * rendered, hidden characters marked; `omitted` is the number of code points
  * a cut value or text left out, and `dropped` the number of facts left out
  * past the eighth, each present only when it is above zero), and a `pin` (64 hex digits, independent of the
  * language) of that description and the resources when there is a description.
- * `target` takes `--language <tag>`, else `<envPrefix>_LANGUAGE`, else
- * `--harness-language <tag>` (the harness's own
+ * `target` takes `--language <tag>`, else `<envPrefix>_LANGUAGE`, else `--harness-language <tag>` (the harness's own
  * display language) as the prompt language; none, or one without a table,
  * keeps English. Standard output carries only the JSON document; a
  * mistake in the command line is one line on standard error and `EXIT_USAGE`.

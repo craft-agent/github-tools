@@ -270,7 +270,7 @@ describe("V2 tool calls", () => {
     for (const location of [{}, null]) {
       const { tools, asserts, events } = await setUp({ location })
       await expect(tools.get(ADD_ID)!.execute({ area: "north" }, { sessionID: SESSION_ID, signal })).rejects.toThrow(
-        /^invalid_argument: The session's directory could not be read.*pass `repo`/,
+        /^invalid_argument: The session's directory could not be read.*retry\.$/,
       )
       expect(asserts).toEqual([])
       expect(events).toEqual([])

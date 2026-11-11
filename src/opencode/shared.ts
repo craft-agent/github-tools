@@ -25,13 +25,13 @@ export type PluginDeps = {
   profile?: EntryProfile
   /** The directory holding `<name>/SKILL.md` files, for the harness version that registers skills. */
   skillsDir?: URL | string
-  /** Where the plugin is installed: never a call's working tree, so a bare number there fails. */
+  /** Where the plugin is installed: never a call's working tree. */
   ownDir?: string
   /** The translations of the tools' words, per language, for the approval prompt; defaults to none, which keeps it in English. */
   translations?: Translations
 }
 
-/** The resources an "always" answer may persist: all but `*`, which would grant every repository. */
+/** The resources an "always" answer may persist: all but `*`, which would grant every target. */
 export function persistableResources(resources: string[]): string[] {
   return resources.filter((resource) => resource !== ANY_RESOURCE)
 }
