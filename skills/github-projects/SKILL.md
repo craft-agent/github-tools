@@ -1,6 +1,8 @@
 ---
 name: github-projects
 description: "Use when reading or changing GitHub project boards (Projects v2) through the github_project_* tools: find a board, list boards or a board's items, create a board with the standard Status, Start and Target fields and the Roadmap, Kanban and Backlog views, add a field or view, link a board to a repository, put an issue or pull request on a board, create a draft and turn it into an issue, set field values such as Status or dates, archive an item. Covers how a board is found, field values by name, the starting Status, partial failures and error codes. Not for the issues themselves (their title, labels, assignees, relations), pull requests, or how to plan work."
+metadata:
+  toolset: projects
 ---
 
 # GitHub project boards

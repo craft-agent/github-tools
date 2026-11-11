@@ -1,6 +1,8 @@
 ---
 name: github-pull-requests
 description: "Use when reading or changing GitHub pull requests or native stacks through the github_pr_* and github_stack_* tools: view or list pull requests, read their checks (waiting for CI, failed job logs) or diff, open a pull request from a pushed branch, edit its title, body, base, labels, assignees, reviewers, milestone or closing issues, comment, post a review, mark it ready or draft, close, reopen or merge it, attach images or videos, and read, link or unlink a stack of pull requests. Covers references, exact commits (head_sha), waiting, closing issues, stacked merges, partial failures and error codes. Not for pushing branches or making commits, issues themselves, or project boards."
+metadata:
+  toolset: pull_requests
 ---
 
 # GitHub pull requests and stacks

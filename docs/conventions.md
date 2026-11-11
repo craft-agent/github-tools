@@ -455,7 +455,7 @@ Every entry point takes the same settings:
 
   ```yaml
   metadata:
-    toolset: notes
+    toolset: issues
   ```
 
   The Agent Skills format allows no other top-level key, and its validators

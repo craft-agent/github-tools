@@ -1,6 +1,8 @@
 ---
 name: github-releases
 description: "Use when reading or changing GitHub releases through the github_release_* tools: list releases, read one by tag, draft a release, edit its title or notes, publish a draft, or delete a release. Covers naming a repository, which changes ask every time, the draft-to-publish flow, the reviewed commit (head_sha), latest status and error codes. Not for uploading, downloading or deleting assets, managing tags alone, or running workflows."
+metadata:
+  toolset: releases
 ---
 
 # GitHub releases
