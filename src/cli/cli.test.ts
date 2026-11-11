@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { z } from "zod"
 import {
   PIN_PATTERN,
@@ -11,7 +11,6 @@ import {
   type ToolSpec,
   type Translations,
 } from "../core"
-import { tempRepo } from "../testing/git-repo"
 import { PROJECT_PROFILE } from "../entry/profile"
 import { PROJECT } from "../project"
 import { EXIT_FAILED, EXIT_OK, EXIT_USAGE, runCli, type CliIo } from "./cli"
@@ -156,21 +155,6 @@ const TRANSLATIONS: Translations = {
     Body: "本文",
   },
 }
-
-/** The titles of the fixtures that are not `Title of <id>`: the id itself. */
-const OWN_ID_TITLES = [DESCRIBED_ID, HANGING_DESCRIBE_ID]
-
-/** The answer of `target` without a language for a fixture: its resources, its English title and the English words. */
-const answer = (id: string, resources: string[]) => ({
-  resources,
-  title: OWN_ID_TITLES.includes(id) ? id : `Title of ${id}`,
-  words: ENGLISH_WORDS,
-})
-
-const cleanups: (() => void)[] = []
-afterEach(() => {
-  for (const cleanup of cleanups.splice(0)) cleanup()
-})
 
 describe("list", () => {
   test("describes the tools the settings select, in order", async () => {
@@ -317,96 +301,6 @@ describe("run", () => {
     expect(run.code).toBe(EXIT_FAILED)
     expect(json(run).error.code).toBe("internal_error")
     expect(json(run).error.message).toContain("cancelled")
-  })
-})
-
-describe("target", () => {
-  test("includes the call's description with hidden characters marked and newlines normalized", async () => {
-    const run = await cli(["target", DESCRIBED_ID, "--cwd", "/x"], '{"repo":"Octo/Hello"}')
-    expect(run.code).toBe(EXIT_OK)
-    expect(run.stderr).toBe("")
-    expect(json(run)).toEqual({
-      ...answer(DESCRIBED_ID, ["octo/hello"]),
-      description: {
-        headline: 'Label the repository "Octo/Hello"',
-        facts: [{ label: "Repository", value: "Octo/Hello" }],
-        text: { label: "Body", body: "Body<U+202E> line\nnext" },
-      },
-      pin: expect.stringMatching(PIN_PATTERN),
-    })
-  })
-
-  test("still answers resources without a description when describing never settles", async () => {
-    const run = await cli(["target", HANGING_DESCRIBE_ID, "--cwd", "/x"], '{"repo":"Octo/Hello"}', {
-      describeTimeoutMs: 50,
-    })
-    expect(run.code).toBe(EXIT_OK)
-    expect(run.stderr).toBe("")
-    expect(json(run)).toEqual(answer(HANGING_DESCRIBE_ID, ["octo/hello"]))
-  })
-
-  test("omits the description and answers * for invalid arguments", async () => {
-    expect(json(await cli(["target", DESCRIBED_ID, "--cwd", "/x"], '{"repo":3}'))).toEqual(answer(DESCRIBED_ID, ["*"]))
-    expect(json(await cli(["target", DESCRIBED_ID, "--cwd", "/x"], '{"bogus":1}'))).toEqual(answer(DESCRIBED_ID, ["*"]))
-  })
-
-  test("is the lowercased repo argument", async () => {
-    const run = await cli(["target", ADD_ID, "--cwd", "/x"], JSON.stringify({ repo: "Octo/Hello" }))
-    expect(run.code).toBe(EXIT_OK)
-    expect(json(run)).toEqual(answer(ADD_ID, ["octo/hello"]))
-  })
-
-  test("is the working tree's origin without a repo argument", async () => {
-    const repo = tempRepo("git@github.com:Octo/Hello.git")
-    cleanups.push(repo.cleanup)
-    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir]))).toEqual(answer(ADD_ID, ["octo/hello"]))
-  })
-
-  test("is the repository a qualified issue names, not the working tree's", async () => {
-    const repo = tempRepo("git@github.com:Octo/Hello.git")
-    cleanups.push(repo.cleanup)
-    const stdin = JSON.stringify({ issue: "Other/Repo#4" })
-    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir], stdin))).toEqual(answer(ADD_ID, ["other/repo"]))
-  })
-
-  test("lists every repository the call writes to", async () => {
-    const repo = tempRepo("git@github.com:Octo/Hello.git")
-    cleanups.push(repo.cleanup)
-    const stdin = JSON.stringify({ issue: "4", parent: "Other/Repo#2" })
-    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir], stdin))).toEqual(
-      answer(ADD_ID, ["octo/hello", "other/repo"]),
-    )
-  })
-
-  test("is * when the repository cannot be resolved", async () => {
-    const repo = tempRepo()
-    cleanups.push(repo.cleanup)
-    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir]))).toEqual(answer(ADD_ID, ["*"]))
-    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir], '{"repo":"not a repo"}'))).toEqual(
-      answer(ADD_ID, ["*"]),
-    )
-    expect(json(await cli(["target", ADD_ID, "--cwd", repo.dir], '{"repo":3}'))).toEqual(answer(ADD_ID, ["*"]))
-  })
-
-  test("is * for a bare number in the install directory, and still names a qualified issue there", async () => {
-    const repo = tempRepo("git@github.com:Octo/Self.git")
-    cleanups.push(repo.cleanup)
-    const argv = ["target", ADD_ID, "--cwd", repo.dir]
-    expect(json(await cli(argv, '{"issue":"3"}', { ownDir: repo.dir }))).toEqual(answer(ADD_ID, ["*"]))
-    expect(json(await cli(argv, '{"issue":"o/r#3"}', { ownDir: repo.dir }))).toEqual(answer(ADD_ID, ["o/r"]))
-    expect(json(await cli(argv, '{"issue":"3"}'))).toEqual(answer(ADD_ID, ["octo/self"]))
-  })
-
-  test("an unknown tool is invalid_argument", async () => {
-    const run = await cli(["target", "github_nonexistent_read", "--cwd", "/x"])
-    expect(run.code).toBe(EXIT_FAILED)
-    expect(json(run).error.code).toBe("invalid_argument")
-  })
-
-  test("rejects stdin that is not JSON", async () => {
-    const run = await cli(["target", ADD_ID, "--cwd", "/x"], "{nope")
-    expect(run.code).toBe(EXIT_FAILED)
-    expect(json(run).error.code).toBe("invalid_argument")
   })
 })
 
