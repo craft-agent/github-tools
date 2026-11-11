@@ -16,9 +16,10 @@ Report it through [GitHub Security Advisories](https://github.com/craft-agent/gi
 A useful report says:
 
 - what an attacker can do, and what they need to do it
-- the tool and harness affected, and the file and lines where it goes wrong
-- the version (the release tag the consumer pins)
-- the steps to reproduce it against the latest release
+- the tool, entry point and harness affected, and the file and lines where it
+  goes wrong
+- the version (the release tag the consumer pins), or the commit
+- the steps to reproduce it
 
 ## What github-tools trusts
 

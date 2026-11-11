@@ -20,7 +20,9 @@ consumers from the Releases page.
    commit that adds the built `dist/` to that tree. `main` gets only the version
    commit, so it never holds `dist/`. Plugin installs and the Hermes plugin
    pin the tag or its commit.
-2. **`npm`** checks out the tag and publishes the package with
+2. **`package`** reads `private` from `package.json`; the two jobs below run
+   only when it is not `true`.
+3. **`npm`** checks out the tag and publishes the package with
    `npm publish --ignore-scripts`. It installs nothing, since the tag already
    carries `dist/`; it checks that npm is 11.5.1 or later, that `package.json`
    names the tag's version, and that the tarball holds `dist/mcp.js`,
@@ -29,7 +31,7 @@ consumers from the Releases page.
    statement. A version npm already publishes is skipped, so a re-run reaches
    the registry job; one npm still holds as staged is waited for, up to five
    minutes, until `npm view` shows it.
-3. **`mcp-registry`** runs after `npm`. It checks out the tag, writes
+4. **`mcp-registry`** runs after `npm`. It checks out the tag, writes
    `server.json` from `package.json` (`scripts/server-json.mjs`; the file is not
    committed), and publishes it with `mcp-publisher`, authenticating with the
    workflow's GitHub OIDC token.
@@ -50,27 +52,27 @@ A tool ID change also changes `provides_tools` in `plugin.yaml`; run
 
 ## One-time setup
 
-- **npm.** On npmjs.com, open the settings of `@craftsamo/github-tools` and add
-  a trusted publisher: GitHub Actions, organization `craft-agent`, repository `github-tools`,
-  workflow `release-publish.yml`. npm does not check the entry when it is saved,
-  and expires it unless a publish succeeds within two days. The package must
-  exist before its settings do, so the first version of `@craftsamo/github-tools` is
-  published by hand from the tag with
-  `npm publish --access public --ignore-scripts --provenance=false`, since
-  `publishConfig.provenance` is true and a local publish cannot make provenance;
-  then add the trusted publisher. Right after a manual publish, npm holds the
-  version as staged while it validates it: `npm view` answers E404 and another
-  publish is refused as staged. The release workflow then waits for `npm view`
-  to show the version, so the job may be run at once; if npm still holds it
-  after five minutes, the job fails and may be re-run.
+- **npm.** The package must exist before its settings do, so publish the first
+  version by hand from its tag with
+  `npm publish --access public --ignore-scripts --provenance=false`
+  (`publishConfig.provenance` is true and a local publish cannot make
+  provenance). Then, on npmjs.com, open the package's settings and add a
+  trusted publisher: GitHub Actions, the repository's owner and name, workflow
+  `release-publish.yml`. npm does not check the entry when it is saved, and
+  expires it unless a publish succeeds within two days. Right after a manual
+  publish, npm holds the version as staged while it validates it: `npm view`
+  answers E404 and another publish is refused as staged. The release workflow
+  then waits for `npm view` to show the version, so the job may be run at once;
+  if npm still holds it after five minutes, the job fails and may be re-run.
 - **MCP Registry.** Nothing beyond the workflow's OIDC token: the GitHub login
-  proves the `io.github.craft-agent/*` namespace, and `mcpName` in `package.json`
+  proves the `io.github.<owner>/*` namespace, and `mcpName` in `package.json`
   proves that the npm package belongs to the entry.
 - **Repository.** `repo-kit setup github` creates the release deploy key
   (`RELEASE_DEPLOY_KEY`) that lets the version commit past the protection of
-  `main`. The organization must allow deploy keys in its repositories
-  (member privileges); where it does not, the key is disabled and the
-  `release` job fails when it pushes the version commit.
+  `main`, and allows the actions the workflows use. Run it again after a
+  workflow starts using a new action. An organization must allow deploy keys in
+  its repositories (member privileges); where it does not, the key is disabled
+  and the `release` job fails when it pushes the version commit.
 
 `mcp-publisher` is pinned to one release and verified against its Sigstore
 bundle before it runs; raise `MCP_PUBLISHER_VERSION` in the workflow when a new
