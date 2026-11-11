@@ -212,7 +212,7 @@ describe("view", () => {
   test("a log that cannot be read is reported in its entry", async () => {
     use([runViewRule(failingRun()), { match: "^run view --job", stderr: "log expired", code: 1 }])
     const result = await run({ method: "view", run: "1", wait: 0 })
-    expect(result.failed_logs?.[0]?.error).toBe("github_error: gh failed (exit 1): log expired")
+    expect(result.failed_logs?.[0]?.error).toBe("upstream_error: gh failed (exit 1): log expired")
   })
 })
 

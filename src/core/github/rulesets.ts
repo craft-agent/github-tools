@@ -175,7 +175,7 @@ export async function createRuleset(repo: RepoName, body: Record<string, unknown
       stdin: JSON.stringify(body),
     }),
   )
-  if (!raw) throw new ToolError("github_error", "GitHub did not return the ruleset it created.")
+  if (!raw) throw new ToolError("upstream_error", "GitHub did not return the ruleset it created.")
   return toRuleset(raw)
 }
 
@@ -198,7 +198,7 @@ export async function updateRuleset(
     if (isToolError(error) && error.code === "not_found") throw rulesetNotFound(repo, id, error)
     throw error
   }
-  if (!raw) throw new ToolError("github_error", `GitHub did not return ruleset ${id} it changed.`)
+  if (!raw) throw new ToolError("upstream_error", `GitHub did not return ruleset ${id} it changed.`)
   return toRuleset(raw)
 }
 

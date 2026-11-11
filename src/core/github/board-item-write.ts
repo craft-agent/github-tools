@@ -64,7 +64,7 @@ type RawContent = {
 function requireId(id: string | null | undefined, what: string): string {
   if (!id) {
     throw new ToolError(
-      "github_error",
+      "upstream_error",
       `GitHub did not return the ${what} it made; look at the board before running this again.`,
     )
   }
@@ -198,7 +198,7 @@ export async function convertDraftToIssue(
   const issue = data?.convertProjectV2DraftIssueItemToIssue?.item?.content
   if (!issue?.number || !issue.url) {
     throw new ToolError(
-      "github_error",
+      "upstream_error",
       "GitHub did not return the issue the draft became; it may have been converted, so look at the board before running this again.",
     )
   }

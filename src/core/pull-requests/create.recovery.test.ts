@@ -56,7 +56,7 @@ describe("labels, people and the milestone", () => {
     const result = await run({ head: "feature", title: "T", labels: ["feature"], assignees: ["@me"] })
     expect(result.pr).toEqual({ number: 7, url: "https://github.com/octo/hello/pull/7", title: "T" })
     expect(result.head_sha).toBe(HEAD_SHA)
-    expect(result.errors).toEqual({ metadata: "github_error: gh failed (exit 1): boom" })
+    expect(result.errors).toEqual({ metadata: "upstream_error: gh failed (exit 1): boom" })
   })
 })
 
@@ -65,7 +65,7 @@ describe("a pull request that gh pr create reported a failure for", () => {
     const installed = use(base(FAILED_CREATE, ...listing({ match: "^pr list", stdout: FOUND }), prEditedRule(47)))
     const result = await run({ head: "feature", title: "T", labels: ["feature"] })
     expect(result.pr).toEqual({ number: 47, url: "https://github.com/octo/hello/pull/47", title: "T" })
-    expect(result.errors).toEqual({ create: `github_error: gh failed (exit 1): ${OUTAGE}` })
+    expect(result.errors).toEqual({ create: `upstream_error: gh failed (exit 1): ${OUTAGE}` })
     expect(listCalls(installed)).toHaveLength(2)
     expect(listCalls(installed)[1]!.args).toEqual(listCalls(installed)[0]!.args)
     // The follow-up the failed create did not finish is done by the step after it.
@@ -93,7 +93,7 @@ describe("a pull request that gh pr create reported a failure for", () => {
   test("that is not found is the original error", async () => {
     const installed = use(base(FAILED_CREATE))
     const error = await failure(run({ head: "feature", title: "T" }))
-    expect(error.code).toBe("github_error")
+    expect(error.code).toBe("upstream_error")
     expect(error.message).toContain(OUTAGE)
     expect(listCalls(installed)).toHaveLength(2)
   })
@@ -101,7 +101,7 @@ describe("a pull request that gh pr create reported a failure for", () => {
   test("whose lookup fails is the original error", async () => {
     use(base(FAILED_CREATE, ...listing({ match: "^pr list", stderr: "lookup failed", code: 1 })))
     const error = await failure(run({ head: "feature", title: "T" }))
-    expect(error.code).toBe("github_error")
+    expect(error.code).toBe("upstream_error")
     expect(error.message).toContain(OUTAGE)
     expect(error.message).not.toContain("lookup failed")
   })

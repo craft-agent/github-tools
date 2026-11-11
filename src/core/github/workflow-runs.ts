@@ -349,7 +349,7 @@ export async function readRun(
     }
     throw error
   }
-  if (!raw) throw new ToolError("github_error", `gh returned nothing for workflow run ${id} of ${repo.full}.`)
+  if (!raw) throw new ToolError("upstream_error", `gh returned nothing for workflow run ${id} of ${repo.full}.`)
   return { ...toRunRow(raw), jobs: (raw.jobs ?? []).map(toRunJob) }
 }
 

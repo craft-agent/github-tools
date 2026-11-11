@@ -84,7 +84,7 @@ export async function writeLabel(
       stdin: JSON.stringify(body),
     }),
   )
-  if (!raw) throw new ToolError("github_error", "GitHub did not return the label it wrote.")
+  if (!raw) throw new ToolError("upstream_error", "GitHub did not return the label it wrote.")
   return {
     label: { name: raw.name, color: raw.color, description: raw.description ?? "" },
   }

@@ -277,7 +277,7 @@ async function writeRelease(
       stdin: JSON.stringify(body),
     }),
   )
-  if (!raw) throw new ToolError("github_error", "GitHub did not return the release it wrote.")
+  if (!raw) throw new ToolError("upstream_error", "GitHub did not return the release it wrote.")
   return raw
 }
 

@@ -247,7 +247,7 @@ const repositoryNotFound = (repo: RepoName) => (cause?: unknown) =>
 export async function viewerLogin(ctx: RefContext): Promise<string> {
   const data = await graphql<{ viewer?: { login?: string } | null } | null>(VIEWER_QUERY, {}, ctx)
   const login = data?.viewer?.login
-  if (!login) throw new ToolError("github_error", "GitHub did not say who the viewer is.")
+  if (!login) throw new ToolError("upstream_error", "GitHub did not say who the viewer is.")
   return login
 }
 

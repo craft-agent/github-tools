@@ -183,7 +183,7 @@ describe("a stacked merge that fails", () => {
     })
   })
 
-  test("with nothing merged it is a github_error", async () => {
+  test("with nothing merged it is an upstream_error", async () => {
     use([
       ...base,
       mergeStateRule(5, stackedAt(1, 2)),
@@ -193,7 +193,7 @@ describe("a stacked merge that fails", () => {
       mergePollRule(5, failed),
     ])
     const error = await failure(run({ pr: "5", with_lower_layers: true }))
-    expect(error.code).toBe("github_error")
+    expect(error.code).toBe("upstream_error")
     expect(error.message).toBe("GitHub could not merge octo/hello#5: Merge conflict in #5.")
   })
 })

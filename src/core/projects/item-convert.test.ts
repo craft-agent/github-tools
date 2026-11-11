@@ -97,8 +97,8 @@ describe("a draft", () => {
     expect(result.kind).toBeNull()
     expect(result.milestone).toMatchObject({ title: "v1" })
     expect(result.errors).toEqual({
-      kind: "github_error: gh failed (exit 1): no type",
-      labels: "github_error: gh failed (exit 1): no such label",
+      kind: "upstream_error: gh failed (exit 1): no type",
+      labels: "upstream_error: gh failed (exit 1): no such label",
     })
     expect(edits(installed).at(-1)).toEqual(["--milestone", "v1"])
   })
@@ -113,7 +113,7 @@ describe("a draft", () => {
     )
     const result = await run({ ...ID, milestone: "v1" })
     expect(result.milestone).toEqual({ number: 1, title: "v1", created: false })
-    expect(result.errors).toEqual({ milestone: "github_error: gh failed (exit 1): boom" })
+    expect(result.errors).toEqual({ milestone: "upstream_error: gh failed (exit 1): boom" })
   })
 
   test("goes to the repo given, and says when that is someone else's tracker", async () => {

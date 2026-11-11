@@ -73,8 +73,8 @@ describe("classifyGhFailure", () => {
     ["GraphQL: Could not resolve to an Issue with the number of 99.", "not_found"],
     ["GraphQL: Could not resolve to a Repository with the name 'o/r'.", "not_found"],
     ["GraphQL: Could not resolve something else", "not_found"],
-    ["pull request not found", "github_error"],
-    ["label not found in the config file", "github_error"],
+    ["pull request not found", "upstream_error"],
+    ["label not found in the config file", "upstream_error"],
     ["gh: Forbidden (HTTP 403)", "forbidden"],
     ["GraphQL: Resource not accessible by personal access token", "forbidden"],
     ["GraphQL: You must have push access to the repository to update it; permission denied", "forbidden"],
@@ -82,8 +82,8 @@ describe("classifyGhFailure", () => {
     ["gh: Conflict (HTTP 409)", "stale"],
     ["Head branch was modified. Review and try the merge again.", "stale"],
     ["Base branch is out of date", "stale"],
-    ["Pull request has a merge conflict", "github_error"],
-    ["something else broke", "github_error"],
+    ["Pull request has a merge conflict", "upstream_error"],
+    ["something else broke", "upstream_error"],
   ]
 
   test.each(table)("%s -> %s", (stderr, code) => {
@@ -220,9 +220,9 @@ describe("ensureGh", () => {
     await ensureGh()
   })
 
-  test("an unreadable version answer -> github_error", async () => {
+  test("an unreadable version answer -> upstream_error", async () => {
     useFake([{ match: "^--version$", stdout: "hello\n" }])
-    expect(await codeOf(ensureGh())).toBe("github_error")
+    expect(await codeOf(ensureGh())).toBe("upstream_error")
   })
 
   test("a failed check is not cached: fixing PATH makes the next call pass", async () => {
@@ -321,7 +321,7 @@ describe("gh", () => {
   test("a call over its time limit is stopped and says how long it waited", async () => {
     useFake([{ match: "^slow$", delayMs: 5000 }])
     const error = await gh(["slow"], { ...OPTIONS, timeoutMs: 300 }).catch((e: unknown) => e)
-    expect(isToolError(error) && error.code).toBe("github_error")
+    expect(isToolError(error) && error.code).toBe("upstream_error")
     expect((error as Error).message).toContain("timed out after 0.3 seconds")
     expect((error as Error).message).toContain("SIGTERM")
   })
@@ -333,7 +333,7 @@ describe("gh", () => {
   test("a call that a signal ended is reported with that signal", async () => {
     useFake([{ match: "^doomed$", killSelf: "SIGKILL" }])
     const error = await gh(["doomed"], OPTIONS).catch((e: unknown) => e)
-    expect(isToolError(error) && error.code).toBe("github_error")
+    expect(isToolError(error) && error.code).toBe("upstream_error")
     expect((error as Error).message).toBe("gh was stopped with SIGKILL.")
   })
 
@@ -354,7 +354,7 @@ describe("gh", () => {
     ])
     expect(await ghJson<{ n: number }>(["a"], OPTIONS)).toEqual({ n: 1 })
     expect(await ghJson(["b"], OPTIONS)).toBeNull()
-    expect(await codeOf(ghJson(["c"], OPTIONS))).toBe("github_error")
+    expect(await codeOf(ghJson(["c"], OPTIONS))).toBe("upstream_error")
   })
 })
 
@@ -427,12 +427,12 @@ describe("graphql", () => {
     expect(await codeOf(graphql("query{x}", {}, OPTIONS))).toBe("rate_limited")
     fake?.restore()
     useFake([{ match: "^api graphql", stdout: gqlErrors([{ message: "Something odd" }]) }])
-    expect(await codeOf(graphql("query{x}", {}, OPTIONS))).toBe("github_error")
+    expect(await codeOf(graphql("query{x}", {}, OPTIONS))).toBe("upstream_error")
   })
 
   test("an error type named like an object property is not mistaken for a known one", async () => {
     useFake([{ match: "^api graphql", stdout: gqlErrors([{ type: "constructor", message: "odd" }]) }])
-    expect(await codeOf(graphql("query{x}", {}, OPTIONS))).toBe("github_error")
+    expect(await codeOf(graphql("query{x}", {}, OPTIONS))).toBe("upstream_error")
   })
 
   test("a non-zero exit without a GraphQL reply is classified from stderr", async () => {

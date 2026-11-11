@@ -266,7 +266,7 @@ export const issueRelate = defineTool({
     const needsDependencies = LISTS.some((list) => list.dependency && !isEmpty(request.lists[list.name]))
     if (needsDependencies && current.dependencies_error) {
       throw new ToolError(
-        "github_error",
+        "upstream_error",
         `Blocked-by and blocking of ${issueLabel(issue)} cannot be changed here: GitHub could not return its current dependencies (${current.dependencies_error}). Nothing was changed; sub-issues and the parent can still be changed without them.`,
       )
     }
@@ -277,7 +277,7 @@ export const issueRelate = defineTool({
       try {
         await editIssue(target, issue.number, flags, ctx)
       } catch (error) {
-        if (isToolError(error) && error.code === "github_error" && tolerated?.test(error.message)) return false
+        if (isToolError(error) && error.code === "upstream_error" && tolerated?.test(error.message)) return false
         throw partialFailure(error, applied)
       }
       applied.push(what)

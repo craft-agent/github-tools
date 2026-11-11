@@ -119,7 +119,7 @@ export async function writeMilestone(
       { ...ctx, stdin: JSON.stringify(body) },
     ),
   )
-  if (!raw) throw new ToolError("github_error", "GitHub did not return the milestone it wrote.")
+  if (!raw) throw new ToolError("upstream_error", "GitHub did not return the milestone it wrote.")
   return fromRest(raw)
 }
 
@@ -231,6 +231,6 @@ export async function resolveMilestone(
     ghJson<RawMilestone>(["api", "-X", "POST", milestonesPath(repo), "-f", `title=${title}`], ctx),
   )
   if (!isMilestone(made))
-    throw new ToolError("github_error", `GitHub did not return the milestone "${title}" it created.`)
+    throw new ToolError("upstream_error", `GitHub did not return the milestone "${title}" it created.`)
   return { number: made.number, title: made.title, created: true }
 }

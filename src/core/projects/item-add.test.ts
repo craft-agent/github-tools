@@ -183,7 +183,7 @@ describe("the Status a new item starts in", () => {
     ])
     const result = await run({ ...BOARD, item: "12" })
     expect(result).toMatchObject({ item_id: "PVTI_new", created: true, fields: { Status: "Todo" } })
-    expect(result.errors).toEqual({ blocked_by: "github_error: gh failed (exit 1): dependencies are off" })
+    expect(result.errors).toEqual({ blocked_by: "upstream_error: gh failed (exit 1): dependencies are off" })
     expect(mutationsOf(installed)[1]!.vars.value).toBe("O_todo")
   })
 })
@@ -231,7 +231,7 @@ describe("field writes after the item exists", () => {
     const result = await run({ ...BOARD, item: "12", fields: { Estimate: 1, Notes: "kept" } })
     expect(result.item_id).toBe("PVTI_new")
     expect(result.fields).toEqual({ Notes: "kept", Status: "Todo" })
-    expect(result.errors).toEqual({ "fields.Estimate": "github_error: gh failed (exit 1): boom" })
+    expect(result.errors).toEqual({ "fields.Estimate": "upstream_error: gh failed (exit 1): boom" })
   })
 })
 

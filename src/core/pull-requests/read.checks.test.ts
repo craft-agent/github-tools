@@ -311,7 +311,7 @@ test("a log that cannot be read is reported in its entry", async () => {
       url: "https://github.com/octo/hello/actions/runs/1/job/101",
       errors: [],
       tail: "",
-      error: "github_error: gh failed (exit 1): log expired",
+      error: "upstream_error: gh failed (exit 1): log expired",
     },
     expect.objectContaining({ job: 102, errors: ["fine"], error: null }),
   ])

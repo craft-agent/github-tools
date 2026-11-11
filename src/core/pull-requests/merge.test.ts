@@ -270,7 +270,7 @@ describe("another merge of the pull request is pending", () => {
       mergeStateRule(7),
       mergePutFailureRule(7, "Method Not Allowed (HTTP 405)"),
     ])
-    expect((await failure(run({ pr: "7" }))).code).toBe("github_error")
+    expect((await failure(run({ pr: "7" }))).code).toBe("upstream_error")
   })
 })
 

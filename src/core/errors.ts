@@ -11,7 +11,6 @@ export type ErrorCode =
   | "internal_error"
   | "gh_missing"
   | "gh_too_old"
-  | "github_error"
 
 /** A value that JSON can carry. */
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }

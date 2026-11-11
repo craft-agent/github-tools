@@ -368,7 +368,7 @@ export const prMerge = defineTool({
     if (status === "failed") {
       const reason = outcome.message?.trim() || NO_REASON
       if (!after.some((layer) => layer.state === "merged")) {
-        throw new ToolError("github_error", `GitHub could not merge ${label}: ${reason.replace(/\.$/, "")}.`)
+        throw new ToolError("upstream_error", `GitHub could not merge ${label}: ${reason.replace(/\.$/, "")}.`)
       }
       errors.merge = reason
     }

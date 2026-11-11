@@ -71,7 +71,7 @@ describe("the kind", () => {
     expect(result.issue.number).toBe(7)
     expect(result.kind).toBeNull()
     expect(Object.keys(result.errors)).toEqual(["kind"])
-    expect(result.errors.kind).toStartWith("github_error: ")
+    expect(result.errors.kind).toStartWith("upstream_error: ")
   })
 
   test("an Issue Types read that fails is a kind error too", async () => {

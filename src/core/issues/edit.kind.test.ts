@@ -140,7 +140,7 @@ describe("the kind", () => {
       issueTypesRule("Bug"),
       repositoryRule(),
     ])
-    expect((await failure(run({ issue: "12", kind: "bug" }))).code).toBe("github_error")
+    expect((await failure(run({ issue: "12", kind: "bug" }))).code).toBe("upstream_error")
     expect(commands(installed)).toHaveLength(1)
   })
 
@@ -149,7 +149,7 @@ describe("the kind", () => {
       { match: "^issue edit", stderr: "HTTP 422: type is invalid", code: 1 },
       ...base(issueFieldsRule(), labelRule(true)),
     ])
-    expect((await failure(run({ issue: "12", kind: "bug" }))).code).toBe("github_error")
+    expect((await failure(run({ issue: "12", kind: "bug" }))).code).toBe("upstream_error")
     expect(commands(installed)).toHaveLength(1)
   })
 })

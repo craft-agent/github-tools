@@ -65,7 +65,7 @@ describe("a draft", () => {
     const result = await run({ ...BOARD, title: "Idea", fields: { Notes: "x" } })
     expect(result.item_id).toBe("PVTI_draft")
     expect(result.fields).toEqual({ Status: "Todo" })
-    expect(result.errors).toEqual({ "fields.Notes": "github_error: gh failed (exit 1): boom" })
+    expect(result.errors).toEqual({ "fields.Notes": "upstream_error: gh failed (exit 1): boom" })
   })
 })
 

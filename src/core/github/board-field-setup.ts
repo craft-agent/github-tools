@@ -125,7 +125,7 @@ function optionsLiteral(options: readonly OptionInput[]): string {
   const items = options.map((option) => {
     if (!OPTION_COLORS.some((color) => color === option.color)) {
       throw new ToolError(
-        "github_error",
+        "upstream_error",
         `Option "${option.name}" has the color "${option.color}", which GitHub does not list.`,
       )
     }
@@ -137,7 +137,7 @@ function optionsLiteral(options: readonly OptionInput[]): string {
 
 function fieldOf(reply: FieldReply, name: string): BoardField {
   const raw = reply?.projectV2Field
-  if (!raw?.id) throw new ToolError("github_error", `GitHub did not return the field "${name}" it changed.`)
+  if (!raw?.id) throw new ToolError("upstream_error", `GitHub did not return the field "${name}" it changed.`)
   return toField(raw)
 }
 

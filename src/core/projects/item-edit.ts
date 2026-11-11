@@ -117,7 +117,7 @@ export const projectItemEdit = defineTool({
       )
     }
     if (draft && hasDraftText(change) && !draftId) {
-      throw new ToolError("github_error", `GitHub did not return the text of draft ${item.item_id}.`)
+      throw new ToolError("upstream_error", `GitHub did not return the text of draft ${item.item_id}.`)
     }
 
     const fields =
@@ -179,7 +179,7 @@ export const projectItemEdit = defineTool({
       )
     }
     if (draft && hasDraftText(change) && !draftId) {
-      throw new ToolError("github_error", `GitHub did not return the text of draft ${item.item_id}.`)
+      throw new ToolError("upstream_error", `GitHub did not return the text of draft ${item.item_id}.`)
     }
 
     const fields =

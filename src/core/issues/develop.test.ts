@@ -184,12 +184,12 @@ describe("the base", () => {
 
   test("a failure to read the base other than not found is thrown as it is", async () => {
     use(writeRules(linkedBranchesRule(), { match: "^api repos/octo/hello/branches/", stderr: "HTTP 500", code: 1 }))
-    expect((await failure(run({ issue: "12", base: "release" }))).code).toBe("github_error")
+    expect((await failure(run({ issue: "12", base: "release" }))).code).toBe("upstream_error")
   })
 
-  test("a base reply without a commit is a github_error", async () => {
+  test("a base reply without a commit is an upstream_error", async () => {
     use(writeRules(linkedBranchesRule(), { match: "^api repos/octo/hello/branches/release$", stdout: "{}" }))
-    expect((await failure(run({ issue: "12", base: "release" }))).code).toBe("github_error")
+    expect((await failure(run({ issue: "12", base: "release" }))).code).toBe("upstream_error")
   })
 })
 
@@ -243,10 +243,10 @@ describe("creating the branch", () => {
     expect((await failure(run({ issue: "12" }))).code).toBe("forbidden")
   })
 
-  test("a reply without a branch is a github_error telling the person to look", async () => {
+  test("a reply without a branch is an upstream_error telling the person to look", async () => {
     use(creating({ match: CREATE_LINKED_BRANCH, stdout: gqlReply({ createLinkedBranch: null }) }))
     const error = await failure(run({ issue: "12" }))
-    expect(error.code).toBe("github_error")
+    expect(error.code).toBe("upstream_error")
     expect(error.message).toContain("Development panel")
   })
 })

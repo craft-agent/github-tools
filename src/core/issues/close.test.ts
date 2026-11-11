@@ -66,7 +66,7 @@ describe("closing", () => {
 
   test("a failing gh is thrown", async () => {
     use([repositoryRule(), issueFieldsRule(), { match: "^issue close", stderr: "HTTP 500", code: 1 }])
-    expect((await failure(run({ issue: "12", reason: "completed" }))).code).toBe("github_error")
+    expect((await failure(run({ issue: "12", reason: "completed" }))).code).toBe("upstream_error")
   })
 })
 

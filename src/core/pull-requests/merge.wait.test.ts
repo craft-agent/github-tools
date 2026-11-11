@@ -139,10 +139,10 @@ describe("a request that ends without an answer", () => {
 describe("a merge GitHub could not make", () => {
   const failed = mergeReply("failed", { message: "Required status check is expected." })
 
-  test("with nothing merged it is a github_error carrying GitHub's message", async () => {
+  test("with nothing merged it is an upstream_error carrying GitHub's message", async () => {
     use([...base, mergeStateRule(7), mergePutRule(7), mergePollRule(7, failed)])
     const error = await failure(run({ pr: "7" }))
-    expect(error.code).toBe("github_error")
+    expect(error.code).toBe("upstream_error")
     expect(error.message).toBe("GitHub could not merge octo/hello#7: Required status check is expected.")
   })
 
@@ -153,7 +153,7 @@ describe("a merge GitHub could not make", () => {
       { match: "-X PUT", stderr: "gh: Pull Request is not mergeable (HTTP 405)", code: 1 },
     ])
     const error = await failure(run({ pr: "7" }))
-    expect(error.code).toBe("github_error")
+    expect(error.code).toBe("upstream_error")
     expect(error.message).toContain("not mergeable")
     expect(mergePuts(installed)).toHaveLength(1)
     expect(polls(installed)).toEqual([])

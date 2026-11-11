@@ -438,7 +438,7 @@ describe("before anything is written", () => {
 
   test("a failing gh is thrown", async () => {
     use([repositoryRule(), { match: "^pr edit", stderr: "HTTP 500", code: 1 }])
-    expect((await failure(run({ pr: "7", title: "T" }))).code).toBe("github_error")
+    expect((await failure(run({ pr: "7", title: "T" }))).code).toBe("upstream_error")
   })
 
   test("a repository of someone else is foreign", async () => {

@@ -136,7 +136,7 @@ async function readGhVersion(): Promise<string> {
   const version = /gh version (\d+\.\d+\.\d+)/.exec(result.stdout)?.[1]
   if (result.code !== 0 || !version) {
     throw new ToolError(
-      "github_error",
+      "upstream_error",
       `Could not read the GitHub CLI version: ${failureText(result.stderr, result.stdout) || `exit ${result.code}`}`,
     )
   }
@@ -194,7 +194,7 @@ function stoppedError(result: ExecResult, timeoutMs: number): ToolError | undefi
   const message = result.timedOut
     ? `gh timed out after ${timeoutMs / 1000} seconds${stoppedBy}.`
     : `gh was stopped with ${result.signal}.`
-  return new ToolError("github_error", message)
+  return new ToolError("upstream_error", message)
 }
 
 /**
@@ -243,7 +243,7 @@ const FAILURE_HINTS: Partial<Record<ErrorCode, string>> = {
 /** Maps a failed `gh` call to the error a tool throws. Pure: it reads only its arguments. */
 export function classifyGhFailure(stderr: string, stdout: string, code: number): ToolError {
   const text = failureText(stderr, stdout)
-  const matched = FAILURE_PATTERNS.find(([, pattern]) => pattern.test(text))?.[0] ?? "github_error"
+  const matched = FAILURE_PATTERNS.find(([, pattern]) => pattern.test(text))?.[0] ?? "upstream_error"
   const prefix = FAILURE_HINTS[matched] ?? `gh failed (exit ${code}):`
   return new ToolError(matched, text ? `${prefix} ${text}` : prefix)
 }
@@ -296,7 +296,7 @@ export async function ghJson<T>(args: string[], options: GhOptions): Promise<T |
   try {
     return JSON.parse(text) as T
   } catch (error) {
-    throw new ToolError("github_error", `gh returned output that is not JSON: ${failureText(text, "")}`, {
+    throw new ToolError("upstream_error", `gh returned output that is not JSON: ${failureText(text, "")}`, {
       cause: error,
     })
   }

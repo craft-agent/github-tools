@@ -132,7 +132,7 @@ function request<T>(
 }
 
 function required(stack: Stack | null): Stack {
-  if (!stack) throw new ToolError("github_error", "GitHub did not return the stack.")
+  if (!stack) throw new ToolError("upstream_error", "GitHub did not return the stack.")
   return stack
 }
 

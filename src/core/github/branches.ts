@@ -41,7 +41,7 @@ export async function branchHead(repo: RepoName, branch: string, ctx: RefContext
   }
   const sha = reply?.commit?.sha
   if (!sha) {
-    throw new ToolError("github_error", `GitHub returned no head commit for branch ${branch} of ${repo.full}.`)
+    throw new ToolError("upstream_error", `GitHub returned no head commit for branch ${branch} of ${repo.full}.`)
   }
   return sha
 }
@@ -64,7 +64,7 @@ export async function tagCommit(repo: RepoName, tag: string, ctx: RefContext): P
   const initialSha = reply?.object?.sha
   let type = reply?.object?.type
   if (!initialSha || !type) {
-    throw new ToolError("github_error", `GitHub returned no ref object for tag ${tag} of ${repo.full}.`)
+    throw new ToolError("upstream_error", `GitHub returned no ref object for tag ${tag} of ${repo.full}.`)
   }
   let sha = initialSha
   while (type === "tag") {
@@ -73,7 +73,7 @@ export async function tagCommit(repo: RepoName, tag: string, ctx: RefContext): P
       ctx,
     )
     if (!peeled?.object?.sha || !peeled.object.type) {
-      throw new ToolError("github_error", `GitHub returned no object for annotated tag ${sha} of ${repo.full}.`)
+      throw new ToolError("upstream_error", `GitHub returned no object for annotated tag ${sha} of ${repo.full}.`)
     }
     sha = peeled.object.sha
     type = peeled.object.type

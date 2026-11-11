@@ -128,7 +128,7 @@ test("server error keeps its code", async () => {
     restNotFound("git/ref/tags/v1.0.0"),
     restFailure("-X DELETE", "Server Error (HTTP 500)"),
   ])
-  expect((await failure(run({ tag: "v1.0.0" }))).code).toBe("github_error")
+  expect((await failure(run({ tag: "v1.0.0" }))).code).toBe("upstream_error")
 })
 
 test("write permission is required", async () => {

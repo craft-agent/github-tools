@@ -261,7 +261,7 @@ describe("GitHub refuses the write", () => {
       }),
     ])
     const error = await failure(run({ prs: [101, 102] }))
-    expect(error.code).toBe("github_error")
+    expect(error.code).toBe("upstream_error")
     expect(error.message).toContain("Unprocessable Entity (HTTP 422)")
     expect(error.message).toContain("pull request #102 is a draft")
   })

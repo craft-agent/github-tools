@@ -7,10 +7,10 @@ import { issueCreate } from "./create"
 const { use, run } = writeHarness(issueCreate)
 
 describe("failures", () => {
-  test("a gh that prints no issue URL is github_error, saying the issue may exist", async () => {
+  test("a gh that prints no issue URL is upstream_error, saying the issue may exist", async () => {
     use(writeRules({ match: "^issue create", stdout: "done\n" }))
     const error = await failure(run({ title: "T" }))
-    expect(error.code).toBe("github_error")
+    expect(error.code).toBe("upstream_error")
     expect(error.message).toContain("may exist")
   })
 

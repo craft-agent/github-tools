@@ -200,7 +200,7 @@ describe("issueFieldValues mapper", () => {
 describe("isIssueFieldsMissingError", () => {
   test("detects schema error from GraphQLToolError", () => {
     const error = new GraphQLToolError(
-      "github_error",
+      "upstream_error",
       "GitHub GraphQL error: Field 'issueFieldValues' doesn't exist on type 'Issue'",
       [{ message: "Field 'issueFieldValues' doesn't exist on type 'Issue'" }],
       null,
@@ -210,7 +210,7 @@ describe("isIssueFieldsMissingError", () => {
 
   test("detects schema error from generic ToolError", () => {
     const error = new ToolError(
-      "github_error",
+      "upstream_error",
       `gh failed (exit 1): Field "issueFieldValues" doesn't exist on type "Issue"`,
     )
     expect(isIssueFieldsMissingError(error)).toBe(true)
@@ -230,38 +230,38 @@ describe("isIssueFieldsMissingError", () => {
 
   test("detects issueFields missing on Repository", () => {
     const message = "Field 'issueFields' doesn't exist on type 'Repository'"
-    expect(isIssueFieldsMissingError(new GraphQLToolError("github_error", message, [{ message }], null))).toBe(true)
-    expect(isIssueFieldsMissingError(new ToolError("github_error", message))).toBe(true)
+    expect(isIssueFieldsMissingError(new GraphQLToolError("upstream_error", message, [{ message }], null))).toBe(true)
+    expect(isIssueFieldsMissingError(new ToolError("upstream_error", message))).toBe(true)
   })
 
   test("detects issueFields missing on Organization", () => {
     const message = "Field 'issueFields' doesn't exist on type 'Organization'"
-    expect(isIssueFieldsMissingError(new GraphQLToolError("github_error", message, [{ message }], null))).toBe(true)
-    expect(isIssueFieldsMissingError(new ToolError("github_error", message))).toBe(true)
+    expect(isIssueFieldsMissingError(new GraphQLToolError("upstream_error", message, [{ message }], null))).toBe(true)
+    expect(isIssueFieldsMissingError(new ToolError("upstream_error", message))).toBe(true)
   })
 
   test("detects isIssueField missing on ProjectV2Field", () => {
     const message = "Field 'isIssueField' doesn't exist on type 'ProjectV2Field'"
-    expect(isIssueFieldsMissingError(new GraphQLToolError("github_error", message, [{ message }], null))).toBe(true)
-    expect(isIssueFieldsMissingError(new ToolError("github_error", message))).toBe(true)
+    expect(isIssueFieldsMissingError(new GraphQLToolError("upstream_error", message, [{ message }], null))).toBe(true)
+    expect(isIssueFieldsMissingError(new ToolError("upstream_error", message))).toBe(true)
   })
 
   test("detects ProjectV2ItemIssueFieldValue missing from schema", () => {
     const message = "No such type ProjectV2ItemIssueFieldValue, so it can't be a fragment condition"
-    expect(isIssueFieldsMissingError(new GraphQLToolError("github_error", message, [{ message }], null))).toBe(true)
-    expect(isIssueFieldsMissingError(new ToolError("github_error", message))).toBe(true)
+    expect(isIssueFieldsMissingError(new GraphQLToolError("upstream_error", message, [{ message }], null))).toBe(true)
+    expect(isIssueFieldsMissingError(new ToolError("upstream_error", message))).toBe(true)
   })
 
   test("detects ProjectV2IssueFieldValues missing from schema", () => {
     const message = "No such type ProjectV2IssueFieldValues, so it can't be a fragment condition"
-    expect(isIssueFieldsMissingError(new GraphQLToolError("github_error", message, [{ message }], null))).toBe(true)
-    expect(isIssueFieldsMissingError(new ToolError("github_error", message))).toBe(true)
+    expect(isIssueFieldsMissingError(new GraphQLToolError("upstream_error", message, [{ message }], null))).toBe(true)
+    expect(isIssueFieldsMissingError(new ToolError("upstream_error", message))).toBe(true)
   })
 
   test("ignores unrelated missing type errors", () => {
     const message = "No such type Foo, so it can't be a fragment condition"
-    expect(isIssueFieldsMissingError(new GraphQLToolError("github_error", message, [{ message }], null))).toBe(false)
-    expect(isIssueFieldsMissingError(new ToolError("github_error", message))).toBe(false)
+    expect(isIssueFieldsMissingError(new GraphQLToolError("upstream_error", message, [{ message }], null))).toBe(false)
+    expect(isIssueFieldsMissingError(new ToolError("upstream_error", message))).toBe(false)
   })
 })
 

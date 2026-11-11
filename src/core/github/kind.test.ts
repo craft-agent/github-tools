@@ -82,7 +82,7 @@ describe("resolveKind", () => {
 
   test("a failed Issue Types read is the call's failure, not a label", async () => {
     useFake([{ match: ISSUE_TYPES, stderr: "HTTP 502", code: 1 }])
-    expect((await failure(resolveKind("bug", REPO, CTX))).code).toBe("github_error")
+    expect((await failure(resolveKind("bug", REPO, CTX))).code).toBe("upstream_error")
   })
 })
 
@@ -116,22 +116,22 @@ describe("ensureLabel", () => {
 
 describe("isTypeFailure", () => {
   test.each([
-    ["github_error", "gh failed (exit 1): Issue type 'Bug' not found"],
+    ["upstream_error", "gh failed (exit 1): Issue type 'Bug' not found"],
     ["forbidden", "gh failed (exit 1): HTTP 403: cannot set the type of this issue"],
   ] as const)("a %s that mentions the type is one", (code, message) => {
     expect(isTypeFailure(new ToolError(code, message))).toBe(true)
   })
 
   test("anything else is not one", () => {
-    expect(isTypeFailure(new ToolError("github_error", "gh failed (exit 1): could not add label"))).toBe(false)
+    expect(isTypeFailure(new ToolError("upstream_error", "gh failed (exit 1): could not add label"))).toBe(false)
     expect(isTypeFailure(new ToolError("not_found", "the issue type was not found"))).toBe(false)
-    expect(isTypeFailure(new ToolError("github_error", "a prototype failed"))).toBe(false)
+    expect(isTypeFailure(new ToolError("upstream_error", "a prototype failed"))).toBe(false)
     expect(isTypeFailure(new Error("issue type"))).toBe(false)
   })
 })
 
 describe("withKindFallback", () => {
-  const typeFailure = new ToolError("github_error", "gh failed (exit 1): issue type is not enabled")
+  const typeFailure = new ToolError("upstream_error", "gh failed (exit 1): issue type is not enabled")
 
   test("returns what the first attempt did", async () => {
     const seen: string[] = []
@@ -152,7 +152,7 @@ describe("withKindFallback", () => {
   })
 
   test("rethrows a failure that is not about the type, and a failing label", async () => {
-    const other = new ToolError("github_error", "gh failed (exit 1): boom")
+    const other = new ToolError("upstream_error", "gh failed (exit 1): boom")
     expect(await failure(withKindFallback("bug", { via: "type", name: "Bug" }, () => Promise.reject(other)))).toBe(
       other,
     )

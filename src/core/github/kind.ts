@@ -15,7 +15,7 @@ export type KindPlacement = z.output<typeof kindPlacementSchema>
 const LABEL_QUERY =
   "query($owner:String!,$name:String!,$label:String!){repository(owner:$owner,name:$name){label(name:$label){id}}}"
 /** The codes under which `gh` reports an Issue Type it cannot set. */
-const TYPE_FAILURE_CODES: readonly ErrorCode[] = ["github_error", "forbidden"]
+const TYPE_FAILURE_CODES: readonly ErrorCode[] = ["upstream_error", "forbidden"]
 const TYPE_MENTION = /\btype\b/i
 const LABEL_EXISTS = /already[_ ]exists/i
 
