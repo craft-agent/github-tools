@@ -22,7 +22,7 @@ DETAILS = "\n\n--- Details ---\n\n"
 
 def key(tool_id: str, *resources: str) -> str:
     """The rule_key of a call of ``tool_id`` that names ``resources``."""
-    return f"{project.PLUGIN_NAME}:{tool_id}:{','.join(resources)}"
+    return f"{project.PLUGIN_NAME}:{tool_id}:{json.dumps(list(resources), separators=(',', ':'))}"
 
 
 class SurfaceContext(StubContext):
@@ -254,6 +254,14 @@ class ApprovalHookTest(FakeCliCase):
         decision = self.hook()(tool_name="github_issue_comment", args={"issue": "other/repo#2", "body": "hi"})
         self.assertEqual(decision["message"], f"{CREATE}{DETAILS}Target: octo/hello\nTarget: other/repo")
         self.assertEqual(decision["rule_key"], key("github_issue_comment", "octo/hello", "other/repo"))
+
+    def test_resources_with_a_comma_never_share_a_rule_key_with_a_longer_list(self) -> None:
+        hook = self.hook()
+        self.reply("target github_issue_comment", stdout='{"resources":["a,b"]}')
+        joined = hook(tool_name="github_issue_comment", args={})["rule_key"]
+        self.reply("target github_issue_comment", stdout='{"resources":["a","b"]}')
+        split = hook(tool_name="github_issue_comment", args={})["rule_key"]
+        self.assertNotEqual(joined, split)
 
     def assert_single_use(self, tool_id: str, key_prefix: str, **call: Any) -> dict[str, str]:
         """The decision's rule_key is the prefix plus a token no other call shares, so an "always" reuses nothing."""
