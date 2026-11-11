@@ -1,6 +1,8 @@
 ---
 name: github-repos
 description: "Use when reading or changing a GitHub repository itself through the github_repo_*, github_label_*, github_milestone_* and github_ruleset_* tools: view a repository's settings or list an owner's repositories, create a repository, change its description, topics, features, merge settings or default branch, change its visibility, archive or unarchive it, list, create, edit or delete labels, list, create, edit or close milestones, and read, create, edit or delete rulesets (branch protection). Covers naming a repository, which changes ask every time, the stale check on rulesets and error codes. Not for issues, pull requests or project boards, and not for deleting, renaming, transferring or forking a repository."
+metadata:
+  toolset: repos
 ---
 
 # GitHub repositories

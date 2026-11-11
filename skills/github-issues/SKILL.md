@@ -1,6 +1,8 @@
 ---
 name: github-issues
 description: "Use when reading or changing GitHub issues through the github_issue_* tools: view or list issues, search a repository's issues, create, edit, comment on, close or reopen an issue, set its kind (an Issue Type or a type: label), labels, assignees, milestone or organization issue fields (Priority, Effort, Start date, Target date), put a new issue on a board, relate issues (parent, sub-issues, blocked by, blocking), or link a development branch to an issue. Covers issue references, what each tool reports, partial failures and error codes. Not for pull requests, managing project boards and their items, or how to plan work."
+metadata:
+  toolset: issues
 ---
 
 # GitHub issues

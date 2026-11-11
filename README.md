@@ -140,7 +140,16 @@ Add the server to the host's MCP configuration. Flags go in `args`:
 
 ## Tools and skills
 
-Each toolset comes with a skill that tells an agent how to use its tools.
+Each toolset comes with a skill that tells an agent how to use its tools. A
+skill names its toolset under `metadata` in its frontmatter
+(`metadata: { toolset: issues }`, written as a block). OpenCode V2 and Hermes
+register it only when the settings register at least one of that toolset's
+tools, so a profile with the toolset off, or with all its tools removed, does
+not see it; a skill without a toolset is always registered. Claude Code,
+Codex, Grok Build and Antigravity install the skill folder whole and pass the
+settings only to the MCP server, so they list every skill whatever the
+settings select. OpenCode V1 registers no skills, and its copied skills are
+all listed too.
 
 ### Issues (`issues`)
 
@@ -392,7 +401,8 @@ environment variable in `env:` is allowed). Where each harness reads them:
   and run by `github-tools-cli`.
 - `src/hermes/`, `plugin.yaml` and `__init__.py` — the Hermes plugin.
 - `skills/` — one skill per toolset, `skills/<name>/SKILL.md`, which every
-  harness that takes skills loads from the package or plugin root.
+  harness that takes skills loads from the package or plugin root; the native
+  plugins load only those of the toolsets that are on.
 - `.claude-plugin/`, `.codex-plugin/`, `.agents/plugins/`, `.mcp.json`,
   `.antigravity-plugin/` and `mcp_config.json` — the plugin manifests of the
   other harnesses. Codex reads `.codex-plugin/plugin.json`; a root

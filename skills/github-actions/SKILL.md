@@ -1,6 +1,8 @@
 ---
 name: github-actions
 description: "Use when reading or acting on GitHub Actions through the github_workflow_* and github_run_* tools: list workflows, read a workflow file and its inputs, list runs, read a run with its jobs and failed logs, wait for a run to finish, re-run failed jobs, cancel a run, or start a workflow by hand (workflow_dispatch). Covers naming a workflow and a run, which actions ask every time, the reviewed commit (head_sha) and error codes. Not for a pull request's checks (github_pr_read), editing workflow files, enabling or disabling workflows, deleting runs, or downloading artifacts."
+metadata:
+  toolset: actions
 ---
 
 # GitHub Actions
