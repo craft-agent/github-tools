@@ -30,6 +30,7 @@ export {
   type RefContext,
   type RepoName,
 } from "./refs"
+export { githubTargets, targetKinds, type TargetKind, type TargetMap } from "./github/targets"
 export { ANY_TARGET, writeTargets } from "./targets"
 export {
   REQUIRES_USER_INTERACTION,
@@ -48,7 +49,6 @@ export {
   type CallText,
   type CallValue,
   type ConfirmRequest,
-  type TargetKind,
   type ToolAnnotations,
   type ToolContext,
   type ToolSettings,

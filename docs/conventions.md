@@ -189,12 +189,21 @@ Every tool belongs to one class, and the class sets its MCP annotations.
 - **A native plugin asks the harness's own permission before every non-read
   call**, since the tools a native plugin adds pass through no harness
   approval of their own.
-- **It asks for every repository and board the call writes to.** Each write
-  tool declares which arguments name one (`repo`, an issue or pull request
-  reference, a workflow run, a list of issues, a board, or a board that is
-  written to only when it is given); a bare number means the call's own
-  repository, and what cannot be told is `*`. An "always" answer then covers
-  only what it named, never a write into another repository or board.
+- **It asks for everything the call writes to.** A write tool's `targets`
+  resolver names what the call writes to, as the permission rules name it
+  (here a repository or a board). Anything it cannot tell, every tool
+  without a resolver, arguments the input schema rejects, and a target holding
+  `*` or `?` (which a harness would store as a pattern) is `*`, and `*` is
+  never stored. An "always" answer then covers only what it named, never a
+  write somewhere else.
+- **The resolvers are made by `githubTargets`**, from a map of argument names
+  to the kind of target each holds: `repo`, an issue or pull request
+  reference (`issue`, `pull`) or a list of issues (`issues`), a workflow run
+  (`run`), a board (`board`), a board that is written to only when it is given
+  (`optional_board`), a board item (`item`) and the owner a board is created
+  for (`owner`). Every argument of the map must be an argument of the tool.
+  A bare number means the call's own repository, and a repository is named
+  in lowercase.
 - **A board is named `owner/projects/N`.** A board belongs to a user or an
   organization, not to a repository, so its writes name the board rather than
   the working tree's repository. A board the call does not name is found with
@@ -502,8 +511,8 @@ Every entry point takes the same settings:
 
 - A tool spec declares its ID, description, argument schema, output schema,
   toolset and write class; every entry point derives the same metadata from
-  it. A write tool also declares its `targets`: the arguments that name a
-  repository the call writes to.
+  it. A write tool also declares `targets(args, context)`, which names what
+  the call writes to.
 - `execute(args, context)` gets the working directory, an abort signal, an
   optional `ownDir` (the directory the tools are installed in, never the
   working tree) and an optional `confirm(request) => Promise<boolean>` hook.

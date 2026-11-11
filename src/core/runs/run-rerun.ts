@@ -3,6 +3,7 @@ import { ToolError } from "../errors"
 import { parseRunRef, readRun, rerunRun } from "../github/workflow-runs"
 import { REPO_DESCRIPTION, invalid, writableContext } from "../write-support"
 import { shortSha } from "../refs"
+import { githubTargets } from "../github/targets"
 import { confirmWrite, defineTool, type CallFact } from "../tool"
 import { describedRun } from "./describe-support"
 
@@ -39,7 +40,7 @@ export const runRerun = defineTool({
     "Re-run a completed workflow run: only failed jobs (the default), a specific job, or every job. Refuses a run that is still going (use github_run_read view to wait or github_run_cancel to cancel), a run where nothing failed when failed_only is true, an unknown job, or passing both job and failed_only. Cannot be undone in effect; steps run again, including deploys and publishes. Read the outcome with github_run_read view, which waits for the run to complete.",
   toolset: "actions",
   class: "administrative",
-  targets: { run: "run", repo: "repo" },
+  targets: githubTargets({ run: "run", repo: "repo" }),
   async describe(args, ctx) {
     const { repo, current } = await describedRun(args, ctx)
     if (current.status !== "completed") {

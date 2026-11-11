@@ -12,6 +12,7 @@ import {
 } from "../github/releases"
 import { REPO_DESCRIPTION, given, invalid, writableContext } from "../write-support"
 import { resolveRepo, SHA_PATTERN, shortSha } from "../refs"
+import { githubTargets } from "../github/targets"
 import { confirmWrite, defineTool, type CallFact } from "../tool"
 import { describedRelease, releaseHeadline, switchValue } from "./describe-support"
 
@@ -49,7 +50,7 @@ export const releasePublish = defineTool({
     "Publish a draft release: creates its tag (pinned to the commit it would name) or uses the existing one, and notifies everyone watching; cannot be undone in effect. Refuses a published release, a target branch that is gone, and with head_sha a commit other than the one reviewed (stale). Read the commit to pass with github_release_read view.",
   toolset: "releases",
   class: "administrative",
-  targets: { repo: "repo" },
+  targets: githubTargets({ repo: "repo" }),
   async describe(args, ctx) {
     const expectedSha = given(args.head_sha)
     if (args.head_sha !== undefined && (!expectedSha || !SHA_PATTERN.test(expectedSha))) {

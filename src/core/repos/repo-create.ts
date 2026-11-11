@@ -8,6 +8,7 @@ import {
 } from "../github/repos"
 import { given, invalid } from "../write-support"
 import { parseRepo } from "../refs"
+import { githubTargets } from "../github/targets"
 import { confirmWrite, defineTool, type CallDescription, type CallFact, type ToolContext } from "../tool"
 import { repoHeadline, visibilityFact } from "./describe-support"
 
@@ -115,7 +116,7 @@ export const repoCreate = defineTool({
   ].join(" "),
   toolset: "repos",
   class: "administrative",
-  targets: { repo: "repo" },
+  targets: githubTargets({ repo: "repo" }),
   describe: describeCreate,
   input,
   output,

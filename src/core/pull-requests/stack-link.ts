@@ -11,6 +11,7 @@ import {
 import { readPullRequestHeading } from "../github/pull-requests"
 import { REPO_DESCRIPTION, invalid, writableContext } from "../write-support"
 import { resolveRepo, type RepoName } from "../refs"
+import { githubTargets } from "../github/targets"
 import { defineTool, type ToolContext } from "../tool"
 import { layersFact } from "./write-support"
 
@@ -137,7 +138,7 @@ export const stackLink = defineTool({
   ].join(" "),
   toolset: "pull_requests",
   class: "idempotent",
-  targets: { repo: "repo" },
+  targets: githubTargets({ repo: "repo" }),
   async describe(args, ctx) {
     const numbers = args.prs
     const repeated = numbers.find((number, index) => numbers.indexOf(number) !== index)

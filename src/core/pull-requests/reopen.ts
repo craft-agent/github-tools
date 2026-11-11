@@ -3,6 +3,7 @@ import { gh } from "../gh"
 import { readPullRequestState } from "../github/pull-requests"
 import { REPO_DESCRIPTION, given, invalid, writableContext } from "../write-support"
 import { parseNumberRef } from "../refs"
+import { githubTargets } from "../github/targets"
 import { defineTool } from "../tool"
 import { PR_DESCRIPTION, PR_TARGETS, describedPull } from "./write-support"
 
@@ -35,7 +36,7 @@ export const prReopen = defineTool({
   ].join(" "),
   toolset: "pull_requests",
   class: "overwrite",
-  targets: PR_TARGETS,
+  targets: githubTargets(PR_TARGETS),
   async describe(args, ctx) {
     const { ref, heading } = await describedPull(args, ctx)
     if (heading.state === MERGED) {

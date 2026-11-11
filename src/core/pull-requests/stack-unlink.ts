@@ -3,6 +3,7 @@ import { readStack, stackOfPull, stackSchema, unstack } from "../github/stacks"
 import { REPO_DESCRIPTION, invalid, writableContext } from "../write-support"
 import { parseNumberRef, resolveRepo } from "../refs"
 import { given } from "../search"
+import { githubTargets } from "../github/targets"
 import { defineTool } from "../tool"
 import { PR_DESCRIPTION, layersFact } from "./write-support"
 
@@ -42,7 +43,7 @@ export const stackUnlink = defineTool({
   ].join(" "),
   toolset: "pull_requests",
   class: "overwrite",
-  targets: { pr: "pull", repo: "repo" },
+  targets: githubTargets({ pr: "pull", repo: "repo" }),
   async describe(args, ctx) {
     const pr = given(args.pr)
     if ((args.stack === undefined) === (pr === undefined)) {

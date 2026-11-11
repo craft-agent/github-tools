@@ -21,6 +21,7 @@ import {
 } from "../../testing/setup-fixtures"
 import { sent } from "../../testing/write-fixtures"
 import { writeHarness } from "../../testing/write-harness"
+import { targetKinds } from "../github/targets"
 import { projectViewEnsure } from "./view-ensure"
 
 const { use, run } = writeHarness(projectViewEnsure)
@@ -198,7 +199,8 @@ describe("the board", () => {
 
   test("there is no title argument: the board is the project", () => {
     expect(projectViewEnsure.input.shape).not.toHaveProperty("title")
-    expect(projectViewEnsure).toMatchObject({ class: "idempotent", toolset: "projects", targets: { project: "board" } })
+    expect(projectViewEnsure).toMatchObject({ class: "idempotent", toolset: "projects" })
+    expect(targetKinds(projectViewEnsure.targets)).toEqual({ project: "board" })
     expect(projectViewEnsure.description).toContain("gh auth refresh -s project")
   })
 })

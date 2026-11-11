@@ -4,6 +4,7 @@ import { ghIssueRef, issueLabel, resolveRelatedIssue, type IssueRef } from "../g
 import { MAX_DEPENDENCIES, MAX_SUB_ISSUES, issueBriefSchema, readIssue, type IssueBrief } from "../github/issues"
 import { assertWritable, repositoryContext, type RepositoryContext } from "../github/repository"
 import { parseNumberRef, type RepoName } from "../refs"
+import { githubTargets } from "../github/targets"
 import { defineTool, type CallFact, type ToolContext } from "../tool"
 import { changeFact } from "../write-facts"
 import { ISSUE_DESCRIPTION, ISSUE_TARGETS, describedIssue, editIssue } from "./write-support"
@@ -222,7 +223,7 @@ export const issueRelate = defineTool({
   ].join(" "),
   toolset: "issues",
   class: "idempotent",
-  targets: {
+  targets: githubTargets({
     ...ISSUE_TARGETS,
     parent: "issue",
     add_sub_issues: "issues",
@@ -231,7 +232,7 @@ export const issueRelate = defineTool({
     remove_blocked_by: "issues",
     add_blocking: "issues",
     remove_blocking: "issues",
-  },
+  }),
   async describe(args, ctx) {
     const { ref, heading } = await describedIssue(args, ctx)
     const request = await parseRequest(args, ref, ctx)

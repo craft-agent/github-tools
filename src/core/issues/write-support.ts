@@ -4,7 +4,8 @@ import { readIssueHeading, type IssueHeading } from "../github/issues"
 import { kindFlags, withKindFallback, type KindPlacement } from "../github/kind"
 import { resolveMilestone } from "../github/milestones"
 import { parseNumberRef, type RepoName } from "../refs"
-import type { CallFact, TargetKind, ToolContext } from "../tool"
+import type { TargetKind } from "../github/targets"
+import type { CallFact, ToolContext } from "../tool"
 
 /** What the issue write tools share: `gh issue edit`, the kind, the issue argument. */
 

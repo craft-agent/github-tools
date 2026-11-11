@@ -12,6 +12,7 @@ import {
 } from "../github/releases"
 import { REPO_DESCRIPTION, invalid, writableContext } from "../write-support"
 import { resolveRepo } from "../refs"
+import { githubTargets } from "../github/targets"
 import { defineTool, type CallFact } from "../tool"
 import { NOTHING_CHANGED, digest } from "../write-facts"
 import { describedRelease, releaseHeadline, switchValue } from "./describe-support"
@@ -49,7 +50,7 @@ export const releaseEdit = defineTool({
     "Edit a GitHub release. Replaces only the parts given, on a draft or a published release. Editing notifies no one; publishing is github_release_publish.",
   toolset: "releases",
   class: "overwrite",
-  targets: { repo: "repo" },
+  targets: githubTargets({ repo: "repo" }),
   async describe(args, ctx) {
     if (CHANGES.every((field) => args[field] === undefined)) {
       throw invalid("Pass at least one of title, notes, prerelease, latest or target to change the release.")

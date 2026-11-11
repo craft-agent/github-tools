@@ -5,6 +5,7 @@ import { parseRunUrl, readRun, softFailure } from "../github/workflow-runs"
 import { dispatchWorkflow, resolveWorkflow } from "../github/workflows"
 import { REPO_DESCRIPTION, given, invalid, writableContext } from "../write-support"
 import { resolveRepo, SHA_PATTERN, shortSha, type RefContext, type RepoName } from "../refs"
+import { githubTargets } from "../github/targets"
 import { confirmWrite, defineTool } from "../tool"
 
 /** The longest input value, in characters, the confirmation shows. */
@@ -107,7 +108,7 @@ export const workflowRun = defineTool({
     "Start a workflow by hand (a workflow_dispatch run) at a branch or tag (ref, default the default branch), with inputs. GitHub checks the inputs and the ref, and its refusal is returned. It runs whatever the workflow does, a deploy or a publish included, and cannot be undone in effect. Refuses a workflow that is not active. With head_sha it stops with stale, starting nothing, if ref is at another commit; the start names the ref, not the commit, so a push right after the check still runs the newer commit (the run's commit is checked afterwards and a hint says so). Read the run with github_run_read view, which waits.",
   toolset: "actions",
   class: "administrative",
-  targets: { repo: "repo" },
+  targets: githubTargets({ repo: "repo" }),
   async describe(args, ctx) {
     const expectedSha = given(args.head_sha)
     if (args.head_sha !== undefined && (!expectedSha || !SHA_PATTERN.test(expectedSha))) {

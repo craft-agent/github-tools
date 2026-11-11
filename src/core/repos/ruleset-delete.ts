@@ -3,6 +3,7 @@ import { readAdministeredRepository } from "../github/repos"
 import { repositoryContext } from "../github/repository"
 import { deleteRuleset, readRuleset } from "../github/rulesets"
 import { resolveRepo } from "../refs"
+import { githubTargets } from "../github/targets"
 import { confirmWrite, defineTool } from "../tool"
 import { describedRepo } from "./describe-support"
 import {
@@ -29,7 +30,7 @@ export const rulesetDelete = defineTool({
   ].join(" "),
   toolset: "repos",
   class: "administrative",
-  targets: { repo: "repo" },
+  targets: githubTargets({ repo: "repo" }),
   async describe(args, ctx) {
     const expected = expectedUpdate(args.updated_at)
     const { target } = await describedRepo(args, ctx)

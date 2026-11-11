@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { cancelRun, parseRunRef, readRun } from "../github/workflow-runs"
 import { REPO_DESCRIPTION, invalid, writableContext } from "../write-support"
+import { githubTargets } from "../github/targets"
 import { confirmWrite, defineTool } from "../tool"
 import { describedRun, statusFact } from "./describe-support"
 
@@ -28,7 +29,7 @@ export const runCancel = defineTool({
     "Cancel a workflow run that is in progress or queued. Refuses a run that has already completed. Stopping jobs cannot be undone, and a deployment may be left half done. Read the final state with github_run_read view.",
   toolset: "actions",
   class: "administrative",
-  targets: { run: "run", repo: "repo" },
+  targets: githubTargets({ run: "run", repo: "repo" }),
   async describe(args, ctx) {
     const { repo, current } = await describedRun(args, ctx)
     if (current.status === "completed") {

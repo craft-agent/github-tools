@@ -5,6 +5,7 @@ import { readBoardFields } from "../github/board-fields"
 import { clearFieldValue, setFieldValue, updateDraft } from "../github/board-item-write"
 import { assertBoardWritable, given, sameTitle } from "../github/projects"
 import { appended, invalid } from "../write-support"
+import { githubTargets } from "../github/targets"
 import { defineTool, type CallFact, type CallText } from "../tool"
 import { NOTHING_CHANGED, changeFact, digest } from "../write-facts"
 import { describedItem, fieldText, itemHeadline } from "./describe-support"
@@ -104,7 +105,7 @@ export const projectItemEdit = defineTool({
   ].join(" "),
   toolset: "projects",
   class: "overwrite",
-  targets: { item: "item" },
+  targets: githubTargets({ item: "item" }),
   async describe(args, ctx) {
     const change = parseChange(args)
     const { board, item, draftId, title: itemTitle } = await describedItem(args, ctx)

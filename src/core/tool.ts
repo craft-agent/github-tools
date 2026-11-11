@@ -9,20 +9,6 @@ export type WriteClass = "read" | "add" | "idempotent" | "overwrite" | "administ
 
 export type ConfirmRequest = { tool: string; message: string }
 
-/**
- * What an argument that names what a call writes to holds: `"repo"` an
- * `owner/name`, `"issue"` one issue reference (`12`, `#12`, `owner/repo#12` or
- * a URL), `"issues"` a list of them, `"board"` the board that `project` (a
- * reference or a title), `owner` and `repo` choose together (declared on
- * `project`), `"item"` a project item's node ID (`PVTI_…`), whose board is
- * written to, `"owner"` a user or organization login (or `@me`) that a board is
- * about to be created for, `"pull"` one pull request reference (`12`, `#12`,
- * `owner/repo#12` or a pull URL), `"optional_board"` a board that `project`
- * names, which the call writes to only when the argument is given, `"run"`
- * a workflow run id or a run URL.
- */
-export type TargetKind = "repo" | "issue" | "issues" | "pull" | "board" | "optional_board" | "item" | "owner" | "run"
-
 /** A fact's value as a template the tool picks, such as `{bytes} bytes`, and the values it holds; the entry point fills them in unquoted. */
 export type CallValue = { text: string; values?: Record<string, string | number> }
 
@@ -67,8 +53,8 @@ export type ToolSpec<I extends z.ZodObject<any> = z.ZodObject<any>, O extends z.
   description: string
   toolset: string
   class: WriteClass
-  /** The arguments that name a repository or board the call writes to, by name; each must be an argument of `input`. */
-  targets?: Readonly<Record<string, TargetKind>>
+  /** What the call writes to, as the permission rules of an entry point name it. */
+  targets?(args: z.output<I>, ctx: ToolContext): string[] | Promise<string[]>
   /**
    * What the call will do, for the person approving it: a headline template
    * (the intent, else the title, stands without one), facts such as the kind
@@ -89,9 +75,9 @@ const READ_TOOL_SUFFIX = "_read"
 
 /**
  * Returns the spec after checking what a type cannot: the ID's shape and
- * length, that a read tool is named `_read`, that the output schema is an
- * object (a tool returns its data as a plain object), and that every target
- * is an argument of the input.
+ * length, that a read tool is named `_read`, and that the output schema is an
+ * object (a tool returns its data as a plain object). The ID's prefix is the
+ * package's to check.
  */
 export function defineTool<I extends z.ZodObject<any>, O extends z.ZodObject<any>>(
   spec: ToolSpec<I, O>,
@@ -107,10 +93,6 @@ export function defineTool<I extends z.ZodObject<any>, O extends z.ZodObject<any
   }
   if (!(spec.output instanceof z.ZodObject)) {
     throw new Error(`Tool "${spec.id}" must have an object output schema, since a result is an object.`)
-  }
-  const unknownTarget = Object.keys(spec.targets ?? {}).find((name) => !Object.hasOwn(spec.input.shape, name))
-  if (unknownTarget !== undefined) {
-    throw new Error(`Tool "${spec.id}" declares the target "${unknownTarget}", which is not one of its arguments.`)
   }
   if (spec.intent !== undefined && spec.intent.trim() === "") {
     throw new Error(`Tool "${spec.id}" must give an intent that is not blank, or none.`)

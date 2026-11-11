@@ -21,6 +21,7 @@ import {
 } from "../github/kind"
 import { milestoneSchema, resolveMilestone, type MilestoneRef } from "../github/milestones"
 import { parseNumberRef } from "../refs"
+import { githubTargets } from "../github/targets"
 import { defineTool, type CallFact, type CallText } from "../tool"
 import { changeFact, digest } from "../write-facts"
 import { ISSUE_DESCRIPTION, ISSUE_TARGETS, describedIssue, editIssue, milestoneFact } from "./write-support"
@@ -193,7 +194,7 @@ export const issueEdit = defineTool({
   ].join(" "),
   toolset: "issues",
   class: "overwrite",
-  targets: ISSUE_TARGETS,
+  targets: githubTargets(ISSUE_TARGETS),
   async describe(args, ctx) {
     const change = parseChange(args)
     const { ref, heading } = await describedIssue(args, ctx)

@@ -30,6 +30,7 @@ import {
 } from "../../testing/setup-fixtures"
 import { repositoryRule, sent } from "../../testing/write-fixtures"
 import { writeHarness } from "../../testing/write-harness"
+import { targetKinds } from "../github/targets"
 import { projectCreate } from "./create"
 import { ROADMAP_NOTE } from "./template"
 
@@ -501,11 +502,8 @@ describe("the arguments", () => {
   })
 
   test("names the board to be made, and the repository to link, as what it writes to", () => {
-    expect(projectCreate).toMatchObject({
-      class: "idempotent",
-      toolset: "projects",
-      targets: { owner: "owner", link_repo: "repo" },
-    })
+    expect(projectCreate).toMatchObject({ class: "idempotent", toolset: "projects" })
+    expect(targetKinds(projectCreate.targets)).toEqual({ owner: "owner", link_repo: "repo" })
     expect(projectCreate.description).toContain("gh auth refresh -s project")
   })
 })

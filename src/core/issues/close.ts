@@ -3,6 +3,7 @@ import { gh } from "../gh"
 import { readIssueFields } from "../github/issues"
 import { ghIssueRef, issueLabel, resolveRelatedIssue } from "../github/issue-refs"
 import { parseNumberRef } from "../refs"
+import { githubTargets } from "../github/targets"
 import { defineTool } from "../tool"
 import { ISSUE_DESCRIPTION, ISSUE_TARGETS, describedIssue } from "./write-support"
 import { REPO_DESCRIPTION, given, invalid, writableContext } from "../write-support"
@@ -57,7 +58,7 @@ export const issueClose = defineTool({
   ].join(" "),
   toolset: "issues",
   class: "overwrite",
-  targets: ISSUE_TARGETS,
+  targets: githubTargets(ISSUE_TARGETS),
   async describe(args, ctx) {
     const { ref, heading } = await describedIssue(args, ctx)
     const headline = { text: "About to close the issue {title}", values: { title: heading.title } }

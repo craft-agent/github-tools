@@ -3,6 +3,7 @@ import { z } from "zod"
 import {
   PIN_PATTERN,
   callDescription,
+  githubTargets,
   pinOf,
   translator,
   type CallDescription,
@@ -27,7 +28,7 @@ type State = {
   facts?: CallDescription["facts"]
 }
 
-function fixture(state: State, targets: ToolSpec["targets"] = { repo: "repo" }) {
+function fixture(state: State, targets: ToolSpec["targets"] = githubTargets({ repo: "repo" })) {
   const describeNow = (): CallDescription | Promise<CallDescription> => {
     if (state.describe === "throw") throw new Error("gone")
     if (state.describe === "hang") return new Promise<CallDescription>(() => {})
@@ -193,12 +194,10 @@ describe("checkPin", () => {
 
   test("without a pin returns at once and resolves nothing", async () => {
     let called = false
-    const targets = new Proxy({ repo: "repo" } as const, {
-      ownKeys(target) {
-        called = true
-        return Reflect.ownKeys(target)
-      },
-    })
+    const targets = async () => {
+      called = true
+      return ["octo/todo"]
+    }
     const state = fresh()
     const spec = {
       ...fixture(state, targets),

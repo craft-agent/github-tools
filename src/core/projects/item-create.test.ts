@@ -11,6 +11,7 @@ import {
 import { failure } from "../../testing/issue-fixtures"
 import { octoBoardRules } from "../../testing/project-fixtures"
 import { writeHarness } from "../../testing/write-harness"
+import { targetKinds } from "../github/targets"
 import { projectItemCreate } from "./item-create"
 
 const { use, run } = writeHarness(projectItemCreate)
@@ -97,7 +98,8 @@ describe("before anything is written", () => {
 })
 
 test("declares its board as what it writes to", () => {
-  expect(projectItemCreate).toMatchObject({ class: "add", toolset: "projects", targets: { project: "board" } })
+  expect(projectItemCreate).toMatchObject({ class: "add", toolset: "projects" })
+  expect(targetKinds(projectItemCreate.targets)).toEqual({ project: "board" })
   expect(projectItemCreate.description).toContain("Todo")
   expect(projectItemCreate.description).toContain("gh auth refresh -s project")
 })

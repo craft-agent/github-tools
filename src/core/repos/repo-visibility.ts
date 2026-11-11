@@ -2,6 +2,7 @@ import { z } from "zod"
 import { patchRepository, readAdministeredRepository, visibilitySchema, type Visibility } from "../github/repos"
 import { REPO_DESCRIPTION, invalid } from "../write-support"
 import { resolveRepo } from "../refs"
+import { githubTargets } from "../github/targets"
 import { confirmWrite, defineTool } from "../tool"
 import { describedRepo, repoHeadline, transitionFact } from "./describe-support"
 
@@ -38,7 +39,7 @@ export const repoVisibility = defineTool({
     "Change a repository's visibility to public, private or internal (internal for an organization's repository only). Making it public lets anyone read its code, history, issues and wiki; making a public one private or internal loses its stars and watchers, and its forks stay public. Needs admin permission; refuses the visibility it has already, before writing.",
   toolset: "repos",
   class: "administrative",
-  targets: { repo: "repo" },
+  targets: githubTargets({ repo: "repo" }),
   async describe(args, ctx) {
     const { view } = await describedRepo(args, ctx)
     if (view.visibility === args.visibility) throw invalid(`${view.repo} is ${args.visibility} already.`)

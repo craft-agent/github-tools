@@ -4,6 +4,7 @@ import { patchRepository, readAdministeredRepository, replaceTopics, type Reposi
 import { repositoryContext } from "../github/repository"
 import { REPO_DESCRIPTION, invalid } from "../write-support"
 import { resolveRepo } from "../refs"
+import { githubTargets } from "../github/targets"
 import { defineTool, type CallDescription, type CallFact, type ToolContext } from "../tool"
 import { NOTHING_CHANGED, changeFact } from "../write-facts"
 import { describedRepo, repoHeadline } from "./describe-support"
@@ -190,7 +191,7 @@ export const repoEdit = defineTool({
   ].join(" "),
   toolset: "repos",
   class: "overwrite",
-  targets: { repo: "repo" },
+  targets: githubTargets({ repo: "repo" }),
   describe: describeEdit,
   input,
   output,

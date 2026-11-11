@@ -9,6 +9,7 @@ import {
 } from "../github/milestones"
 import { REPO_DESCRIPTION, invalid, writableContext } from "../write-support"
 import { resolveRepo } from "../refs"
+import { githubTargets } from "../github/targets"
 import { defineTool } from "../tool"
 import { describedWritableRepo } from "./describe-support"
 
@@ -20,7 +21,7 @@ export const milestoneCreate = defineTool({
     "Create a repository milestone with an optional due date and description. Refuses a title the repository has in any state, without regard to case; use github_milestone_edit to change it. due must be a real YYYY-MM-DD date.",
   toolset: "repos",
   class: "add",
-  targets: { repo: "repo" },
+  targets: githubTargets({ repo: "repo" }),
   async describe(args, ctx) {
     const repo = await describedWritableRepo(args, ctx)
     const milestones = await milestonesForWrite(repo, ctx)

@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { setItemArchived } from "../github/board-item-write"
 import { assertBoardWritable } from "../github/projects"
+import { githubTargets } from "../github/targets"
 import { defineTool, type CallDescription, type CallFact, type ToolContext } from "../tool"
 import { NOT_ARCHIVED } from "../write-facts"
 import { describedItem, itemHeadline } from "./describe-support"
@@ -59,7 +60,7 @@ export const projectItemArchive = defineTool({
   ].join(" "),
   toolset: "projects",
   class: "overwrite",
-  targets: { item: "item" },
+  targets: githubTargets({ item: "item" }),
   describe: (args, ctx) => describeArchived(args, true, "About to archive the project item {title}", ctx),
   input,
   output,
@@ -78,7 +79,7 @@ export const projectItemUnarchive = defineTool({
   ].join(" "),
   toolset: "projects",
   class: "overwrite",
-  targets: { item: "item" },
+  targets: githubTargets({ item: "item" }),
   describe: (args, ctx) =>
     describeArchived(args, false, "About to restore the project item {title} from the archive", ctx),
   input,

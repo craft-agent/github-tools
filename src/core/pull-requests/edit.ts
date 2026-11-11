@@ -16,6 +16,7 @@ import { closingIssueSchema, readPullRequestState, type PullRequestState } from 
 import { REPO_DESCRIPTION, appended, given, invalid, lastUrl, nameList, writableContext } from "../write-support"
 import { stepErrorsSchema } from "../projects/item-support"
 import { parseNumberRef } from "../refs"
+import { githubTargets } from "../github/targets"
 import { StepErrors, defineTool, type CallFact, type CallText } from "../tool"
 import { changeFact, digest } from "../write-facts"
 import { milestoneFact } from "../issues/write-support"
@@ -192,7 +193,7 @@ export const prEdit = defineTool({
   ].join(" "),
   toolset: "pull_requests",
   class: "overwrite",
-  targets: PR_TARGETS,
+  targets: githubTargets(PR_TARGETS),
   async describe(args, ctx) {
     const { ref, heading } = await describedPull(args, ctx)
     const change = parseChange(args, {

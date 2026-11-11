@@ -6,6 +6,7 @@ import { assertBoardWritable, given } from "../github/projects"
 import { editIssue, milestoneFact, setKind } from "../issues/write-support"
 import { invalid, nameList, writableContext } from "../write-support"
 import { resolveRepo } from "../refs"
+import { githubTargets } from "../github/targets"
 import { StepErrors, defineTool, type CallFact } from "../tool"
 import { changeFact } from "../write-facts"
 import { describedItem } from "./describe-support"
@@ -58,7 +59,7 @@ export const projectItemConvert = defineTool({
   ].join(" "),
   toolset: "projects",
   class: "add",
-  targets: { item: "item", repo: "repo" },
+  targets: githubTargets({ item: "item", repo: "repo" }),
   async describe(args, ctx) {
     const [kind] = nameList("kind", args.kind === undefined ? [] : [args.kind])
     const labels = nameList("labels", args.labels)
