@@ -3,6 +3,7 @@ import { ToolError } from "../errors"
 import { branchHead, defaultBranch } from "../github/branches"
 import { createLinkedBranch, linkedBranchSchema, readLinkedBranches } from "../github/issues"
 import { parseNumberRef, parseRepo, type RepoName } from "../refs"
+import { githubTargets } from "../github/targets"
 import { defineTool, type ToolContext } from "../tool"
 import { ISSUE_DESCRIPTION, ISSUE_TARGETS, describedIssue } from "./write-support"
 import { REPO_DESCRIPTION, given, invalid, writableContext } from "../write-support"
@@ -101,7 +102,7 @@ export const issueDevelop = defineTool({
   ].join(" "),
   toolset: "issues",
   class: "idempotent",
-  targets: { ...ISSUE_TARGETS, branch_repo: "repo" },
+  targets: githubTargets({ ...ISSUE_TARGETS, branch_repo: "repo" }),
   async describe(args, ctx) {
     const branch = branchName("branch", args.branch)
     const base = branchName("base", args.base)

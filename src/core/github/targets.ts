@@ -210,6 +210,19 @@ async function targetRepository(
   return typeof value === "string" ? attempt(() => parseRepo(value)) : undefined
 }
 
+/** The kind of each argument a call writes to, by the argument's name. */
+export type TargetMap = Readonly<Record<string, TargetKind>>
+
+/** The targets of a tool whose arguments `kinds` declares: the repositories and boards the call writes to (see `writeTargets`). */
+export function githubTargets(kinds: TargetMap): TargetMap {
+  return kinds
+}
+
+/** The kinds `githubTargets` was given for a tool's targets, or `undefined` for a tool that has none. */
+export function targetKinds(targets: ToolSpec["targets"]): TargetMap | undefined {
+  return targets
+}
+
 /**
  * What a call writes to, as the permission rule of an entry point names it:
  * the call's own repository (`owner/name`), and each repository the arguments

@@ -2,6 +2,7 @@ import { z } from "zod"
 import { deleteLabel, findLabel, labelNameInput, labelsForWrite } from "../github/labels"
 import { REPO_DESCRIPTION, writableContext } from "../write-support"
 import { resolveRepo } from "../refs"
+import { githubTargets } from "../github/targets"
 import { confirmWrite, defineTool } from "../tool"
 import { describedWritableRepo } from "./describe-support"
 
@@ -13,7 +14,7 @@ export const labelDelete = defineTool({
     "Delete a repository label, matched without regard to case, removing it from every issue and pull request it is on. Refuses an unknown label before writing.",
   toolset: "repos",
   class: "administrative",
-  targets: { repo: "repo" },
+  targets: githubTargets({ repo: "repo" }),
   async describe(args, ctx) {
     const repo = await describedWritableRepo(args, ctx)
     const label = findLabel(await labelsForWrite(repo, ctx), args.name)

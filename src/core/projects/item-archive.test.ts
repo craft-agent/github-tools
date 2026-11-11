@@ -11,6 +11,7 @@ import { failure } from "../../testing/issue-fixtures"
 import { itemBoardRule, octoBoardRules, rawBoard } from "../../testing/project-fixtures"
 import { mutationRule } from "../../testing/setup-fixtures"
 import { writeHarness } from "../../testing/write-harness"
+import { targetKinds } from "../github/targets"
 import { projectItemArchive, projectItemUnarchive } from "./item-archive"
 
 const ON_BOARD = itemBoardRule("PVTI_1", rawBoard(3))
@@ -70,7 +71,8 @@ describe("github_project_item_archive", () => {
   })
 
   test("declares its item as what it writes to", () => {
-    expect(projectItemArchive).toMatchObject({ class: "overwrite", toolset: "projects", targets: { item: "item" } })
+    expect(projectItemArchive).toMatchObject({ class: "overwrite", toolset: "projects" })
+    expect(targetKinds(projectItemArchive.targets)).toEqual({ item: "item" })
     expect(projectItemArchive.description).toContain("gh auth refresh -s project")
   })
 })
@@ -98,6 +100,7 @@ describe("github_project_item_unarchive", () => {
   })
 
   test("declares its item as what it writes to", () => {
-    expect(projectItemUnarchive).toMatchObject({ class: "overwrite", targets: { item: "item" } })
+    expect(projectItemUnarchive).toMatchObject({ class: "overwrite" })
+    expect(targetKinds(projectItemUnarchive.targets)).toEqual({ item: "item" })
   })
 })

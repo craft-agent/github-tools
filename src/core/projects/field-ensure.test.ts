@@ -15,6 +15,7 @@ import {
 } from "../../testing/setup-fixtures"
 import { ISSUE_FIELD_DEFINITIONS, ISSUE_FIELD_NODES, sent } from "../../testing/write-fixtures"
 import { writeHarness } from "../../testing/write-harness"
+import { targetKinds } from "../github/targets"
 import { projectFieldEnsure } from "./field-ensure"
 
 const { use, run } = writeHarness(projectFieldEnsure)
@@ -315,11 +316,8 @@ describe("the board", () => {
 
 describe("the tool", () => {
   test("is an idempotent write of the projects toolset that names its board", () => {
-    expect(projectFieldEnsure).toMatchObject({
-      class: "idempotent",
-      toolset: "projects",
-      targets: { project: "board" },
-    })
+    expect(projectFieldEnsure).toMatchObject({ class: "idempotent", toolset: "projects" })
+    expect(targetKinds(projectFieldEnsure.targets)).toEqual({ project: "board" })
     expect(projectFieldEnsure.description).toContain("gh auth refresh -s project")
   })
 })

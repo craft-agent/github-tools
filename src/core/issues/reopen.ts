@@ -2,6 +2,7 @@ import { z } from "zod"
 import { gh } from "../gh"
 import { readIssueFields } from "../github/issues"
 import { parseNumberRef } from "../refs"
+import { githubTargets } from "../github/targets"
 import { defineTool } from "../tool"
 import { ISSUE_DESCRIPTION, ISSUE_TARGETS, describedIssue } from "./write-support"
 import { REPO_DESCRIPTION, given, writableContext } from "../write-support"
@@ -32,7 +33,7 @@ export const issueReopen = defineTool({
   ].join(" "),
   toolset: "issues",
   class: "overwrite",
-  targets: ISSUE_TARGETS,
+  targets: githubTargets(ISSUE_TARGETS),
   async describe(args, ctx) {
     const { heading } = await describedIssue(args, ctx)
     const headline = { text: "About to reopen the issue {title}", values: { title: heading.title } }

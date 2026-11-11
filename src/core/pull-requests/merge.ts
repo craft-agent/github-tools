@@ -13,6 +13,7 @@ import { readStack } from "../github/stacks"
 import { REPO_DESCRIPTION, given, invalid, writableContext } from "../write-support"
 import { stepErrorsSchema } from "../projects/item-support"
 import { parseNumberRef, SHA_PATTERN, shortSha, type RepoName } from "../refs"
+import { githubTargets } from "../github/targets"
 import { StepErrors, defineTool, type CallFact, type ToolContext } from "../tool"
 import { digest } from "../write-facts"
 import { branchOutcomeSchema, tidyBranches, type BranchTarget } from "./merge-branches"
@@ -238,7 +239,7 @@ export const prMerge = defineTool({
   ].join(" "),
   toolset: "pull_requests",
   class: "administrative",
-  targets: PR_TARGETS,
+  targets: githubTargets(PR_TARGETS),
   async describe(args, ctx) {
     const subject = given(args.subject)
     const message = given(args.body)

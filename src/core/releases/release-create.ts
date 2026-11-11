@@ -3,6 +3,7 @@ import { tagCommit } from "../github/branches"
 import { createRelease, findRelease, releaseTagInput, resolveTarget, type ReleaseBody } from "../github/releases"
 import { REPO_DESCRIPTION, invalid, writableContext } from "../write-support"
 import { resolveRepo } from "../refs"
+import { githubTargets } from "../github/targets"
 import { defineTool, type CallFact } from "../tool"
 import { switchValue } from "./describe-support"
 
@@ -40,7 +41,7 @@ export const releaseCreate = defineTool({
     "Create a draft release in a repository. Always creates a draft, which only people who can push see until github_release_publish publishes it. Refuses a tag that has a release (points to github_release_edit), a target for a tag that exists, and a missing branch.",
   toolset: "releases",
   class: "add",
-  targets: { repo: "repo" },
+  targets: githubTargets({ repo: "repo" }),
   async describe(args, ctx) {
     const { repo } = await writableContext(await resolveRepo(args.repo, ctx), ctx)
     const existing = await findRelease(repo, args.tag, ctx)

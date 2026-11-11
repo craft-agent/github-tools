@@ -16,6 +16,7 @@ import { failure } from "../../testing/issue-fixtures"
 import { itemBoardRule, octoBoardRules, rawBoard } from "../../testing/project-fixtures"
 import { sent } from "../../testing/write-fixtures"
 import { writeHarness } from "../../testing/write-harness"
+import { targetKinds } from "../github/targets"
 import { projectItemEdit } from "./item-edit"
 
 const { use, run } = writeHarness(projectItemEdit)
@@ -283,7 +284,8 @@ describe("the item", () => {
 })
 
 test("declares its item as what it writes to, and sends GitHub's own fields to the issue tools", () => {
-  expect(projectItemEdit).toMatchObject({ class: "overwrite", toolset: "projects", targets: { item: "item" } })
+  expect(projectItemEdit).toMatchObject({ class: "overwrite", toolset: "projects" })
+  expect(targetKinds(projectItemEdit.targets)).toEqual({ item: "item" })
   expect(projectItemEdit.description).toContain("github_issue_edit")
   expect(projectItemEdit.description).toContain("gh auth refresh -s project")
 })

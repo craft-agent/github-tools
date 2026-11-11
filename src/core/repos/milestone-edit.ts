@@ -11,6 +11,7 @@ import {
 } from "../github/milestones"
 import { REPO_DESCRIPTION, invalid, writableContext } from "../write-support"
 import { resolveRepo } from "../refs"
+import { githubTargets } from "../github/targets"
 import { defineTool, type CallFact } from "../tool"
 import { NOTHING_CHANGED, stateFact } from "../write-facts"
 import { describedWritableRepo } from "./describe-support"
@@ -25,7 +26,7 @@ export const milestoneEdit = defineTool({
     "Edit a repository milestone by number or title (any case, any state). Refuses an unknown milestone, no change arguments, due with clear_due, or a title another milestone has. due must be a real YYYY-MM-DD date. Unchanged fields are left alone; changed is [] when nothing is sent.",
   toolset: "repos",
   class: "overwrite",
-  targets: { repo: "repo" },
+  targets: githubTargets({ repo: "repo" }),
   async describe(args, ctx) {
     if (args.due !== undefined && args.clear_due !== undefined) throw invalid("Pass due or clear_due, not both.")
     if (

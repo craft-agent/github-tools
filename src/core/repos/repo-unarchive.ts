@@ -2,6 +2,7 @@ import { z } from "zod"
 import { patchRepository, readAdministeredRepository } from "../github/repos"
 import { REPO_DESCRIPTION } from "../write-support"
 import { resolveRepo } from "../refs"
+import { githubTargets } from "../github/targets"
 import { defineTool } from "../tool"
 import { NOT_ARCHIVED } from "../write-facts"
 import { describedRepo, repoHeadline, visibilityFact } from "./describe-support"
@@ -14,7 +15,7 @@ export const repoUnarchive = defineTool({
     "Unarchive a repository, which makes it writable again. Needs admin permission. A repository that is not archived is left as it is: changed is false and nothing is sent.",
   toolset: "repos",
   class: "overwrite",
-  targets: { repo: "repo" },
+  targets: githubTargets({ repo: "repo" }),
   async describe(args, ctx) {
     const { view } = await describedRepo(args, ctx)
     return {

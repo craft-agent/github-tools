@@ -3,6 +3,7 @@ import { tagCommit } from "../github/branches"
 import { deleteRelease, findRelease, releaseNotFound, releaseTagInput } from "../github/releases"
 import { REPO_DESCRIPTION, writableContext } from "../write-support"
 import { resolveRepo } from "../refs"
+import { githubTargets } from "../github/targets"
 import { confirmWrite, defineTool } from "../tool"
 import { describedRelease, releaseHeadline } from "./describe-support"
 
@@ -26,7 +27,7 @@ export const releaseDelete = defineTool({
     "Delete a GitHub release and its assets, keeping its git tag. Refuses an unknown release. Cannot be undone.",
   toolset: "releases",
   class: "administrative",
-  targets: { repo: "repo" },
+  targets: githubTargets({ repo: "repo" }),
   async describe(args, ctx) {
     const { current } = await describedRelease(args, ctx)
     const assets = current.assets?.length ?? 0

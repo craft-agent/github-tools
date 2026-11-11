@@ -30,7 +30,7 @@ export {
   type RefContext,
   type RepoName,
 } from "./refs"
-export { ANY_TARGET, writeTargets, type TargetKind } from "./github/targets"
+export { ANY_TARGET, githubTargets, targetKinds, writeTargets, type TargetKind, type TargetMap } from "./github/targets"
 export {
   REQUIRES_USER_INTERACTION,
   StepErrors,

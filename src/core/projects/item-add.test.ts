@@ -18,6 +18,7 @@ import { octoBoardRules } from "../../testing/project-fixtures"
 import { rawField } from "../../testing/setup-fixtures"
 import { sent } from "../../testing/write-fixtures"
 import { writeHarness } from "../../testing/write-harness"
+import { targetKinds } from "../github/targets"
 import { projectItemAdd } from "./item-add"
 
 const { use, run } = writeHarness(projectItemAdd)
@@ -275,7 +276,8 @@ describe("before anything is written", () => {
 })
 
 test("declares its board as what it writes to, and says the Status it starts in", () => {
-  expect(projectItemAdd).toMatchObject({ class: "idempotent", toolset: "projects", targets: { project: "board" } })
+  expect(projectItemAdd).toMatchObject({ class: "idempotent", toolset: "projects" })
+  expect(targetKinds(projectItemAdd.targets)).toEqual({ project: "board" })
   expect(projectItemAdd.description).toContain("Waiting")
   expect(projectItemAdd.description).toContain("gh auth refresh -s project")
 })

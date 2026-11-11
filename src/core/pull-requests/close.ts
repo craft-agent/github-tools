@@ -3,6 +3,7 @@ import { gh } from "../gh"
 import { readPullRequestState } from "../github/pull-requests"
 import { REPO_DESCRIPTION, given, writableContext } from "../write-support"
 import { parseNumberRef } from "../refs"
+import { githubTargets } from "../github/targets"
 import { defineTool } from "../tool"
 import { PR_DESCRIPTION, PR_TARGETS, describedPull } from "./write-support"
 
@@ -41,7 +42,7 @@ export const prClose = defineTool({
   ].join(" "),
   toolset: "pull_requests",
   class: "overwrite",
-  targets: PR_TARGETS,
+  targets: githubTargets(PR_TARGETS),
   async describe(args, ctx) {
     const { heading } = await describedPull(args, ctx)
     const headline = { text: "About to close the pull request {title}", values: { title: heading.title } }

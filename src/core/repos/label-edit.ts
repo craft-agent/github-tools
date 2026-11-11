@@ -11,6 +11,7 @@ import {
 } from "../github/labels"
 import { REPO_DESCRIPTION, invalid, writableContext } from "../write-support"
 import { resolveRepo } from "../refs"
+import { githubTargets } from "../github/targets"
 import { defineTool, type CallFact } from "../tool"
 import { NOTHING_CHANGED } from "../write-facts"
 import { describedWritableRepo } from "./describe-support"
@@ -32,7 +33,7 @@ export const labelEdit = defineTool({
     "Edit a repository label, matched without regard to case. Refuses an unknown label, no change arguments, or a new name another label has. Unchanged fields are left alone; changed is [] when nothing is sent.",
   toolset: "repos",
   class: "overwrite",
-  targets: { repo: "repo" },
+  targets: githubTargets({ repo: "repo" }),
   async describe(args, ctx) {
     if (args.new_name === undefined && args.color === undefined && args.description === undefined) {
       throw invalid("Pass at least one of new_name, color or description to change the label.")

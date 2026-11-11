@@ -2,6 +2,7 @@ import { z } from "zod"
 import { assertSameOwner, isLinked, setLinked } from "../github/board-setup"
 import { assertBoardWritable, boardResource, resolveBoard } from "../github/projects"
 import { resolveRepo } from "../refs"
+import { githubTargets } from "../github/targets"
 import { defineTool, type CallDescription, type ToolContext } from "../tool"
 import { writableContext } from "../write-support"
 import { BOARD_LOOKUP_NOTE, BOARD_SELECTION, PROJECT_SCOPE_NOTE, boardSummary, boardSummarySchema } from "./support"
@@ -71,7 +72,7 @@ export const projectLink = defineTool({
   ].join(" "),
   toolset: "projects",
   class: "idempotent",
-  targets: { project: "board", repo: "repo" },
+  targets: githubTargets({ project: "board", repo: "repo" }),
   describe: (args, ctx) =>
     describeLink(args, true, "About to link the project board {title} to the repository", ALREADY_LINKED, ctx),
   input,
@@ -90,7 +91,7 @@ export const projectUnlink = defineTool({
   ].join(" "),
   toolset: "projects",
   class: "idempotent",
-  targets: { project: "board", repo: "repo" },
+  targets: githubTargets({ project: "board", repo: "repo" }),
   describe: (args, ctx) =>
     describeLink(args, false, "About to unlink the project board {title} from the repository", NOT_LINKED, ctx),
   input,

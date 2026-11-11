@@ -2,6 +2,7 @@ import { z } from "zod"
 import { labelColorInput, labelNameInput, labelSchema, labelsForWrite, writeLabel } from "../github/labels"
 import { REPO_DESCRIPTION, invalid, writableContext } from "../write-support"
 import { resolveRepo } from "../refs"
+import { githubTargets } from "../github/targets"
 import { defineTool } from "../tool"
 import { describedWritableRepo } from "./describe-support"
 
@@ -20,7 +21,7 @@ export const labelCreate = defineTool({
     "Create a repository label. Refuses a name the repository has already, without regard to case; use github_label_edit to change it. Without color, GitHub picks one.",
   toolset: "repos",
   class: "add",
-  targets: { repo: "repo" },
+  targets: githubTargets({ repo: "repo" }),
   async describe(args, ctx) {
     const repo = await describedWritableRepo(args, ctx)
     const labels = await labelsForWrite(repo, ctx)

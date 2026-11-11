@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { gh } from "../gh"
 import { parseNumberRef } from "../refs"
+import { githubTargets } from "../github/targets"
 import { defineTool } from "../tool"
 import { stateFact } from "../write-facts"
 import { ISSUE_DESCRIPTION, ISSUE_TARGETS, describedIssue } from "./write-support"
@@ -32,7 +33,7 @@ export const issueComment = defineTool({
   ].join(" "),
   toolset: "issues",
   class: "add",
-  targets: ISSUE_TARGETS,
+  targets: githubTargets(ISSUE_TARGETS),
   async describe(args, ctx) {
     const { heading } = await describedIssue(args, ctx)
     return {

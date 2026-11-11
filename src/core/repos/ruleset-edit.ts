@@ -5,6 +5,7 @@ import { repositoryContext } from "../github/repository"
 import { readRuleset, rulesetSchema, updateRuleset } from "../github/rulesets"
 import { invalid } from "../write-support"
 import { resolveRepo } from "../refs"
+import { githubTargets } from "../github/targets"
 import { confirmWrite, defineTool, type CallDescription, type CallFact, type ToolContext } from "../tool"
 import { NOTHING_CHANGED, changeFact } from "../write-facts"
 import { describedRepo } from "./describe-support"
@@ -147,7 +148,7 @@ export const rulesetEdit = defineTool({
   ].join(" "),
   toolset: "repos",
   class: "administrative",
-  targets: { repo: "repo" },
+  targets: githubTargets({ repo: "repo" }),
   describe: describeEdit,
   input,
   output,

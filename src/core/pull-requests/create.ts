@@ -29,6 +29,7 @@ import {
 } from "../projects/item-support"
 import { BOARD_LOOKUP_NOTE, PROJECT_SCOPE_NOTE, boardSummary, boardSummarySchema } from "../projects/support"
 import { resolveRepo, SHA_PATTERN, shortSha, type RepoName } from "../refs"
+import { githubTargets } from "../github/targets"
 import { StepErrors, defineTool, type CallFact, type ToolContext } from "../tool"
 import { changeFact, stateFact } from "../write-facts"
 import { milestoneFact } from "../issues/write-support"
@@ -216,7 +217,7 @@ export const prCreate = defineTool({
   ].join(" "),
   toolset: "pull_requests",
   class: "add",
-  targets: { repo: "repo", project: "optional_board" },
+  targets: githubTargets({ repo: "repo", project: "optional_board" }),
   async describe(args, ctx) {
     const title = given(args.title)
     if (!title) throw invalid("title cannot be blank.")

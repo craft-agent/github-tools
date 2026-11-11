@@ -16,6 +16,7 @@ import { boardFieldSchema, readBoardFields, type BoardField } from "../github/bo
 import { OPTION_COLORS, appendOptions } from "../github/board-options"
 import { assertBoardWritable, resolveBoard, sameTitle, type Board } from "../github/projects"
 import type { RefContext } from "../refs"
+import { githubTargets } from "../github/targets"
 import { defineTool, type CallDescription, type CallFact } from "../tool"
 import { changeFact } from "../write-facts"
 import { ALREADY_THERE } from "./describe-support"
@@ -99,7 +100,7 @@ export const projectFieldEnsure = defineTool({
   ].join(" "),
   toolset: "projects",
   class: "idempotent",
-  targets: { project: "board" },
+  targets: githubTargets({ project: "board" }),
   async describe(args, ctx) {
     planEnsure(args)
     const name = args.name.trim()

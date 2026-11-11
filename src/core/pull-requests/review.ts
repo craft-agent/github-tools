@@ -5,6 +5,7 @@ import { viewerLogin } from "../github/projects"
 import { readPullRequestState } from "../github/pull-requests"
 import { REPO_DESCRIPTION, given, invalid, writableContext } from "../write-support"
 import { parseNumberRef, SHA_PATTERN, shortSha } from "../refs"
+import { githubTargets } from "../github/targets"
 import { defineTool, type CallFact } from "../tool"
 import { PR_DESCRIPTION, PR_TARGETS, describedPull } from "./write-support"
 
@@ -141,7 +142,7 @@ export const prReview = defineTool({
   ].join(" "),
   toolset: "pull_requests",
   class: "add",
-  targets: PR_TARGETS,
+  targets: githubTargets(PR_TARGETS),
   async describe(args, ctx) {
     const { body, comments, expectedSha } = checkedReview(args)
     const { ref, heading } = await describedPull(args, ctx)

@@ -4,6 +4,7 @@ import { readBoardFields } from "../github/board-fields"
 import { addDraftToBoard } from "../github/board-item-write"
 import { assertBoardWritable, given, resolveBoard } from "../github/projects"
 import { invalid } from "../write-support"
+import { githubTargets } from "../github/targets"
 import { StepErrors, defineTool } from "../tool"
 import { fieldsFact } from "./describe-support"
 import {
@@ -45,7 +46,7 @@ export const projectItemCreate = defineTool({
   ].join(" "),
   toolset: "projects",
   class: "add",
-  targets: { project: "board" },
+  targets: githubTargets({ project: "board" }),
   async describe(args, ctx) {
     const title = given(args.title)
     if (!title) throw invalid("title cannot be blank.")

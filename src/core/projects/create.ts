@@ -30,6 +30,7 @@ import {
 } from "../github/projects"
 import { writableContext, invalid } from "../write-support"
 import { parseRepo, type RefContext } from "../refs"
+import { githubTargets } from "../github/targets"
 import { StepErrors, defineTool, type CallFact } from "../tool"
 import { changeFact } from "../write-facts"
 import { PROJECT_SCOPE_NOTE, boardSummary, boardSummarySchema } from "./support"
@@ -197,7 +198,7 @@ export const projectCreate = defineTool({
   ].join(" "),
   toolset: "projects",
   class: "idempotent",
-  targets: { owner: "owner", link_repo: "repo" },
+  targets: githubTargets({ owner: "owner", link_repo: "repo" }),
   async describe(args, ctx) {
     const ownerArg = givenOwner(args.owner)
     if (ownerArg === undefined) throw invalid(`owner cannot be blank; use a login or ${CURRENT_USER}.`)

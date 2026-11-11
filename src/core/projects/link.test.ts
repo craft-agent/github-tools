@@ -4,6 +4,7 @@ import { linkedBoardsRule, octoBoardRules, rawBoard } from "../../testing/projec
 import { mutationRule, mutationsSent, queryOf } from "../../testing/setup-fixtures"
 import { repositoryRule, sent } from "../../testing/write-fixtures"
 import { writeHarness } from "../../testing/write-harness"
+import { targetKinds } from "../github/targets"
 import { projectLink, projectUnlink } from "./link"
 
 const SUMMARY = { number: 3, title: "Roadmap", url: "https://github.com/orgs/octo/projects/3", owner: "octo" }
@@ -90,11 +91,8 @@ describe("github_project_link", () => {
   })
 
   test("declares its board and repository as what it writes to", () => {
-    expect(projectLink).toMatchObject({
-      class: "idempotent",
-      toolset: "projects",
-      targets: { project: "board", repo: "repo" },
-    })
+    expect(projectLink).toMatchObject({ class: "idempotent", toolset: "projects" })
+    expect(targetKinds(projectLink.targets)).toEqual({ project: "board", repo: "repo" })
     expect(projectLink.description).toContain("gh auth refresh -s project")
   })
 })
@@ -126,6 +124,7 @@ describe("github_project_unlink", () => {
   })
 
   test("declares its board and repository as what it writes to", () => {
-    expect(projectUnlink).toMatchObject({ class: "idempotent", targets: { project: "board", repo: "repo" } })
+    expect(projectUnlink).toMatchObject({ class: "idempotent" })
+    expect(targetKinds(projectUnlink.targets)).toEqual({ project: "board", repo: "repo" })
   })
 })

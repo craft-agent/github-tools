@@ -11,6 +11,7 @@ import { ATTACH_MIN_GH_VERSION, ensureGhAtLeast, gh } from "../gh"
 import { REPO_DESCRIPTION, given, invalid, lastUrl, writableContext } from "../write-support"
 import { stepErrorsSchema } from "../projects/item-support"
 import { parseNumberRef } from "../refs"
+import { githubTargets } from "../github/targets"
 import { StepErrors, defineTool } from "../tool"
 import { stateFact } from "../write-facts"
 import { PR_DESCRIPTION, PR_TARGETS, describedPull, settleUpload } from "./write-support"
@@ -46,7 +47,7 @@ export const prComment = defineTool({
   ].join(" "),
   toolset: "pull_requests",
   class: "add",
-  targets: PR_TARGETS,
+  targets: githubTargets(PR_TARGETS),
   async describe(args, ctx) {
     if (!given(args.body)) throw invalid("body cannot be blank.")
     const { heading } = await describedPull(args, ctx)

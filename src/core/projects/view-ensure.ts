@@ -9,6 +9,7 @@ import {
 } from "../github/board-view-setup"
 import { boardViewSchema, readBoardViews } from "../github/board-fields"
 import { assertBoardWritable, resolveBoard, sameTitle } from "../github/projects"
+import { githubTargets } from "../github/targets"
 import { defineTool, type CallFact, type CallValue } from "../tool"
 import { ALREADY_THERE } from "./describe-support"
 import { BOARD_LOOKUP_NOTE, BOARD_SELECTION, PROJECT_SCOPE_NOTE, boardSummary, boardSummarySchema } from "./support"
@@ -55,7 +56,7 @@ export const projectViewEnsure = defineTool({
   ].join(" "),
   toolset: "projects",
   class: "idempotent",
-  targets: { project: "board" },
+  targets: githubTargets({ project: "board" }),
   async describe(args, ctx) {
     const request = checkViewRequest(args)
     const { project } = await resolveBoard(args, ctx)

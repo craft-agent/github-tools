@@ -2,6 +2,7 @@ import { z } from "zod"
 import { patchRepository, readAdministeredRepository } from "../github/repos"
 import { REPO_DESCRIPTION, invalid } from "../write-support"
 import { resolveRepo } from "../refs"
+import { githubTargets } from "../github/targets"
 import { confirmWrite, defineTool } from "../tool"
 import { describedRepo, repoHeadline, visibilityFact } from "./describe-support"
 
@@ -13,7 +14,7 @@ export const repoArchive = defineTool({
     "Archive a repository, which makes it read-only: no pushes, issues, pull requests or comments until github_repo_unarchive lifts it. Needs admin permission; refuses a repository that is archived already, before writing.",
   toolset: "repos",
   class: "administrative",
-  targets: { repo: "repo" },
+  targets: githubTargets({ repo: "repo" }),
   async describe(args, ctx) {
     const { view } = await describedRepo(args, ctx)
     if (view.archived) throw invalid(`${view.repo} is archived already.`)

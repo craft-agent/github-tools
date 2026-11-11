@@ -29,6 +29,7 @@ import {
 } from "../projects/item-support"
 import { BOARD_LOOKUP_NOTE, PROJECT_SCOPE_NOTE, boardSummary, boardSummarySchema } from "../projects/support"
 import { resolveRepo, type RepoName } from "../refs"
+import { githubTargets } from "../github/targets"
 import { StepErrors, defineTool, type CallFact, type ToolContext } from "../tool"
 import { changeFact } from "../write-facts"
 import { editIssue, milestoneFact, setKind } from "./write-support"
@@ -141,7 +142,7 @@ export const issueCreate = defineTool({
   ].join(" "),
   toolset: "issues",
   class: "add",
-  targets: { repo: "repo", parent: "issue", blocked_by: "issues", project: "optional_board" },
+  targets: githubTargets({ repo: "repo", parent: "issue", blocked_by: "issues", project: "optional_board" }),
   async describe(args, ctx) {
     const title = given(args.title)
     if (!title) throw invalid("title cannot be blank.")

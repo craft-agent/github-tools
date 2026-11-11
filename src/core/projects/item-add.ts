@@ -7,6 +7,7 @@ import { readBlockedBy, readIssueHeading } from "../github/issues"
 import { assertBoardWritable, resolveBoard } from "../github/projects"
 import { readPullRequestHeading } from "../github/pull-requests"
 import { parseNumberRef, type RepoName } from "../refs"
+import { githubTargets } from "../github/targets"
 import { StepErrors, defineTool, type ToolContext } from "../tool"
 import { fieldsFact } from "./describe-support"
 import {
@@ -69,7 +70,7 @@ export const projectItemAdd = defineTool({
   ].join(" "),
   toolset: "projects",
   class: "idempotent",
-  targets: { project: "board" },
+  targets: githubTargets({ project: "board" }),
   async describe(args, ctx) {
     const ref = await parseNumberRef(args.item, args.repo, ctx)
     const { project } = await resolveBoard(args, ctx)

@@ -14,6 +14,7 @@ import {
   writeRules,
 } from "../../testing/write-fixtures"
 import { writeHarness } from "../../testing/write-harness"
+import { targetKinds } from "../github/targets"
 import { projectItemConvert } from "./item-convert"
 
 const { use, run } = writeHarness(projectItemConvert)
@@ -163,10 +164,7 @@ describe("before anything is written", () => {
 })
 
 test("declares its item and repository as what it writes to", () => {
-  expect(projectItemConvert).toMatchObject({
-    class: "add",
-    toolset: "projects",
-    targets: { item: "item", repo: "repo" },
-  })
+  expect(projectItemConvert).toMatchObject({ class: "add", toolset: "projects" })
+  expect(targetKinds(projectItemConvert.targets)).toEqual({ item: "item", repo: "repo" })
   expect(projectItemConvert.description).toContain("gh auth refresh -s project")
 })

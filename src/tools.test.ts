@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import type { TargetKind } from "./core"
+import { targetKinds, type TargetKind } from "./core"
 import { PROJECT } from "./project"
 import { ALL_TOOLS } from "./tools"
 
@@ -121,17 +121,26 @@ describe("the registry's write tools", () => {
     expect(writeTools.map((spec) => spec.id).sort()).toEqual(Object.keys(EXPECTED_TARGETS).sort())
   })
 
+  test("every declared target is an argument of the tool", () => {
+    const unknown = writeTools.flatMap((spec) =>
+      Object.keys(targetKinds(spec.targets) ?? {})
+        .filter((name) => !Object.hasOwn(spec.input.shape, name))
+        .map((name) => `${spec.id}.${name}`),
+    )
+    expect(unknown).toEqual([])
+  })
+
   test("no argument that looks like it names a repository is left undeclared", () => {
     const undeclared = writeTools.flatMap((spec) =>
       Object.keys(spec.input.shape)
         .filter((name) => REPOSITORY_LIKE.test(name))
-        .filter((name) => !(name in (spec.targets ?? {})) && !(name in (NOT_TARGETS[spec.id] ?? {})))
+        .filter((name) => !(name in (targetKinds(spec.targets) ?? {})) && !(name in (NOT_TARGETS[spec.id] ?? {})))
         .map((name) => `${spec.id}.${name}`),
     )
     expect(undeclared).toEqual([])
   })
 
   test.each(Object.entries(EXPECTED_TARGETS))("%s declares exactly its pinned targets", (id, expected) => {
-    expect(ALL_TOOLS.find((spec) => spec.id === id)?.targets).toEqual(expected)
+    expect(targetKinds(ALL_TOOLS.find((spec) => spec.id === id)?.targets)).toEqual(expected)
   })
 })
