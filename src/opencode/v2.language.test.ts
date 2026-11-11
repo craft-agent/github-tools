@@ -7,6 +7,7 @@ import {
   JAPANESE_ADD,
   JAPANESE_LABEL,
   LABEL_ID,
+  PROFILE,
   TRANSLATIONS,
   fixtureSpecs,
 } from "./testing"
@@ -34,8 +35,8 @@ async function asserted(
     tool: { transform: async (callback) => callback({ add: (tool) => tools.set(tool.name, tool) }) },
     skill: { transform: async () => {} },
   }
-  await createV2Setup(fixtureSpecs([]), { env, translations })(ctx)
-  await tools.get(id)!.execute({ repo: "Octo/Hello" }, { sessionID: SESSION_ID, signal: new AbortController().signal })
+  await createV2Setup(fixtureSpecs([]), { env, profile: PROFILE, translations })(ctx)
+  await tools.get(id)!.execute({ area: "north" }, { sessionID: SESSION_ID, signal: new AbortController().signal })
   return asserts[0]!
 }
 
@@ -52,8 +53,8 @@ describe("V2 permission prompt in a language", () => {
   })
 
   test("the environment variable sets the language, and the option wins over it", async () => {
-    expect((await asserted({}, { GITHUB_TOOLS_LANGUAGE: "ja" })).metadata?.message).toBe(JAPANESE_ADD)
-    expect((await asserted({ language: "en" }, { GITHUB_TOOLS_LANGUAGE: "ja" })).metadata?.message).toBe(ENGLISH_ADD)
+    expect((await asserted({}, { DEMO_LANGUAGE: "ja" })).metadata?.message).toBe(JAPANESE_ADD)
+    expect((await asserted({ language: "en" }, { DEMO_LANGUAGE: "ja" })).metadata?.message).toBe(ENGLISH_ADD)
   })
 
   test("an unknown language, a blank one and none keep today's English", async () => {
@@ -65,7 +66,7 @@ describe("V2 permission prompt in a language", () => {
 
   test("a package without translations still has the plugin's own words in Japanese", async () => {
     const request = await asserted({ language: "ja" }, {}, ADD_ID, {})
-    expect(request.metadata?.message).toBe(`Title of ${ADD_ID}\n\n--- 詳細 ---\n\n対象: octo/hello`)
+    expect(request.metadata?.message).toBe(`Title of ${ADD_ID}\n\n--- 詳細 ---\n\n対象: north`)
   })
 
   test("a language option that is not text is the invalid option error", async () => {

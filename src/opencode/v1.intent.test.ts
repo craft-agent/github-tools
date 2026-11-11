@@ -10,6 +10,7 @@ import {
   JAPANESE_ADD,
   JAPANESE_INTENT,
   JAPANESE_INTENT_LABEL,
+  PROFILE,
   TRANSLATIONS,
   fixtureSpecs,
   intentSpecs,
@@ -31,9 +32,10 @@ async function message(id: string, language?: string): Promise<string> {
   }
   const { tool } = await createV1Server([...fixtureSpecs([]), ...intentSpecs([])], {
     env: {},
+    profile: PROFILE,
     translations,
   })({}, language === undefined ? {} : { language })
-  await tool[id]!.execute({ repo: "Octo/Hello" }, context)
+  await tool[id]!.execute({ area: "north" }, context)
   return String(asks[0]?.metadata.message)
 }
 

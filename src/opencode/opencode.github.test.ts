@@ -13,6 +13,15 @@ test("the package ships the github-issues skill", async () => {
   expect(shipped.map((skill) => skill.id)).toContain("github-issues")
 })
 
+test("the package profile reads GITHUB_TOOLS_TOOLSETS and GITHUB_TOOLS_READ_ONLY", async () => {
+  const { tool } = await createV1Server(ALL_TOOLS, {
+    env: { GITHUB_TOOLS_TOOLSETS: "releases", GITHUB_TOOLS_READ_ONLY: "true" },
+  })({}, {})
+  expect(Object.keys(tool)).toEqual(
+    ALL_TOOLS.filter((spec) => spec.toolset === "releases" && spec.class === "read").map((spec) => spec.id),
+  )
+})
+
 const fixture = defineTool({
   id: "github_issue_comment",
   title: "Comment",
@@ -31,7 +40,13 @@ afterEach(() => {
 })
 
 for (const version of ["V1", "V2"] as const) {
-  async function asked(args: Record<string, unknown>, cwd: string, ownDir?: string, realId?: string) {
+  async function asked(
+    args: Record<string, unknown>,
+    cwd: string,
+    ownDir?: string,
+    realId?: string,
+    env: Record<string, string | undefined> = {},
+  ) {
     const requests: V1AskRequest[] = []
     const stop = new Error("stopped at the question")
     const record = async (request: V1AskRequest) => {
@@ -43,7 +58,7 @@ for (const version of ["V1", "V2"] as const) {
     const signal = new AbortController().signal
     let pending: Promise<unknown>
     if (version === "V1") {
-      const { tool } = await createV1Server(specs, { env: {}, ownDir })({}, {})
+      const { tool } = await createV1Server(specs, { env, ownDir })({}, {})
       const context: V1ToolContext = { directory: cwd, worktree: cwd, abort: signal, ask: record }
       pending = tool[id]!.execute(args, context)
     } else {
@@ -62,7 +77,7 @@ for (const version of ["V1", "V2"] as const) {
         tool: { transform: async (callback) => callback({ add: (tool) => tools.set(tool.name, tool) }) },
         skill: { transform: async () => {} },
       }
-      await createV2Setup(specs, { env: {}, ownDir })(ctx)
+      await createV2Setup(specs, { env, ownDir })(ctx)
       pending = tools.get(id)!.execute(args, { sessionID: "ses_1", signal })
     }
     if (realId !== undefined) await expect(pending).rejects.toBe(stop)
@@ -71,6 +86,13 @@ for (const version of ["V1", "V2"] as const) {
   }
 
   describe(`${version} GitHub permissions`, () => {
+    test("the package profile reads GITHUB_TOOLS_LANGUAGE", async () => {
+      const request = await asked({ repo: "Octo/Hello" }, "/work/project", undefined, undefined, {
+        GITHUB_TOOLS_LANGUAGE: "ja",
+      })
+      expect(request.metadata.message).toContain("対象: octo/hello")
+    })
+
     test("uses the origin, a qualified issue or every repository the call writes to", async () => {
       const repo = tempRepo("git@github.com:Octo/Hello.git")
       cleanups.push(repo.cleanup)
