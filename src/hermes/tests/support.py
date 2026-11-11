@@ -98,13 +98,13 @@ def tool_entry(tool_id: str, toolset: str, write_class: str, title: str | None =
 
 
 LISTING = [
-    tool_entry("github_issue_read", "issues", "read"),
-    tool_entry("github_issue_comment", "issues", "add", "Comment on an issue"),
-    tool_entry("github_pr_merge", "pull_requests", "administrative", "Merge a pull request"),
-    tool_entry("github_project_item_add", "projects", "add"),
-    tool_entry("github_repo_edit", "repos", "overwrite"),
-    tool_entry("github_release_publish", "releases", "administrative"),
-    tool_entry("github_run_rerun", "actions", "idempotent"),
+    tool_entry("demo_thing_read", "things", "read"),
+    tool_entry("demo_thing_create", "things", "add", "Create a thing"),
+    tool_entry("demo_widget_update", "widgets", "administrative", "Update a widget"),
+    tool_entry("demo_item_add", "items", "add"),
+    tool_entry("demo_gadget_edit", "gadgets", "overwrite"),
+    tool_entry("demo_bundle_publish", "bundles", "administrative"),
+    tool_entry("demo_task_run", "tasks", "idempotent"),
 ]
 
 

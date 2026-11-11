@@ -106,8 +106,8 @@ class ProcessGroupTest(FakeCliCase):
 
     def run_until_timeout(self, **reply: Any) -> dict[str, Any]:
         self.addCleanup(self.kill_leftovers)
-        self.reply("run github_issue_comment", sleep=30, pid_dir=str(self.dir), **reply)
-        handler = self.register().tools["github_issue_comment"]["handler"]
+        self.reply("run demo_thing_create", sleep=30, pid_dir=str(self.dir), **reply)
+        handler = self.register().tools["demo_thing_create"]["handler"]
         started = time.monotonic()
         with mock.patch.object(tools, "RUN_TIMEOUT_SECONDS", 0.5), mock.patch.object(
             runtime, "TERMINATE_GRACE_SECONDS", 0.5
