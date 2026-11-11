@@ -206,10 +206,11 @@ function errorDetail(error: unknown): string {
  * (`{"details", "target", "more", "more_character", "more_characters"}`, the
  * last two the notices of characters left out, with a `{count}` placeholder)
  * in the prompt language, plus a `description` when the tool gives one:
- * `{"headline"?: string, "facts": [{"label", "value", "omitted"?}], "text"?: {"label", "body", "omitted"?}}`,
+ * `{"headline"?: string, "facts": [{"label", "value", "omitted"?}], "dropped"?, "text"?: {"label", "body", "omitted"?}}`,
  * as the approval prompt shows it (the words translated, the headline
  * rendered, hidden characters marked; `omitted` is the number of code points
- * a cut value or text left out, present only when it is above zero), and a `pin` (64 hex digits, independent of the
+ * a cut value or text left out, and `dropped` the number of facts left out
+ * past the eighth, each present only when it is above zero), and a `pin` (64 hex digits, independent of the
  * language) of that description and the resources when there is a description.
  * `target` takes `--language <tag>`, else `GITHUB_TOOLS_LANGUAGE`, else
  * `--harness-language <tag>` (the harness's own
