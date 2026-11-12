@@ -49,6 +49,7 @@ export {
   type CallText,
   type CallValue,
   type ConfirmRequest,
+  type OptionSpec,
   type OptionType,
   type ToolAnnotations,
   type ToolContext,
