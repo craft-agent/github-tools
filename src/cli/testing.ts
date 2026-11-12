@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { ToolError, abortError, defineTool, isWithin, type ToolSpec, type Translations, type WriteClass } from "../core"
 import type { EntryProfile } from "../entry/profile"
+import { NOTE_OPTION } from "../entry/options.testing"
 import { runCli, type CliIo } from "./cli"
 
 /** Fixtures the command-line tests share. */
@@ -8,6 +9,7 @@ import { runCli, type CliIo } from "./cli"
 /** The profile the test command lines are built with: `alpha` is on by default, `beta` is not. */
 export const PROFILE: EntryProfile = {
   envPrefix: "DEMO",
+  options: { [NOTE_OPTION]: "text" },
   toolsets: { names: ["alpha", "beta"], defaults: ["alpha"] },
 }
 

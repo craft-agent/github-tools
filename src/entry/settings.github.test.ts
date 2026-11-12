@@ -25,6 +25,7 @@ describe("the package settings profile", () => {
       tools: ["github_repo_read"],
       exclude_tools: ["github_pr_merge"],
       confirm: "elicitation",
+      options: {},
     })
     expect(languageVariable()).toBe("GITHUB_TOOLS_LANGUAGE")
     expect(settingsFromOptions({}, env).language).toBe("ja")
@@ -54,6 +55,7 @@ describe("the package settings profile", () => {
       read_only: true,
       tools: ["github_repo_read"],
       exclude_tools: ["github_pr_merge"],
+      options: {},
     })
   })
 })
