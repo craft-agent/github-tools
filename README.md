@@ -91,8 +91,9 @@ codex plugin add github-tools@craft-agent
 
 Codex turns `-` into `_` in server names, so it shows the tools as
 `mcp__github_tools__github_issue_*`. It starts the MCP server in the plugin's
-install directory, so name issues as `owner/repo#N` or pass `repo` (a bare number
-fails there with a message saying so).
+install directory and passes no roots, so the server takes each call's directory
+from what Codex sends with the call: its sandbox state, which the server asks
+for, else the one workspace it names.
 
 ### Grok Build
 
