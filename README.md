@@ -469,17 +469,17 @@ with; see [Settings](#settings) before changing the job's variables.
 Every entry point takes the same settings. A flag wins over its environment
 variable, and an option or setting wins over the variable too.
 
-| Setting         | Flag              | Variable                     | Meaning                                                                                                                          |
-| --------------- | ----------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `toolsets`      | `--toolsets`      | `GITHUB_TOOLS_TOOLSETS`      | `issues`, `pull_requests`, `projects`, `repos`, `releases`, `actions` or `all`; default `issues`, `pull_requests` and `projects` |
-| `read_only`     | `--read-only`     | `GITHUB_TOOLS_READ_ONLY`     | registers no tool that writes; wins over every other setting                                                                     |
-| `unattended`    | `--unattended`    | `GITHUB_TOOLS_UNATTENDED`    | no person can answer: a write runs only under a grant that covers it; off by default                                             |
-| `grants_dir`    | `--grants-dir`    | `GITHUB_TOOLS_GRANTS_DIR`    | where grants and their use are kept; default `$XDG_STATE_HOME/github-tools/grants`, else `~/.local/state/github-tools/grants`    |
-| `tools`         | `--tools`         | `GITHUB_TOOLS_TOOLS`         | single tools to add by ID, whatever their toolset                                                                                |
-| `exclude_tools` | `--exclude-tools` | `GITHUB_TOOLS_EXCLUDE_TOOLS` | single tools to remove by ID; wins over `tools` and `toolsets`                                                                   |
-| `confirm`       | `--confirm`       | `GITHUB_TOOLS_CONFIRM`       | MCP server only: `harness` (default) or `elicitation`, as the conventions say                                                    |
-| `language`      | `--language`      | `GITHUB_TOOLS_LANGUAGE`      | native plugins only: the approval prompt's language, such as `ja`                                                                |
-| `emoji`         | —                 | —                            | Hermes only: the emoji shown beside each toolset, by toolset name (`""` for none)                                                |
+| Setting         | Flag              | Variable                     | Meaning                                                                                                                                    |
+| --------------- | ----------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `toolsets`      | `--toolsets`      | `GITHUB_TOOLS_TOOLSETS`      | `issues`, `pull_requests`, `projects`, `repos`, `releases`, `actions`, `grants` or `all`; default `issues`, `pull_requests` and `projects` |
+| `read_only`     | `--read-only`     | `GITHUB_TOOLS_READ_ONLY`     | registers no tool that writes; wins over every other setting                                                                               |
+| `unattended`    | `--unattended`    | `GITHUB_TOOLS_UNATTENDED`    | no person can answer: a write runs only under a grant that covers it; off by default                                                       |
+| `grants_dir`    | `--grants-dir`    | `GITHUB_TOOLS_GRANTS_DIR`    | where grants and their use are kept; default `$XDG_STATE_HOME/github-tools/grants`, else `~/.local/state/github-tools/grants`              |
+| `tools`         | `--tools`         | `GITHUB_TOOLS_TOOLS`         | single tools to add by ID, whatever their toolset                                                                                          |
+| `exclude_tools` | `--exclude-tools` | `GITHUB_TOOLS_EXCLUDE_TOOLS` | single tools to remove by ID; wins over `tools` and `toolsets`                                                                             |
+| `confirm`       | `--confirm`       | `GITHUB_TOOLS_CONFIRM`       | MCP server only: `harness` (default) or `elicitation`, as the conventions say                                                              |
+| `language`      | `--language`      | `GITHUB_TOOLS_LANGUAGE`      | native plugins only: the approval prompt's language, such as `ja`                                                                          |
+| `emoji`         | —                 | —                            | Hermes only: the emoji shown beside each toolset, by toolset name (`""` for none)                                                          |
 
 `GITHUB_TOOLS_GRANT_KEY` is a variable only, never a flag or a plugin
 option. Use at least 32 characters, for example from `openssl rand -hex 32`,
