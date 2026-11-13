@@ -1,6 +1,6 @@
 {
   "name": "@craftsamo/github-tools",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "GitHub tools for coding agents: issues, boards, pull requests, repositories, releases and Actions.",
   "author": "craftsamo",
   "license": "LicenseRef-AGPL-3.0-Commons-Clause",
