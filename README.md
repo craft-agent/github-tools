@@ -301,9 +301,11 @@ Hermes. A new release is always a draft; assets are not covered yet.
 The toolset is off by default: add `actions` to `toolsets`. The skill is
 [`github-actions`](skills/github-actions/SKILL.md), shown as
 `github-tools:github-actions` in Claude Code and `github-tools:actions` in
-Hermes. Every Actions write asks each time, since a workflow can deploy or
-publish whatever its name says. Enabling or disabling a workflow, deleting a
-run and downloading artifacts are not covered yet.
+Hermes. In an attended run, every Actions write asks each time, since a
+workflow can deploy or publish whatever its name says. An unattended job can
+instead use a person's [grant](#writes-no-one-is-there-to-approve). Enabling
+or disabling a workflow, deleting a run and downloading artifacts are not
+covered yet.
 
 ### Planning
 

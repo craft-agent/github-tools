@@ -21,12 +21,17 @@ tool meant here.
 | `github_run_rerun`     | re-runs a finished run: its failed jobs, every job, or one job          | administrative |
 | `github_run_cancel`    | cancels a queued or running run                                         | administrative |
 
-**Every write here asks every time**, even where other writes are allowed: a
-workflow can deploy, publish or spend money whatever its name says, and a run
-stopped halfway can leave a deploy half done. Before one, say to the user
-exactly which workflow or run, in which repository, and on which branch, and
-call it only once they agree. The tools' own confirmation says it again where
+**In an attended run, every write here asks every time**, even where other
+writes are allowed: a workflow can deploy, publish or spend money whatever its
+name says, and a run stopped halfway can leave a deploy half done. Before one,
+say to the user exactly which workflow or run, in which repository, and on
+which branch, and call it only once they agree. The tools' own confirmation says it again where
 the host shows one.
+
+For an unattended job, a person can instead delegate the write in advance
+with `github_grant_create`. With `GITHUB_TOOLS_UNATTENDED=true`, the call needs
+a covering grant and the host must still allow it. The grant can limit the
+repository, rate and expiry, but not the workflow, run, branch or inputs.
 
 For a pull request's checks, read them with `github_pr_read` `method:
 "checks"`: it waits for them and returns the failed jobs' logs. A job or run
