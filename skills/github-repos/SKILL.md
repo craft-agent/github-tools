@@ -35,12 +35,17 @@ ending in `github_repo_…`, `github_label_…`, `github_milestone_…` or
 | `github_ruleset_delete`   | deletes a ruleset                                                | administrative |
 
 A write usually waits for the host's approval, which names the repository
-(`owner/name`). **An administrative change asks every time**, even where other
-writes are allowed: creating a repository (it can be public), visibility,
-archiving, deleting a label, and every ruleset write. Before one, say to the
-user exactly what will change and on which repository, and call it only once
-they agree. The tools' own confirmation says it again where the host shows
-one.
+(`owner/name`). **In an attended run, an administrative change asks every
+time**, even where other writes are allowed: creating a repository (it can be
+public), visibility, archiving, deleting a label, and every ruleset write.
+Before one, say to the user exactly what will change and on which repository,
+and call it only once they agree. The tools' own confirmation says it again
+where the host shows one.
+
+For an unattended job, a person can instead delegate the write in advance
+with `github_grant_create`. With `GITHUB_TOOLS_UNATTENDED=true`, the call needs
+a covering grant and the host must still allow it. The grant can limit the
+repository, rate and expiry, but not the settings, label, milestone or ruleset.
 
 Deleting, renaming, transferring or forking a repository is not done here.
 Say what the user should do, and they do it themselves.

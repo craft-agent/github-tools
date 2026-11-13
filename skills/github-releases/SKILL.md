@@ -21,11 +21,16 @@ before it); the part ending in `github_release_…` is the tool meant here.
 | `github_release_delete`  | deletes a release and its assets; the tag stays               | administrative |
 
 A write usually waits for the host's approval, which names the repository
-(`owner/name`). **Publishing and deleting ask every time**, even where other
-writes are allowed. Before one, say to the user exactly which release and
-repository will change, and call it only once they agree. Publishing makes
-the release public and notifies watchers; deleting cannot be undone. The
-tools' own confirmation says it again where the host shows one.
+(`owner/name`). **In an attended run, publishing and deleting ask every time**,
+even where other writes are allowed. Before one, say to the user exactly which
+release and repository will change, and call it only once they agree.
+Publishing makes the release public and notifies watchers; deleting cannot be
+undone. The tools' own confirmation says it again where the host shows one.
+
+For an unattended job, a person can instead delegate the write in advance
+with `github_grant_create`. With `GITHUB_TOOLS_UNATTENDED=true`, the call needs
+a covering grant and the host must still allow it. The grant can limit the
+repository, rate and expiry, but not the release, tag or notes.
 
 Uploading, downloading and deleting individual assets are not covered here.
 

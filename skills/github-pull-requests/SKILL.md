@@ -28,9 +28,15 @@ ending in `github_pr_…` or `github_stack_…` is the tool meant here.
 
 A write usually waits for the host's approval, which names the repository
 (`owner/name`), plus the board when `github_pr_create` puts the pull request on
-one. **Merging always asks**, even where other writes are allowed: confirm with
-the user which pull request, which method and whether lower layers go along
-before calling `github_pr_merge`.
+one. **In an attended run, merging always asks**, even where other writes are
+allowed: confirm with the user which pull request, which method and whether
+lower layers go along before calling `github_pr_merge`.
+
+For an unattended job, a person can instead delegate the write in advance
+with `github_grant_create`. With `GITHUB_TOOLS_UNATTENDED=true`, the call needs
+a covering grant and the host must still allow it. The grant can limit the
+repository (and a board for creation), rate and expiry, but not the pull
+request, commit, merge method, stack layers or attachments.
 
 These tools never push and never commit. Push the branch first, with the git
 tools or `git push`, and keep the commit it pushed: that is the `head_sha` the
