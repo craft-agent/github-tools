@@ -31,8 +31,8 @@ describe("the package settings profile", () => {
     expect(settingsFromOptions({}, env).language).toBe("ja")
   })
 
-  test("defines the six toolsets, three defaults and all", () => {
-    const names = ["issues", "pull_requests", "projects", "repos", "releases", "actions"]
+  test("defines the seven toolsets, three defaults and all", () => {
+    const names = ["issues", "pull_requests", "projects", "repos", "releases", "actions", "grants"]
     expect(PROJECT_PROFILE.toolsets.names).toEqual(names)
     expect(PROJECT_PROFILE.toolsets.defaults).toEqual(["issues", "pull_requests", "projects"])
     expect(parseSettings(["--toolsets", names.join(",")], {}).toolsets).toEqual(names)
