@@ -10,6 +10,7 @@ import { NOTE_OPTION } from "../entry/options.testing"
 
 /** The profile the test plugins are built with: `alpha` is on by default, `beta` is not. */
 export const PROFILE: EntryProfile = {
+  name: "demo-tools",
   envPrefix: "DEMO",
   options: { [NOTE_OPTION]: "text" },
   toolsets: { names: ["alpha", "beta"], defaults: ["alpha"] },
